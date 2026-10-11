@@ -106,6 +106,9 @@ struct PopoverView: View {
             }
             .buttonStyle(RowButtonStyle())
 
+            menuRow(l10n.diskCleanup, icon: "trash") {
+                (NSApp.delegate as? AppDelegate)?.showMainWindow(selecting: .diskCleanup)
+            }
             menuRow(l10n.settingsEllipsis, icon: "gearshape") {
                 withAnimation(.easeOut(duration: 0.2)) { showSettings = true }
             }

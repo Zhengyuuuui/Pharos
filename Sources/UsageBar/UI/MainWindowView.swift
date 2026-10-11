@@ -3,12 +3,20 @@ import UsageBarCore
 
 struct MainWindowView: View {
     @EnvironmentObject var store: ProjectStore
+    @ObservedObject private var cleanup = CleanupStoreHolder.shared
     @ObservedObject private var l10n = L10n.shared
     @State private var selection: SidebarItem?
+    /// Entry point from the menu-bar popover (e.g. "Disk Cleanup").
+    private let initialSelection: SidebarItem?
+
+    init(initialSelection: SidebarItem? = nil) {
+        self.initialSelection = initialSelection
+    }
 
     enum SidebarItem: Hashable {
         case systemMemory
         case portsOverview
+        case diskCleanup
         case project(String)
         case settings
     }
@@ -35,6 +43,14 @@ struct MainWindowView: View {
                             .foregroundStyle(.secondary)
                     }
                     .tag(SidebarItem.portsOverview)
+                    HStack {
+                        Label(l10n.diskCleanup, systemImage: "trash")
+                        Spacer()
+                        Text(ByteFormat.short(cleanup.totalBytes))
+                            .font(.system(size: 10).monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                    .tag(SidebarItem.diskCleanup)
                 }
                 Section(l10n.projects) {
                     ForEach(store.projects) { project in
@@ -80,6 +96,8 @@ struct MainWindowView: View {
                 SystemMemoryView()
             case .portsOverview:
                 PortsOverviewView { selection = .project($0.id) }
+            case .diskCleanup:
+                CleanupView()
             case .project(let id):
                 if let project = store.project(id: id) {
                     ProjectDetailView(project: project)
@@ -102,9 +120,8 @@ struct MainWindowView: View {
         .frame(minWidth: 860, minHeight: 560)
         .onAppear {
             store.viewAppeared()
-            if selection == nil { selection = .portsOverview }
-        }
-        .onDisappear { store.viewDisappeared() }
+            if selection == nil { selection = initialSelection ?? .portsOverview }
+        }        .onDisappear { store.viewDisappeared() }
     }
 }
 

@@ -37,6 +37,13 @@ After a day of work you end up with a pile of `npm run dev`, `python -m http.ser
 - Projects / ports / exposed ports / total dev memory at a glance
 - Port map chart (log scale, ◆ = exposed), memory-by-project bars, stacked dev-memory trend
 
+**Disk Cleanup**
+- **Pinned "Temp files" group** on top: `/tmp`, `/var/tmp`, and your `/var/folders/…/T` and `…/C` — where AI agents, CLIs and build tools constantly write scratch files. One **Clean Temp Files** button, plus an adjustable retention (keep files newer than none / 1 h / 6 h / 1 day / 3 days; default 1 day, saved across restarts), meant for cleaning every day or two
+- Other caches in collapsible groups, each with its own **Clean Group** button: App caches (`~/Library/Caches`), Xcode & Apple toolchain (DerivedData, Archives, DeviceSupport, Simulator, SwiftPM, CocoaPods), Package managers (npm, pnpm, uv, pip, Gradle, Maven, Cargo, rustup, Go, Homebrew)
+- Every location also has its own **Clean** button; **Clean Everything** cleans all groups at once. All destructive buttons need a second click to confirm. Decided file by file: only your own regular files older than the retention window are deleted; sockets, FIFOs, symlinks and other users' files are left alone; emptied subfolders are removed, the target folder itself is kept
+- The size shown uses the exact same rule as the clean, so it's what you'll actually get back; a result banner reports freed space or why nothing could be freed
+- Nested dev caches (SwiftPM, pip, Go…) under `~/Library/Caches` get their own rows and are excluded from the parent's size — no double counting
+
 **General**
 - English / 简体中文, switchable live
 - Refresh every 2 / 5 / 10 / 30 s while a window is visible; low-frequency (30 s) background sampling keeps 1 hour of history
@@ -121,6 +128,13 @@ swift build
 **端口总览**
 - 项目数 / 端口数 / 对外暴露端口数 / 开发项目总内存
 - 端口分布图（对数轴，◆ = 对外暴露）、各项目内存柱状图、开发项目内存堆叠趋势
+
+**磁盘清理**
+- **置顶的「临时文件」组**：`/tmp`、`/var/tmp`、你的 `/var/folders/…/T` 和 `…/C`——AI 助手、命令行工具和构建工具不断往这里写临时文件。一个**一键清理临时文件**按钮，加可调的保留期（保留最近：不保留 / 1 小时 / 6 小时 / 1 天 / 3 天；默认 1 天，重启后保留设置），适合每 1–2 天清理一次
+- 其他缓存按组折叠显示，每组有**清理本组**按钮：应用缓存（`~/Library/Caches`）、Xcode 与 Apple 工具链（DerivedData、Archives、DeviceSupport、模拟器、SwiftPM、CocoaPods）、包管理器缓存（npm、pnpm、uv、pip、Gradle、Maven、Cargo、rustup、Go、Homebrew）
+- 每个位置也有单独的**清理**按钮；**全部清理**一次清理所有组。所有删除按钮都要点两次确认。按单个文件判断：只删属于你、超过保留期的普通文件；socket、FIFO、符号链接和其他用户的文件不动；删空的子目录会回收，目标目录本身保留
+- 显示的体积与清理用同一条规则，看到多少就能释放多少；结果横幅会显示释放了多少，或说明为什么没能释放
+- `~/Library/Caches` 下嵌套的开发缓存（SwiftPM、pip、Go…）单列一行，并从父目录体积中排除——不会重复计数
 
 **通用**
 - 中文 / English 即时切换

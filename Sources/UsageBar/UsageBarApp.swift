@@ -20,11 +20,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         return true
     }
 
-    func showMainWindow() {
+    func showMainWindow(selecting select: MainWindowView.SidebarItem? = nil) {
         NSApp.setActivationPolicy(.regular)
         if window == nil {
             let hosting = NSHostingController(
-                rootView: MainWindowView().environmentObject(store)
+                rootView: MainWindowView(initialSelection: select).environmentObject(store)
             )
             let w = NSWindow(contentViewController: hosting)
             w.title = "UsageBar"

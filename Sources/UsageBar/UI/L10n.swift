@@ -169,6 +169,124 @@ final class L10n: ObservableObject {
         en ? "Only works from the installed app (/Applications)."
            : "仅在已安装的应用（/Applications）中可用。"
     }
+
+    // MARK: - Disk cleanup
+
+    var diskCleanup: String { en ? "Disk Cleanup" : "磁盘清理" }
+    var cleanupIntro: String {
+        en ? "Frees disk space, not RAM. Sizes count only your own regular files older than each location's retention window — exactly what a clean can delete. System/other users' files, sockets and symlinks are never touched; folders themselves are kept."
+           : "释放的是磁盘空间，不是内存。体积只统计超过保留期且属于你自己的普通文件——也就是清理时真正能删的部分。系统或其他用户的文件、socket、符号链接不会被动；文件夹本身保留。"
+    }
+    var cleanupScan: String { en ? "Rescan" : "重新扫描" }
+    var cleanEverything: String { en ? "Clean Everything" : "全部清理" }
+    func cleanEverythingHelp(_ size: String) -> String {
+        en ? "Cleans every location below (\(size)), including long-lived caches like Xcode and npm."
+           : "清理下面所有位置（\(size)），包括 Xcode、npm 等长期缓存。"
+    }
+    var cleanTemp: String { en ? "Clean Temp Files" : "一键清理临时文件" }
+    var cleanGroup: String { en ? "Clean Group" : "清理本组" }
+    var cleanRow: String { en ? "Clean" : "清理" }
+    var confirmClean: String { en ? "Confirm" : "确认清理" }
+    var cleaning: String { en ? "Cleaning…" : "清理中…" }
+    var scanning: String { en ? "Scanning…" : "扫描中…" }
+    var otherCaches: String { en ? "Other caches (clean occasionally)" : "其他缓存（偶尔清理）" }
+    func locationCount(_ n: Int) -> String { en ? "\(n) locations" : "\(n) 个位置" }
+    var tempGroupHint: String {
+        en ? "/tmp, /var/tmp and your /var/folders T & C dirs — where AI agents, CLIs and build tools keep writing scratch files."
+           : "/tmp、/var/tmp 以及 /var/folders 下你的 T、C 目录——AI 助手、命令行工具和构建工具不断往这里写临时文件。"
+    }
+    var keepNewerThan: String { en ? "Keep files newer than" : "保留最近" }
+    func retentionLabel(hours: Int) -> String {
+        switch hours {
+        case 0: return en ? "None" : "不保留"
+        case 1: return en ? "1 h" : "1 小时"
+        case 24: return en ? "1 day" : "1 天"
+        case let h where h % 24 == 0: return en ? "\(h / 24) days" : "\(h / 24) 天"
+        default: return en ? "\(hours) h" : "\(hours) 小时"
+        }
+    }
+
+    func groupTitle(_ group: DiskCleaner.Group) -> String {
+        switch group {
+        case .temp: return en ? "Temp files" : "临时文件"
+        case .appCaches: return en ? "App caches" : "应用缓存"
+        case .apple: return en ? "Xcode & Apple toolchain" : "Xcode 与 Apple 工具链"
+        case .packages: return en ? "Package managers" : "包管理器缓存"
+        }
+    }
+
+    func groupIcon(_ group: DiskCleaner.Group) -> String {
+        switch group {
+        case .temp: return "pin.fill"
+        case .appCaches: return "square.stack.3d.up"
+        case .apple: return "hammer"
+        case .packages: return "shippingbox"
+        }
+    }
+    func freedReport(_ size: String, files: Int, failed: Int) -> String {
+        let base = en ? "freed \(size) (\(files) item(s))." : "已释放 \(size)（\(files) 项）。"
+        return failed > 0
+            ? base + (en ? " \(failed) in-use item(s) could not be deleted." : " \(failed) 项正在使用，无法删除。")
+            : base
+    }
+    func nothingFreed(failed: Int) -> String {
+        failed > 0
+            ? (en ? "nothing freed — \(failed) item(s) are in use or protected."
+                  : "没有释放空间——\(failed) 项正在使用或受保护。")
+            : (en ? "nothing to clean — remaining files are newer than the age window or not yours."
+                  : "没有可清理的内容——剩余文件还在保留期内，或不属于你。")
+    }
+    var cleanupTmp: String { en ? "System temp (/tmp)" : "系统临时目录（/tmp）" }
+    var cleanupVarTmp: String { en ? "Persistent temp (/var/tmp)" : "持久临时目录（/var/tmp）" }
+    var cleanupUserTemp: String { en ? "User temp (/var/folders/…/T)" : "用户临时目录（/var/folders/…/T）" }
+    var cleanupUserCache: String { en ? "User cache (/var/folders/…/C)" : "用户缓存目录（/var/folders/…/C）" }
+    var cleanupAppCaches: String { en ? "App caches (~/Library/Caches)" : "应用缓存（~/Library/Caches）" }
+    var cleanupXcodeDerived: String { en ? "Xcode DerivedData" : "Xcode DerivedData" }
+    var cleanupXcodeArchives: String { en ? "Xcode Archives" : "Xcode 归档（Archives）" }
+    var cleanupXcodeDeviceSupport: String { en ? "Xcode iOS DeviceSupport" : "Xcode iOS DeviceSupport" }
+    var cleanupSimulatorCaches: String { en ? "Simulator caches" : "模拟器缓存" }
+    var cleanupNpm: String { en ? "npm cache" : "npm 缓存" }
+    var cleanupUv: String { en ? "uv cache" : "uv 缓存" }
+    var cleanupGradle: String { en ? "Gradle caches" : "Gradle 缓存" }
+    var cleanupMaven: String { en ? "Maven repository" : "Maven 仓库" }
+    var cleanupCargo: String { en ? "Cargo registry" : "Cargo registry 缓存" }
+    var cleanupPnpm: String { en ? "pnpm store" : "pnpm store" }
+    var cleanupRustup: String { en ? "rustup toolchains" : "rustup 工具链" }
+    var cleanupSpm: String { en ? "SwiftPM caches" : "SwiftPM 缓存" }
+    var cleanupCocoapods: String { en ? "CocoaPods caches" : "CocoaPods 缓存" }
+    var cleanupPip: String { en ? "pip cache" : "pip 缓存" }
+    var cleanupGoBuild: String { en ? "Go build cache" : "Go 编译缓存" }
+    var cleanupGoMod: String { en ? "Go module cache" : "Go 模块缓存" }
+    var cleanupHomebrew: String { en ? "Homebrew downloads" : "Homebrew 下载缓存" }
+
+    func cleanupTargetTitle(_ id: String) -> String {
+        switch id {
+        case "tmp": return cleanupTmp
+        case "var-tmp": return cleanupVarTmp
+        case "user-temp": return cleanupUserTemp
+        case "user-cache": return cleanupUserCache
+        case "app-caches": return cleanupAppCaches
+        case "xcode-derived": return cleanupXcodeDerived
+        case "xcode-archives": return cleanupXcodeArchives
+        case "xcode-device-support": return cleanupXcodeDeviceSupport
+        case "simulator-caches": return cleanupSimulatorCaches
+        case "npm": return cleanupNpm
+        case "uv": return cleanupUv
+        case "gradle-caches": return cleanupGradle
+        case "maven": return cleanupMaven
+        case "cargo-registry": return cleanupCargo
+        case "pnpm-store": return cleanupPnpm
+        case "rustup-toolchains": return cleanupRustup
+        case "spm": return cleanupSpm
+        case "cocoapods": return cleanupCocoapods
+        case "pip": return cleanupPip
+        case "go-build": return cleanupGoBuild
+        case "go-mod": return cleanupGoMod
+        case "homebrew": return cleanupHomebrew
+        default: return id
+        }
+    }
+
     var dataNotice: String {
         en ? "Read-only: lists your own processes with listening TCP ports. Memory = Activity Monitor footprint (incl. child processes)."
            : "只读：列出你自己监听 TCP 端口的进程。内存 = 活动监视器口径（含子进程）。"

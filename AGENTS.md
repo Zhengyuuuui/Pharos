@@ -74,9 +74,12 @@ Swift 通过 **ARC（自动引用计数）** 管理内存：编译器自动插�
 - 进程/端口/内存采集只在 `Sources/UsageBarCore/ProcessScanner.swift`
   （libproc + sysctl，与 `lsof`/活动监视器同源），项目归组逻辑在
   `ProjectGrouper.swift`；二者纯逻辑、可单测。
+- 缓存目录扫描/清理只在 `Sources/UsageBarCore/DiskCleaner.swift`
+  （固定目标列表，按分组展示；逐文件判定，按 mtime 保留期跳过新文件，目标目录本身保留）。
 - 纯逻辑放 `Sources/UsageBarCore/`，保持可被 `usagebar-tests` 单测；
   Core 不得 import SwiftUI/AppKit。
 - App 状态在 `Sources/UsageBar/ProjectStore.swift`（窗口可见时按设置间隔轮询，不可见时 30s 低频采样以保留 1 小时内存历史）；
+  磁盘清理状态在 `Sources/UsageBar/CleanupStore.swift`（懒扫描：仅清理页可见时扫描）；
   UI 组件放 `Sources/UsageBar/UI/`。
 - **国际化**：所有 UI 文案必须走 `L10n`（`UI/L10n.swift`），同时提供
   `en` 与 `zh-Hans` 两种语言；禁止在 View 里硬编码用户可见字符串。
@@ -85,8 +88,14 @@ Swift 通过 **ARC（自动引用计数）** 管理内存：编译器自动插�
 ## 4. 行为与安全约定
 
 - **只读原则**：只读取当前用户自己的进程信息，不发起网络请求，不上传任何数据。
-- 唯一的写操作是用户显式点击的「结束进程」：先 SIGTERM（需二次确认），
-  仍存活才提供 SIGKILL；不得结束其他用户或 PID ≤ 1 的进程，不得结束自身。
+- 写操作仅限两类，都必须用户显式点击并二次确认：
+  1. 「结束进程」：先 SIGTERM，仍存活才提供 SIGKILL；不得结束其他用户或
+     PID ≤ 1 的进程，不得结束自身。
+  2. 「磁盘清理」（`DiskCleaner`）：只在固定目标列表的目录内，按**单个文件**
+     判断——当前用户拥有、超过保留期（mtime）、所在目录可写的**普通文件**才删；
+     socket/FIFO/符号链接一律不动；删空的子目录用 `rmdir` 回收，目标目录本身保留。
+     扫描与清理必须共用同一条判定（`forEachEligibleFile`），保证显示的体积就是能删的体积。
+     删除失败只计数并在结果横幅中显示。不得把任意路径加入清理列表。
 - 配置变更需持久化，重启后生效；错误态必须有可见文案，不静默失败。
 
 ## 5. 代码风格
