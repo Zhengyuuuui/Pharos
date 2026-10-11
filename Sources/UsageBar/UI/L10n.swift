@@ -170,6 +170,64 @@ final class L10n: ObservableObject {
            : "仅在已安装的应用（/Applications）中可用。"
     }
 
+    // MARK: - Favorites (saved workspaces)
+
+    var favorites: String { en ? "Favorites" : "常用项目" }
+    var runningProjects: String { en ? "Running" : "运行中的项目" }
+    var addWorkspace: String { en ? "Add Workspace…" : "添加工作区…" }
+    var addWorkspaceMessage: String {
+        en ? "Choose project folders. UsageBar reads package.json, Makefile, manage.py… to find the start command."
+           : "选择项目文件夹。UsageBar 会读取 package.json、Makefile、manage.py 等文件来识别启动命令。"
+    }
+    var favoritesEmpty: String {
+        en ? "No favorites yet. Add a workspace folder, or click ☆ on a running project to keep it here with its start command."
+           : "还没有常用项目。添加一个工作区文件夹，或点击运行中项目的 ☆，把它连同启动命令保存到这里。"
+    }
+    var pinToFavorites: String { en ? "Add to Favorites" : "加入常用" }
+    var pinned: String { en ? "In Favorites" : "已加入常用" }
+    var pinHelp: String { en ? "Save to Favorites with the command it's running with" : "连同当前运行命令保存到常用项目" }
+    var unpinHelp: String { en ? "Remove from Favorites" : "从常用项目移除" }
+    var removeFavorite: String { en ? "Remove" : "移除" }
+    var rename: String { en ? "Rename" : "重命名" }
+    var notRunning: String { en ? "Not running" : "未运行" }
+    var stoppedShort: String { en ? "off" : "未运行" }
+    func notRunningLastPorts(_ ports: String) -> String { en ? "Not running · last seen on \(ports)" : "未运行 · 上次端口 \(ports)" }
+    func runningSummary(ports: Int, memory: String) -> String {
+        en ? "Running · \(ports) port(s) · \(memory)" : "运行中 · \(ports) 个端口 · \(memory)"
+    }
+    var startCommand: String { en ? "Start command" : "启动命令" }
+    func commandSourceLabel(_ s: Favorite.CommandSource) -> String {
+        switch s {
+        case .detected: return en ? "detected from project files" : "从项目文件识别"
+        case .running: return en ? "taken from the running process" : "取自正在运行的进程"
+        case .custom: return en ? "set by you" : "手动设置"
+        }
+    }
+    var noCommandSet: String { en ? "No start command — click ✎ to set one" : "没有启动命令——点 ✎ 设置" }
+    var commandPlaceholder: String { en ? "e.g. pnpm run dev" : "例如 pnpm run dev" }
+    var editCommand: String { en ? "Edit command" : "编辑命令" }
+    var copyCommand: String { en ? "Copy cd + command" : "复制 cd + 命令" }
+    var save: String { en ? "Save" : "保存" }
+    var openInTerminal: String { en ? "Open in Terminal" : "在终端中启动" }
+    var openInTerminalHint: String {
+        en ? "Runs in a new Terminal window with your shell setup; Ctrl-C there stops it."
+           : "在新的终端窗口里用你的 shell 环境运行；在那里按 Ctrl-C 即可停止。"
+    }
+    var alreadyRunningHint: String {
+        en ? "Already running — starting again may fail with \"port in use\"."
+           : "已在运行——再次启动可能会提示端口被占用。"
+    }
+    var detectedCommands: String { en ? "Other detected commands" : "识别到的其他命令" }
+    var useThis: String { en ? "Use" : "使用" }
+    var runningNow: String { en ? "Running now" : "当前运行" }
+    var dismiss: String { en ? "Dismiss" : "关闭" }
+    func folderMissing(_ dir: String) -> String { en ? "Folder not found: \(dir)" : "找不到文件夹：\(dir)" }
+    func launchFailed(_ reason: String) -> String { en ? "Couldn't open Terminal: \(reason)" : "无法打开终端：\(reason)" }
+    var favoritesLoadFailed: String {
+        en ? "Saved favorites couldn't be read and were reset." : "已保存的常用项目无法读取，已重置。"
+    }
+    var favoritesSaveFailed: String { en ? "Couldn't save favorites." : "常用项目保存失败。" }
+
     // MARK: - Disk cleanup
 
     var diskCleanup: String { en ? "Disk Cleanup" : "磁盘清理" }

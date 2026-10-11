@@ -152,6 +152,7 @@ struct PopoverProjectRow: View {
                 Text(ByteFormat.short(project.memoryBytes))
                     .font(.system(size: 11, weight: .medium).monospacedDigit())
                     .foregroundStyle(.secondary)
+                PinButton(project: project)
                 if project.directory != nil {
                     IconButton(systemImage: "folder", help: l10n.revealInFinder) {
                         store.revealInFinder(project)

@@ -72,6 +72,17 @@ public struct Project: Hashable, Sendable, Identifiable {
     public let ports: [ListeningPort]
     public let memoryBytes: UInt64
 
+    public init(id: String, name: String, directory: String?, listeners: [ProcessSnapshot],
+                helpers: [ProcessSnapshot], ports: [ListeningPort], memoryBytes: UInt64) {
+        self.id = id
+        self.name = name
+        self.directory = directory
+        self.listeners = listeners
+        self.helpers = helpers
+        self.ports = ports
+        self.memoryBytes = memoryBytes
+    }
+
     public var allPIDs: [Int32] { listeners.map(\.pid) + helpers.map(\.pid) }
     public var processCount: Int { listeners.count + helpers.count }
 }

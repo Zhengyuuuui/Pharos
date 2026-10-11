@@ -4,6 +4,7 @@ import UsageBarCore
 struct MainWindowView: View {
     @EnvironmentObject var store: ProjectStore
     @ObservedObject private var cleanup = CleanupStoreHolder.shared
+    @ObservedObject private var workspaces = WorkspaceStore.shared
     @ObservedObject private var l10n = L10n.shared
     @State private var selection: SidebarItem?
     /// Entry point from the menu-bar popover (e.g. "Disk Cleanup").
@@ -17,6 +18,7 @@ struct MainWindowView: View {
         case systemMemory
         case portsOverview
         case diskCleanup
+        case favorite(String)
         case project(String)
         case settings
     }
@@ -52,10 +54,44 @@ struct MainWindowView: View {
                     }
                     .tag(SidebarItem.diskCleanup)
                 }
-                Section(l10n.projects) {
+                Section {
+                    ForEach(workspaces.statuses(store.projects), id: \.favorite.id) { s in
+                        HStack(spacing: 6) {
+                            RunDot(running: s.isRunning)
+                            Text(s.favorite.name).lineLimit(1)
+                            Spacer()
+                            Text(s.isRunning
+                                 ? s.ports.prefix(2).map { ":\($0.port)" }.joined(separator: " ")
+                                 : l10n.stoppedShort)
+                                .font(.system(size: 10).monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                        .tag(SidebarItem.favorite(s.favorite.id))
+                        .contextMenu {
+                            Button(l10n.openInTerminal) { workspaces.openInTerminal(s.favorite) }
+                                .disabled(s.favorite.command.isEmpty)
+                            Button(l10n.revealInFinder) { workspaces.revealInFinder(s.favorite) }
+                            Divider()
+                            Button(l10n.removeFavorite) { workspaces.unpin(id: s.favorite.id) }
+                        }
+                    }
+                } header: {
+                    HStack {
+                        Text(l10n.favorites)
+                        Spacer()
+                        Button {
+                            if let id = workspaces.addFolder() { selection = .favorite(id) }
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                        .buttonStyle(.borderless)
+                        .help(l10n.addWorkspace)
+                    }
+                }
+                Section(l10n.runningProjects) {
                     ForEach(store.projects) { project in
                         HStack {
-                            Label(project.name, systemImage: "shippingbox")
+                            Label(project.name, systemImage: workspaces.isPinned(project) ? "star.fill" : "shippingbox")
                                 .lineLimit(1)
                             Spacer()
                             Text(ByteFormat.short(project.memoryBytes))
@@ -95,7 +131,10 @@ struct MainWindowView: View {
             case .systemMemory:
                 SystemMemoryView()
             case .portsOverview:
-                PortsOverviewView { selection = .project($0.id) }
+                PortsOverviewView(onSelect: { selection = .project($0.id) },
+                                  onSelectFavorite: { selection = .favorite($0.id) })
+            case .favorite(let id):
+                FavoriteDetailView(favoriteId: id) { selection = .portsOverview }
             case .diskCleanup:
                 CleanupView()
             case .project(let id):
@@ -121,7 +160,11 @@ struct MainWindowView: View {
         .onAppear {
             store.viewAppeared()
             if selection == nil { selection = initialSelection ?? .portsOverview }
-        }        .onDisappear { store.viewDisappeared() }
+        }
+        .onDisappear { store.viewDisappeared() }
+        .onChange(of: store.lastScan) { _, _ in
+            workspaces.recordPorts(workspaces.running(in: store.projects))
+        }
     }
 }
 
@@ -183,6 +226,7 @@ struct ProjectDetailView: View {
             }
             Spacer()
             HStack(spacing: 8) {
+                PinButton(project: project, large: true)
                 if project.directory != nil {
                     Button {
                         store.revealInFinder(project)

@@ -66,11 +66,14 @@ struct PortsOverviewView: View {
     @EnvironmentObject var store: ProjectStore
     @ObservedObject private var l10n = L10n.shared
     var onSelect: (Project) -> Void = { _ in }
+    var onSelectFavorite: (Favorite) -> Void = { _ in }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 Text(l10n.portsOverview).font(.system(size: 20, weight: .bold))
+
+                FavoritesTable(onSelect: onSelectFavorite)
 
                 HStack(spacing: 12) {
                     StatCard(title: l10n.projects, value: "\(store.projects.count)", icon: "shippingbox")
@@ -110,7 +113,7 @@ struct PortsOverviewView: View {
                         }
                     }
 
-                    Section(title: l10n.projects) {
+                    Section(title: l10n.runningProjects) {
                         portTable
                     }
                 }
@@ -141,6 +144,7 @@ struct PortsOverviewView: View {
                     Text(ByteFormat.short(p.memoryBytes))
                         .font(.system(size: 11, weight: .medium).monospacedDigit())
                         .frame(width: 52, alignment: .trailing)
+                    PinButton(project: p)
                     StopButton(project: p, compact: true)
                 }
                 .padding(.horizontal, 10)
