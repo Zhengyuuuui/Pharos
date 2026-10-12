@@ -1,5 +1,5 @@
 import SwiftUI
-import UsageBarCore
+import PharosCore
 
 /// Owns the shared ProjectStore and the main NSWindow.
 /// The app is LSUIElement (menu-bar agent): it stays in the menu bar by
@@ -12,10 +12,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// Weak: the @NSApplicationDelegateAdaptor owns the instance.
     private(set) static weak var shared: AppDelegate?
 
-    let store = ProjectStore()
+    let store: ProjectStore
     private var window: NSWindow?
 
     override init() {
+        // Before any store reads its settings.
+        LegacyDefaults.migrate()
+        store = ProjectStore()
         super.init()
         AppDelegate.shared = self
     }
@@ -41,7 +44,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 rootView: MainWindowView(initialSelection: select).environmentObject(store)
             )
             let w = NSWindow(contentViewController: hosting)
-            w.title = "UsageBar"
+            w.title = "Pharos"
             w.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             w.setContentSize(NSSize(width: 980, height: 680))
             w.isReleasedWhenClosed = false
@@ -76,10 +79,11 @@ final class WindowRouter: ObservableObject {
 }
 
 @main
-struct UsageBarApp: App {
+struct PharosApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     init() {
+        LegacyDefaults.migrate()
         NSApplication.shared.setActivationPolicy(.accessory)
         if CommandLine.arguments.contains("--check") {
             let all = CommandLine.arguments.contains("--all")

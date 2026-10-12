@@ -1,5 +1,5 @@
 import SwiftUI
-import UsageBarCore
+import PharosCore
 
 /// Main window page: every Chrome instance (running or saved preset) with
 /// port, profile folder, proxy, memory, folder size, start/quit and editing.

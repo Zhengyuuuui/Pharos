@@ -1,5 +1,5 @@
 import SwiftUI
-import UsageBarCore
+import PharosCore
 
 /// Live state of one favorite: the running projects inside its folder.
 struct FavoriteStatus {

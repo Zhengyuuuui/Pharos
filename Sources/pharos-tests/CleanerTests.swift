@@ -1,5 +1,5 @@
 import Foundation
-import UsageBarCore
+import PharosCore
 
 func testCleanerTargetsAndPaths() {
     expect(DiskCleaner.darwinUserDir(isCache: false).hasPrefix("/var/folders/"), "user temp dir resolved from kernel")
@@ -38,7 +38,7 @@ func testCleanerGroups() {
 
 /// Hour-level retention: a 2-hour-old file passes a 1-hour window, a fresh one doesn't.
 func testHourRetention() {
-    let base = NSTemporaryDirectory() + "usagebar-hours-\(UUID().uuidString)"
+    let base = NSTemporaryDirectory() + "pharos-hours-\(UUID().uuidString)"
     try? FileManager.default.createDirectory(atPath: base + "/agent/run", withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(atPath: base) }
     let old = base + "/agent/run/old.log", fresh = base + "/agent/fresh.log"
@@ -62,7 +62,7 @@ func testHourRetention() {
 
 /// Build a temp tree: root/a.txt (10 B), root/sub/b.txt (20 B), root/link → a.txt.
 private func makeTree() -> (root: String, tearDown: () -> Void) {
-    let base = NSTemporaryDirectory() + "usagebar-cleaner-\(UUID().uuidString)"
+    let base = NSTemporaryDirectory() + "pharos-cleaner-\(UUID().uuidString)"
     try? FileManager.default.createDirectory(atPath: base + "/sub", withIntermediateDirectories: true)
     let a = base + "/a.txt", b = base + "/sub/b.txt"
     FileManager.default.createFile(atPath: a, contents: Data(repeating: 1, count: 10))
@@ -154,7 +154,7 @@ func testCleanOldFileInsideFreshDir() {
 /// Running apps own sockets/FIFOs in temp dirs; cleaning must not touch them
 /// even when old — deleting the path would break the running process.
 func testCleanLeavesSpecialFilesAlone() {
-    let base = NSTemporaryDirectory() + "usagebar-sock-\(UUID().uuidString)"
+    let base = NSTemporaryDirectory() + "pharos-sock-\(UUID().uuidString)"
     try? FileManager.default.createDirectory(atPath: base, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(atPath: base) }
 
@@ -176,7 +176,7 @@ func testCleanLeavesSpecialFilesAlone() {
 /// (entries inside directories the user can't write, e.g. root-owned dirs).
 /// Undeletable files must be excluded from both scan and clean.
 func testUndeletableFilesNotCounted() {
-    let base = NSTemporaryDirectory() + "usagebar-ro-\(UUID().uuidString)"
+    let base = NSTemporaryDirectory() + "pharos-ro-\(UUID().uuidString)"
     try? FileManager.default.createDirectory(atPath: base + "/locked", withIntermediateDirectories: true)
     let file = base + "/locked/old.bin"
     FileManager.default.createFile(atPath: file, contents: Data(repeating: 3, count: 70))
@@ -196,7 +196,7 @@ func testUndeletableFilesNotCounted() {
 /// Per-row clean of a parent must not delete nested-row subtrees (their own,
 /// looser rules would be violated), while single files around them go.
 func testCleanOneHonorsExclusions() {
-    let base = NSTemporaryDirectory() + "usagebar-nested-\(UUID().uuidString)"
+    let base = NSTemporaryDirectory() + "pharos-nested-\(UUID().uuidString)"
     try? FileManager.default.createDirectory(atPath: base + "/Caches/Go", withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(atPath: base) }
     FileManager.default.createFile(atPath: base + "/Caches/Go/g.bin", contents: Data(repeating: 7, count: 40))
@@ -214,13 +214,13 @@ func testCleanOneHonorsExclusions() {
 
 func testCleanMissingAndNested() {
     // Missing directory: scan 0, clean no-op, no crash.
-    let missing = DiskCleaner.Target(id: "m", path: "/nonexistent/usagebar", title: "m")
+    let missing = DiskCleaner.Target(id: "m", path: "/nonexistent/pharos", title: "m")
     expectEq(DiskCleaner.size(of: missing), UInt64(0), "missing dir scans as 0")
     let r = DiskCleaner.clean([missing])
     expectEq(r.removedCount, 0, "missing dir cleans as no-op")
 
     // Excluded subtrees survive a parent clean.
-    let base = NSTemporaryDirectory() + "usagebar-nested-\(UUID().uuidString)"
+    let base = NSTemporaryDirectory() + "pharos-nested-\(UUID().uuidString)"
     try? FileManager.default.createDirectory(atPath: base + "/Caches/Go", withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(atPath: base) }
     FileManager.default.createFile(atPath: base + "/Caches/Go/g.bin", contents: Data(repeating: 7, count: 40))

@@ -1,5 +1,5 @@
 import AppKit
-import UsageBarCore
+import PharosCore
 
 /// Scans processes, ports and machine memory. Polls at `refreshSeconds` while a
 /// popover / main window is visible, otherwise every `backgroundSeconds` so the

@@ -1,4 +1,4 @@
-# AGENTS.md — UsageBar 二次开发守则
+# AGENTS.md — Pharos 二次开发守则
 
 > 本文件是所有 AI Agent / 人类贡献者在本仓库写代码前必须遵守的规则。
 > 违反本守则的改动不予合并。
@@ -64,23 +64,23 @@ Swift 通过 **ARC（自动引用计数）** 管理内存：编译器自动插�
 - [ ] delegate 均为 `weak`
 - [ ] Timer / 通知观察者在适当生命周期移除
 - [ ] 无手动 `malloc`/`free`/`UnsafeMutablePointer` 业务用法
-  （例外：`UsageBarCore/ProcessScanner.swift` 调用 libproc/sysctl 系统接口，
+  （例外：`PharosCore/ProcessScanner.swift` 调用 libproc/sysctl 系统接口，
   只允许 `withUnsafe…` 作用域内借用 Swift 数组/结构体的缓冲区，不得手动分配）
 - [ ] 新类型默认考虑 struct，确需 class 时无属性↔闭包强引用环
 - [ ] `swift build` 通过，`make test` 全绿
 
 ## 3. 项目结构约定
 
-- 进程/端口/内存采集只在 `Sources/UsageBarCore/ProcessScanner.swift`
+- 进程/端口/内存采集只在 `Sources/PharosCore/ProcessScanner.swift`
   （libproc + sysctl，与 `lsof`/活动监视器同源），项目归组逻辑在
   `ProjectGrouper.swift`；二者纯逻辑、可单测。
-- 缓存目录扫描/清理只在 `Sources/UsageBarCore/DiskCleaner.swift`
+- 缓存目录扫描/清理只在 `Sources/PharosCore/DiskCleaner.swift`
   （固定目标列表，按分组展示；逐文件判定，按 mtime 保留期跳过新文件，目标目录本身保留）。
-- 纯逻辑放 `Sources/UsageBarCore/`，保持可被 `usagebar-tests` 单测；
+- 纯逻辑放 `Sources/PharosCore/`，保持可被 `pharos-tests` 单测；
   Core 不得 import SwiftUI/AppKit。
-- App 状态在 `Sources/UsageBar/ProjectStore.swift`（窗口可见时按设置间隔轮询，不可见时 30s 低频采样以保留 1 小时内存历史）；
-  磁盘清理状态在 `Sources/UsageBar/CleanupStore.swift`（懒扫描：仅清理页可见时扫描）；
-  UI 组件放 `Sources/UsageBar/UI/`。
+- App 状态在 `Sources/Pharos/ProjectStore.swift`（窗口可见时按设置间隔轮询，不可见时 30s 低频采样以保留 1 小时内存历史）；
+  磁盘清理状态在 `Sources/Pharos/CleanupStore.swift`（懒扫描：仅清理页可见时扫描）；
+  UI 组件放 `Sources/Pharos/UI/`。
 - **国际化**：所有 UI 文案必须走 `L10n`（`UI/L10n.swift`），同时提供
   `en` 与 `zh-Hans` 两种语言；禁止在 View 里硬编码用户可见字符串。
   视图用 `@ObservedObject private var l10n = L10n.shared` 观察以便即时切换。
@@ -102,8 +102,8 @@ Swift 通过 **ARC（自动引用计数）** 管理内存：编译器自动插�
   - 从运行中进程取命令时，**不得保存内联代码**（`-e`/`-c`/`--eval` 等）、多行参数或超长命令行
     ——它们常含 token/请求头。
   - 「在终端中启动」是唯一的启动方式：只能由用户点击触发；把一个 `.command` 脚本写到
-    `~/Library/Application Support/UsageBar/launch/`（权限 0700）后交给 Terminal.app 打开，
-    进程归终端窗口所有，UsageBar 不托管、不后台运行任何命令。路径和命令必须经 `ShellQuote` 转义。
+    `~/Library/Application Support/Pharos/launch/`（权限 0700）后交给 Terminal.app 打开，
+    进程归终端窗口所有，Pharos 不托管、不后台运行任何命令。路径和命令必须经 `ShellQuote` 转义。
   - 自动填入只用「声明式」或「入口文件」候选；`start.sh` 等 shell 脚本只列出、不自动填入；
     含 `git reset --hard`、`rm -rf`、`sudo` 等的脚本标记为危险，不提供一键设为启动命令。
 - 「Chrome 实例」（`ChromeInstances.swift` + `ChromeStore.swift`）：
@@ -126,5 +126,5 @@ Swift 通过 **ARC（自动引用计数）** 管理内存：编译器自动插�
 ```sh
 swift build          # 编译通过
 make test            # 全部 assertions 通过（含真实端口扫描测试）
-.build/debug/UsageBar --check   # 打印当前项目/端口/内存（--all 含后台应用）
+.build/debug/Pharos --check   # 打印当前项目/端口/内存（--all 含后台应用）
 ```

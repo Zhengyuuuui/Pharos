@@ -1,5 +1,5 @@
 import SwiftUI
-import UsageBarCore
+import PharosCore
 
 enum Format {
     static func relativeAge(_ date: Date?, now: Date = Date()) -> String {

@@ -1,5 +1,5 @@
 import SwiftUI
-import UsageBarCore
+import PharosCore
 
 struct MainWindowView: View {
     @EnvironmentObject var store: ProjectStore

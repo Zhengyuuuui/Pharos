@@ -1,6 +1,6 @@
 import Foundation
 import SwiftUI
-import UsageBarCore
+import PharosCore
 
 enum AppLanguage: String, CaseIterable, Identifiable {
     case english = "en"
@@ -176,8 +176,8 @@ final class L10n: ObservableObject {
     var runningProjects: String { en ? "Running" : "运行中的项目" }
     var addWorkspace: String { en ? "Add Workspace…" : "添加工作区…" }
     var addWorkspaceMessage: String {
-        en ? "Choose project folders. UsageBar reads package.json, Makefile, manage.py… to find the start command."
-           : "选择项目文件夹。UsageBar 会读取 package.json、Makefile、manage.py 等文件来识别启动命令。"
+        en ? "Choose project folders. Pharos reads package.json, Makefile, manage.py… to find the start command."
+           : "选择项目文件夹。Pharos 会读取 package.json、Makefile、manage.py 等文件来识别启动命令。"
     }
     var favoritesEmpty: String {
         en ? "No favorites yet. Add a workspace folder, or click ☆ on a running project to keep it here with its start command."
@@ -282,8 +282,8 @@ final class L10n: ObservableObject {
     var chromeLoadFailed: String { en ? "Saved Chrome presets couldn't be read and were reset." : "已保存的 Chrome 预设无法读取，已重置。" }
     var chromeSaveFailed: String { en ? "Couldn't save Chrome presets." : "Chrome 预设保存失败。" }
     var chromeNotice: String {
-        en ? "Instances are identified by profile folder (Chrome allows one per folder). Start runs `open -na \"Google Chrome\" --args …`; Quit sends SIGTERM (Chrome's normal shutdown, tabs restore next time), force quit only if it stays open. UsageBar doesn't connect to the debug ports."
-           : "实例按配置文件夹区分（Chrome 每个文件夹只能开一个）。启动即执行 `open -na \"Google Chrome\" --args …`；退出发送 SIGTERM（Chrome 正常关闭，下次可恢复标签页），仍未退出才提供强制结束。UsageBar 不会连接调试端口。"
+        en ? "Instances are identified by profile folder (Chrome allows one per folder). Start runs `open -na \"Google Chrome\" --args …`; Quit sends SIGTERM (Chrome's normal shutdown, tabs restore next time), force quit only if it stays open. Pharos doesn't connect to the debug ports."
+           : "实例按配置文件夹区分（Chrome 每个文件夹只能开一个）。启动即执行 `open -na \"Google Chrome\" --args …`；退出发送 SIGTERM（Chrome 正常关闭，下次可恢复标签页），仍未退出才提供强制结束。Pharos 不会连接调试端口。"
     }
 
     // MARK: - Disk cleanup

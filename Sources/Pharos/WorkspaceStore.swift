@@ -1,5 +1,5 @@
 import AppKit
-import UsageBarCore
+import PharosCore
 
 /// Saved workspaces ("favorites"): add a folder or pin a running project, keep
 /// its start command, open it in Terminal. Persisted as JSON in UserDefaults.
@@ -162,7 +162,7 @@ final class WorkspaceStore: ObservableObject {
 
     private static var scriptDirectory: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("UsageBar/launch", isDirectory: true)
+            .appendingPathComponent("Pharos/launch", isDirectory: true)
     }
 
     private static var terminalURL: URL {

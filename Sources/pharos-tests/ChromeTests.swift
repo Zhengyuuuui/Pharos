@@ -1,5 +1,5 @@
 import Foundation
-import UsageBarCore
+import PharosCore
 
 private let chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 private let helper = "/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/1/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/Google Chrome Helper (Renderer)"
@@ -100,7 +100,7 @@ func testChromeLaunchProblems() {
 }
 
 func testChromeProfileHelpers() {
-    let dir = NSTemporaryDirectory() + "usagebar-chrome-\(UUID().uuidString)"
+    let dir = NSTemporaryDirectory() + "pharos-chrome-\(UUID().uuidString)"
     try? FileManager.default.createDirectory(atPath: dir + "/Default", withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(atPath: dir) }
     let state = #"{"profile":{"info_cache":{"Default":{"name":"Work","user_name":"me@x.com"},"Profile 1":{"name":"Alt"}}}}"#

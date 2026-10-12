@@ -1,5 +1,5 @@
 import SwiftUI
-import UsageBarCore
+import PharosCore
 
 /// Main window page. The temp group (where AI agents and CLIs keep writing) is
 /// pinned on top with its own clean button and retention setting; the

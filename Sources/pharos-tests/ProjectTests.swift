@@ -1,5 +1,5 @@
 import Foundation
-import UsageBarCore
+import PharosCore
 
 private let home = "/Users/me"
 
@@ -125,5 +125,5 @@ func testLiveScan() {
            "scan finds own loopback listener on \(port)")
     expect((me?.memoryBytes ?? 0) > 0, "footprint > 0")
     expectEq(me?.cwd, FileManager.default.currentDirectoryPath, "cwd")
-    expect(me?.executablePath?.hasSuffix("usagebar-tests") == true, "exec path")
+    expect(me?.executablePath?.hasSuffix("pharos-tests") == true, "exec path")
 }

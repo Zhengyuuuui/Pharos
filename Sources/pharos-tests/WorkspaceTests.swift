@@ -1,8 +1,8 @@
 import Foundation
-import UsageBarCore
+import PharosCore
 
 private func makeProject(_ files: [String: String]) -> (dir: String, done: () -> Void) {
-    let dir = NSTemporaryDirectory() + "usagebar-ws-\(UUID().uuidString)"
+    let dir = NSTemporaryDirectory() + "pharos-ws-\(UUID().uuidString)"
     for (name, body) in files {
         let path = dir + "/" + name
         try? FileManager.default.createDirectory(atPath: (path as NSString).deletingLastPathComponent,

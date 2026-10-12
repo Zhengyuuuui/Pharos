@@ -1,6 +1,6 @@
 import Charts
 import SwiftUI
-import UsageBarCore
+import PharosCore
 
 enum ChartFormat {
     static func gb(_ bytes: UInt64) -> Double { Double(bytes) / 1_073_741_824 }

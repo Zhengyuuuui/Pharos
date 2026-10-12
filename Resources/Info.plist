@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-    <key>CFBundleName</key><string>UsageBar</string>
-    <key>CFBundleDisplayName</key><string>UsageBar</string>
-    <key>CFBundleIdentifier</key><string>local.usagebar</string>
+    <key>CFBundleName</key><string>Pharos</string>
+    <key>CFBundleDisplayName</key><string>Pharos</string>
+    <key>CFBundleIdentifier</key><string>local.pharos</string>
     <key>CFBundleVersion</key><string>1.1</string>
     <key>CFBundleShortVersionString</key><string>1.1</string>
-    <key>CFBundleExecutable</key><string>UsageBar</string>
-    <key>CFBundleIconFile</key><string>UsageBar</string>
+    <key>CFBundleExecutable</key><string>Pharos</string>
+    <key>CFBundleIconFile</key><string>Pharos</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>LSUIElement</key><true/>

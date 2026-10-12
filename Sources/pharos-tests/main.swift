@@ -1,4 +1,4 @@
-import UsageBarCore
+import PharosCore
 
 expectEq(Core.version, "0.2.0", "core version")
 testListeningPortMerge()

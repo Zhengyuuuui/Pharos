@@ -1,5 +1,5 @@
 import AppKit
-import UsageBarCore
+import PharosCore
 
 /// Scans cache-target sizes in the background and runs cleans (all, one group,
 /// or one row). Scanning is lazy: it only runs while the cleanup page is on

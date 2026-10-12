@@ -1,5 +1,5 @@
 import Foundation
-import UsageBarCore
+import PharosCore
 
 func testSystemMemoryMath() {
     let s = SystemMemoryStats.from(pageSize: 16384, internalPages: 1000, purgeablePages: 100,

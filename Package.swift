@@ -4,11 +4,11 @@ import PackageDescription
 let lang: [SwiftSetting] = [.swiftLanguageMode(.v5)]
 
 let package = Package(
-    name: "UsageBar",
+    name: "Pharos",
     platforms: [.macOS(.v14)],
     targets: [
-        .target(name: "UsageBarCore", swiftSettings: lang),
-        .executableTarget(name: "UsageBar", dependencies: ["UsageBarCore"], swiftSettings: lang),
-        .executableTarget(name: "usagebar-tests", dependencies: ["UsageBarCore"], swiftSettings: lang),
+        .target(name: "PharosCore", swiftSettings: lang),
+        .executableTarget(name: "Pharos", dependencies: ["PharosCore"], swiftSettings: lang),
+        .executableTarget(name: "pharos-tests", dependencies: ["PharosCore"], swiftSettings: lang),
     ]
 )

@@ -1,5 +1,5 @@
 import AppKit
-import UsageBarCore
+import PharosCore
 
 /// Chrome instances: running ones (from ProjectStore's scan) and saved presets.
 /// Start launches Chrome directly; Quit sends SIGTERM to the browser process

@@ -1,5 +1,5 @@
 import SwiftUI
-import UsageBarCore
+import PharosCore
 
 /// Main window: whole-machine memory (Activity Monitor style) + top apps.
 struct SystemMemoryView: View {
