@@ -17,6 +17,7 @@ struct MainWindowView: View {
 
     enum SidebarItem: Hashable {
         case systemMemory
+        case diskUsage
         case portsOverview
         case diskCleanup
         case chrome
@@ -39,6 +40,23 @@ struct MainWindowView: View {
                         }
                     }
                     .tag(SidebarItem.systemMemory)
+                    HStack {
+                        Label(l10n.diskUsage, systemImage: "internaldrive")
+                        Spacer()
+                        if let s = store.volumes.first(where: { $0.kind == .startup }) {
+                            Text("\(Int((s.usedFraction * 100).rounded()))%")
+                                .font(.system(size: 10).monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                        let extra = store.volumes.filter { $0.kind == .external || $0.kind == .network }.count
+                        if extra > 0 {
+                            Text("+\(extra)")
+                                .font(.system(size: 10).monospacedDigit())
+                                .foregroundStyle(.secondary)
+                                .help(l10n.diskExternalCount)
+                        }
+                    }
+                    .tag(SidebarItem.diskUsage)
                     HStack {
                         Label(l10n.portsOverview, systemImage: "point.3.connected.trianglepath.dotted")
                         Spacer()
@@ -140,6 +158,8 @@ struct MainWindowView: View {
             switch selection {
             case .systemMemory:
                 SystemMemoryView()
+            case .diskUsage:
+                DiskUsageView()
             case .portsOverview:
                 PortsOverviewView(onSelect: { selection = .project($0.id) },
                                   onSelectFavorite: { selection = .favorite($0.id) })

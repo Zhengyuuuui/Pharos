@@ -94,6 +94,9 @@ struct PharosApp: App {
             for a in AppGrouper.group(procs).prefix(5) {
                 print("app\t\(a.name)\t\(ByteFormat.short(a.memoryBytes))\t\(a.processCount) proc")
             }
+            for v in DiskVolumes.read() {
+                print("disk\t\(v.name)\t\(v.kind)\tused \(ByteFormat.disk(v.used)) / \(ByteFormat.disk(v.total))\tavailable \(ByteFormat.disk(v.available))\t\(v.connection ?? "-")\t\(v.path)")
+            }
             for p in ProjectGrouper.group(procs, includeSystem: all) {
                 let ports = p.ports.map { ":\($0.port)\($0.loopbackOnly ? "" : "*")" }.joined(separator: " ")
                 print("\(p.name)\t\(ports)\t\(ByteFormat.short(p.memoryBytes))\t\(p.processCount) proc\t\(p.directory ?? "-")")

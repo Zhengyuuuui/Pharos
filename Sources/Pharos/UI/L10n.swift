@@ -246,6 +246,15 @@ final class L10n: ObservableObject {
     var measuring: String { en ? "Measuring…" : "计算中…" }
     var notSaved: String { en ? "not saved" : "未保存" }
     var saveChromePreset: String { en ? "Save as preset (keeps its exact flags)" : "保存为预设（保留它的全部参数）" }
+    var unsaveChromePreset: String { en ? "Remove from saved" : "取消收藏" }
+    var launchCommand: String { en ? "Launch command" : "启动命令" }
+    var copyLaunchCommand: String { en ? "Copy launch command" : "复制启动命令" }
+    var copied: String { en ? "Copied" : "已复制" }
+    var presetDiffers: String {
+        en ? "Running with different flags than the saved preset." : "当前运行的参数与已保存的预设不同。"
+    }
+    var updatePreset: String { en ? "Update Preset" : "更新预设" }
+    var savedStopped: String { en ? "saved · not running" : "已收藏 · 未运行" }
     var startChrome: String { en ? "Start" : "启动" }
     var quitChrome: String { en ? "Quit" : "退出" }
     var openDevToolsList: String { en ? "Open DevTools target list in browser" : "在浏览器中打开 DevTools 调试列表" }
@@ -284,6 +293,42 @@ final class L10n: ObservableObject {
     var chromeNotice: String {
         en ? "Instances are identified by profile folder (Chrome allows one per folder). Start runs `open -na \"Google Chrome\" --args …`; Quit sends SIGTERM (Chrome's normal shutdown, tabs restore next time), force quit only if it stays open. Pharos doesn't connect to the debug ports."
            : "实例按配置文件夹区分（Chrome 每个文件夹只能开一个）。启动即执行 `open -na \"Google Chrome\" --args …`；退出发送 SIGTERM（Chrome 正常关闭，下次可恢复标签页），仍未退出才提供强制结束。Pharos 不会连接调试端口。"
+    }
+
+    // MARK: - Disk usage
+
+    var diskUsage: String { en ? "Disk Usage" : "磁盘用量" }
+    var diskUsed: String { en ? "Used" : "已用" }
+    var diskAvailable: String { en ? "Available" : "可用" }
+    var diskTotal: String { en ? "Capacity" : "容量" }
+    var diskVolumes: String { en ? "Volumes" : "卷" }
+    var diskExternalCount: String { en ? "External" : "外接" }
+    var diskFormat: String { en ? "Format" : "格式" }
+    var diskConnection: String { en ? "Connection" : "接口" }
+    var diskMountPoint: String { en ? "Mounted at" : "挂载位置" }
+    var diskReadOnly: String { en ? "read-only" : "只读" }
+    var diskOpenInFinder: String { en ? "Open in Finder" : "在 Finder 中打开" }
+    var diskNoExternal: String {
+        en ? "No external drives connected. Plugged-in drives and network shares appear here automatically."
+           : "没有接入外接硬盘。接入的硬盘和网络共享会自动出现在这里。"
+    }
+    var diskLow: String { en ? "Low space" : "空间不足" }
+    var diskFreeUpSpace: String { en ? "Free Up Space…" : "释放空间…" }
+    var diskNotice: String {
+        en ? "Same numbers as Finder: “Available” includes purgeable space macOS frees on demand. Hidden system volumes (VM, Preboot, simulator runtimes) aren't listed. Read only — Pharos never writes to or ejects drives."
+           : "口径与 Finder 一致：「可用」包含 macOS 可按需释放的可清除空间。隐藏的系统卷（VM、Preboot、模拟器运行时）不列出。只读——Pharos 不会写入或推出任何磁盘。"
+    }
+    func diskKind(_ k: DiskVolume.Kind) -> String {
+        switch k {
+        case .startup: return en ? "Startup disk" : "启动磁盘"
+        case .internalDisk: return en ? "Internal" : "内置"
+        case .external: return en ? "External" : "外接硬盘"
+        case .network: return en ? "Network" : "网络共享"
+        case .diskImage: return en ? "Disk image" : "磁盘映像"
+        }
+    }
+    func diskFreeOf(_ free: String, _ total: String) -> String {
+        en ? "\(free) available of \(total)" : "可用 \(free) / 共 \(total)"
     }
 
     // MARK: - Disk cleanup

@@ -55,6 +55,18 @@ final class ChromeStore: ObservableObject {
         persist()
     }
 
+    /// The instance was relaunched with different flags than the preset stores.
+    func adopt(_ instance: ChromeInstance, into presetID: String) {
+        guard let i = presets.firstIndex(where: { $0.id == presetID }) else { return }
+        presets[i].config = instance.config
+        persist()
+    }
+
+    func copyCommand(_ config: ChromeConfig) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(ChromeInstances.shellCommand(config), forType: .string)
+    }
+
     @discardableResult
     func addPreset() -> String {
         let used = Set(presets.compactMap(\.config.debugPort))

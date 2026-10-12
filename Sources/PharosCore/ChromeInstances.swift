@@ -141,6 +141,14 @@ public enum ChromeInstances {
         return args
     }
 
+    /// The same launch as a terminal command, for showing and copying. Pharos
+    /// itself never runs this through a shell; it passes `launchArguments` directly.
+    public static func shellCommand(_ c: ChromeConfig) -> String {
+        let args = launchArguments(c)
+        let head = "open -na " + ShellQuote.quote("Google Chrome")
+        return args.isEmpty ? head : head + " --args " + args.map(ShellQuote.quote).joined(separator: " ")
+    }
+
     /// Problems that would make a launch fail or hit the wrong instance.
     public enum LaunchProblem: Equatable, Sendable {
         case alreadyRunning

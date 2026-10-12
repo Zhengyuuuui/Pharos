@@ -39,15 +39,16 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 | | |
 |---|---|
 | **Ports & memory** | Every dev project listening on a TCP port, grouped by folder, with memory incl. child processes; machine-wide memory, pressure and a 1-hour trend |
+| **Disk usage** | Startup disk, external drives, network shares and disk images — used / available like Finder, updated the moment a drive is plugged in |
 | **Stop processes** | `SIGTERM` first, `SIGKILL` only if it refuses; never system or other users' processes |
 | **Disk cleanup** | Temp folders and dev caches, file by file, with a retention window; the size shown is exactly what gets freed |
 | **Favorite projects** | Save project folders, start commands detected automatically, open in Terminal with one click |
-| **Chrome instances** | Every Chrome profile folder with its debug port, proxy and memory; save presets, start and quit |
+| **Chrome instances** | Every Chrome profile folder with its debug port, proxy and memory; save favorites that stay listed with their launch command after quitting; start and quit |
 
 ### Features
 
 **Menu bar popover**
-- **Overview** tab: system memory, pressure, top apps
+- **Overview** tab: system memory, pressure, disk usage of every volume (incl. external drives), top apps
 - **Projects** tab: running projects with ports and memory, plus your Chrome instances (start / quit / open debug list, “Manage…” jumps to the Chrome page)
 - Quick buttons to open the main window or jump straight to Disk Cleanup
 
@@ -65,6 +66,13 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 - Memory trend over the last hour
 - Top apps by memory (helper processes rolled up into their app, e.g. all Chrome helpers → “Google Chrome”)
 
+**Disk usage**
+- Every volume Finder shows: startup disk, other internal disks, **external drives**, network shares and mounted disk images, each labeled by type
+- Used / available / capacity with the same numbers as Finder (“available” includes purgeable space; decimal units, so a 4 TB drive reads 4.0 TB)
+- Format (APFS, ExFAT…), connection (USB, Thunderbolt…) and mount point; bars turn orange at 85 % and red at 95 %
+- Plugging in or ejecting a drive updates the list immediately; click a volume to open it in Finder
+- Hidden system volumes (VM, Preboot, simulator runtimes) are skipped. Read only — Pharos never writes to, unmounts or ejects drives
+
 **Ports overview**
 - Projects / ports / exposed ports / total dev memory at a glance
 - Port map chart (log scale, ◆ = exposed), memory-by-project bars, stacked dev-memory trend
@@ -79,6 +87,8 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 **Chrome instances**
 - Every running Chrome browser, identified by its profile folder (`--user-data-dir`): debug port, proxy, start URL, signed-in profiles, memory incl. all helper processes, folder size on demand. Debug-profile browsers no longer clutter the project list
 - ☆ saves a running instance as a preset with its exact flags; **New Instance** picks the next free port and a `~/chromeNNNN` folder; every field is editable
+- Saved instances stay listed after you quit Chrome (“saved · not running”) with their port and the exact **launch command** — a ready-to-paste `open -na 'Google Chrome' --args …` with a copy button; ★ again removes it
+- If a saved instance is relaunched elsewhere with different flags, the card says so and **Update Preset** adopts the running flags
 - **Start** runs `open -na "Google Chrome" --args …` after checking the folder isn't already open and the port is free
 - **Quit** sends `SIGTERM` (normal Chrome shutdown, tabs restore next time); force quit is offered only if it's still open after 3 s
 - 🐞 opens `http://127.0.0.1:<port>` (DevTools target list) in your default browser. Pharos itself never connects to debug ports
@@ -122,6 +132,7 @@ Pharos makes **no network requests**, uploads nothing, and only reads **your own
 | Command line | `sysctl(KERN_PROCARGS2)` |
 | Per-process memory | `proc_pid_rusage` → `ri_phys_footprint` |
 | System memory | `host_statistics64(HOST_VM_INFO64)`, `vm.swapusage`, `kern.memorystatus_vm_pressure_level` |
+| Disk volumes | `FileManager.mountedVolumeURLs` + `URLResourceValues` (capacity, available incl. purgeable), DiskArbitration `DADiskCopyDescription` (connection, disk image) |
 
 Every write action is user-initiated and confirmed:
 - **Stop** (`SIGTERM`, then `SIGKILL` only if still alive) — never PID ≤ 1, other users' processes, or Pharos itself
@@ -138,6 +149,7 @@ Sources/
 │   ├── ProjectGrouper   #   processes → projects
 │   ├── AppGrouper       #   processes → apps
 │   ├── SystemMemory     #   machine-wide memory stats
+│   ├── DiskVolumes      #   mounted volumes: capacity, type, connection
 │   ├── MemoryHistory    #   rolling 1-hour samples for charts
 │   ├── DiskCleaner      #   temp/cache scan + clean (one shared per-file rule)
 │   ├── Workspaces       #   favorites model, start-command detection, launch script
@@ -180,15 +192,16 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 | | |
 |---|---|
 | **端口与内存监控** | 列出所有监听 TCP 端口的开发项目，按目录归组，内存含子进程；整机内存、内存压力与近 1 小时趋势 |
+| **磁盘用量** | 启动磁盘、外接硬盘、网络共享和磁盘映像的已用 / 可用，口径与 Finder 一致；接入硬盘后立即显示 |
 | **结束进程** | 先 `SIGTERM`，拒不退出才 `SIGKILL`；不碰系统进程和其他用户的进程 |
 | **磁盘清理** | 临时目录与开发缓存，按单个文件、按保留期判断；显示的体积就是实际能释放的体积 |
 | **常用项目** | 收藏项目文件夹，自动识别启动命令，一键在终端中启动 |
-| **Chrome 实例** | 按配置文件夹列出每个 Chrome，显示调试端口、代理、内存；保存预设、启动与退出 |
+| **Chrome 实例** | 按配置文件夹列出每个 Chrome，显示调试端口、代理、内存；收藏后关闭也能看到端口和启动命令；启动与退出 |
 
 ### 功能
 
 **菜单栏弹窗**
-- **概览**页：本机内存、内存压力、应用内存排行
+- **概览**页：本机内存、内存压力、所有磁盘的用量（含外接硬盘）、应用内存排行
 - **项目**页：运行中的项目（端口、内存）以及 Chrome 实例（启动 / 退出 / 打开调试列表，「管理…」直达 Chrome 页面）
 - 快捷按钮：打开主窗口、直达磁盘清理
 
@@ -206,6 +219,13 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 - 近 1 小时内存趋势
 - 按应用汇总的内存排行（Chrome 的所有 Helper 合并为「Google Chrome」）
 
+**磁盘用量**
+- 列出 Finder 中可见的所有卷：启动磁盘、其他内置磁盘、**外接硬盘**、网络共享和已挂载的磁盘映像，并标注类型
+- 已用 / 可用 / 容量，口径与 Finder 一致（「可用」包含可清除空间；十进制单位，4 TB 硬盘显示为 4.0 TB）
+- 显示格式（APFS、ExFAT…）、接口（USB、雷雳…）和挂载位置；用量超过 85% 变橙色，超过 95% 变红色
+- 接入或推出硬盘后列表立即更新；点击某个卷即在 Finder 中打开
+- 隐藏的系统卷（VM、Preboot、模拟器运行时）不列出。只读——Pharos 不会写入、卸载或推出任何磁盘
+
 **端口总览**
 - 项目数 / 端口数 / 对外暴露端口数 / 开发项目总内存
 - 端口分布图（对数轴，◆ = 对外暴露）、各项目内存柱状图、开发项目内存堆叠趋势
@@ -220,6 +240,8 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 **Chrome 实例**
 - 列出所有运行中的 Chrome 浏览器，按配置文件夹（`--user-data-dir`）区分：调试端口、代理、启动网址、已登录账号、内存（含全部 Helper 进程）、按需计算文件夹大小。调试用的 Chrome 不再混在项目列表里
 - ☆ 把运行中的实例连同全部参数保存为预设；**新建实例**自动选下一个空闲端口和 `~/chromeNNNN` 文件夹；所有字段可编辑
+- 收藏的实例在 Chrome 关闭后仍会列出（「已收藏 · 未运行」），显示端口和完整的**启动命令**——可直接粘贴到终端的 `open -na 'Google Chrome' --args …`，带复制按钮；再点 ★ 即取消收藏
+- 如果收藏的实例在别处用不同参数重新启动，卡片会提示，点**更新预设**即可改用当前参数
 - **启动**：检查文件夹未被占用、端口空闲后执行 `open -na "Google Chrome" --args …`
 - **退出**：发送 `SIGTERM`（Chrome 正常关闭，下次可恢复标签页），3 秒后仍未退出才提供强制结束
 - 🐞 用默认浏览器打开 `http://127.0.0.1:端口`（DevTools 调试列表）。Pharos 本身不连接调试端口
@@ -263,6 +285,7 @@ Pharos **不发起任何网络请求**、不上传任何数据，只读取**当�
 | 命令行 | `sysctl(KERN_PROCARGS2)` |
 | 单进程内存 | `proc_pid_rusage` → `ri_phys_footprint` |
 | 本机内存 | `host_statistics64(HOST_VM_INFO64)`、`vm.swapusage`、`kern.memorystatus_vm_pressure_level` |
+| 磁盘卷 | `FileManager.mountedVolumeURLs` + `URLResourceValues`（容量、含可清除空间的可用量），DiskArbitration `DADiskCopyDescription`（接口、是否磁盘映像） |
 
 所有写操作都由用户主动触发并二次确认：
 - **结束进程**（先 `SIGTERM`，仍存活才 `SIGKILL`）——不会作用于 PID ≤ 1、其他用户的进程或 Pharos 自身
@@ -279,6 +302,7 @@ Sources/
 │   ├── ProjectGrouper   #   进程 → 项目
 │   ├── AppGrouper       #   进程 → 应用
 │   ├── SystemMemory     #   整机内存统计
+│   ├── DiskVolumes      #   已挂载的卷：容量、类型、接口
 │   ├── MemoryHistory    #   1 小时滚动采样（图表用）
 │   ├── DiskCleaner      #   临时/缓存目录扫描与清理（扫描与清理共用同一条逐文件规则）
 │   ├── Workspaces       #   常用项目模型、启动命令识别、启动脚本

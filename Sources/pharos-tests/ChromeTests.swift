@@ -46,6 +46,18 @@ func testChromeLaunchArgsRoundTrip() {
     expectEq(ChromeInstances.launchArguments(defaultDir), [], "explicit default dir isn't passed")
 }
 
+func testChromeShellCommand() {
+    let c = ChromeConfig(userDataDir: "/Users/me/chrome 9367", debugPort: 9367,
+                         proxyServer: "http://127.0.0.1:7890", startURL: "https://x.com/?a=1&b=2",
+                         extraFlags: ["--no-first-run"])
+    expectEq(ChromeInstances.shellCommand(c),
+             "open -na 'Google Chrome' --args '--user-data-dir=/Users/me/chrome 9367' --remote-debugging-port=9367 "
+                + "--remote-allow-origins=http://localhost:9367,http://127.0.0.1:9367 "
+                + "--proxy-server=http://127.0.0.1:7890 --no-first-run 'https://x.com/?a=1&b=2'",
+             "shell command quotes spaces and & so it can be pasted into a terminal")
+    expectEq(ChromeInstances.shellCommand(ChromeConfig()), "open -na 'Google Chrome'", "default profile → no --args")
+}
+
 func testChromeFindInstances() {
     let all = [
         ProcessSnapshot(pid: 100, ppid: 1, name: "Google Chrome", executablePath: chrome,

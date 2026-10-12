@@ -98,6 +98,8 @@ private struct ChromeCard: View {
                 }
                 if entry.preset == nil {
                     Text(l10n.notSaved).font(.system(size: 10)).foregroundStyle(.tertiary)
+                } else if !entry.isRunning {
+                    Text(l10n.savedStopped).font(.system(size: 10)).foregroundStyle(.tertiary)
                 }
                 Spacer()
                 if let r = entry.running {
@@ -118,6 +120,17 @@ private struct ChromeCard: View {
                     row(l10n.folderSize, ByteFormat.short(size), mono: false)
                 }
                 if !c.extraFlags.isEmpty { row(l10n.extraFlags, c.extraFlags.joined(separator: " "), mono: true) }
+            }
+
+            LaunchCommandRow(config: entry.preset?.config ?? c)
+
+            if let preset = entry.preset, let r = entry.running, r.config != preset.config {
+                HStack(spacing: 6) {
+                    Label(l10n.presetDiffers, systemImage: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 10)).foregroundStyle(.orange)
+                    Button(l10n.updatePreset) { chrome.adopt(r, into: preset.id) }
+                        .controlSize(.mini)
+                }
             }
 
             ForEach(warnings(c), id: \.self) { w in
@@ -142,7 +155,11 @@ private struct ChromeCard: View {
             }
             IconButton(systemImage: "folder", help: l10n.revealInFinder) { chrome.reveal(c) }
             if let r = entry.running {
-                if entry.preset == nil {
+                if let preset = entry.preset {
+                    IconButton(systemImage: "star.fill", help: l10n.unsaveChromePreset, tint: .yellow) {
+                        chrome.remove(id: preset.id)
+                    }
+                } else {
                     IconButton(systemImage: "star", help: l10n.saveChromePreset, tint: .secondary) { chrome.save(r) }
                 }
                 quitButton(r)
@@ -303,6 +320,38 @@ private extension String {
     var nilIfEmpty: String? { isEmpty ? nil : self }
 }
 
+/// The exact launch, shown as a pasteable terminal command.
+private struct LaunchCommandRow: View {
+    @ObservedObject private var chrome = ChromeStore.shared
+    @ObservedObject private var l10n = L10n.shared
+    let config: ChromeConfig
+    @State private var copied = false
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 6) {
+            Text(l10n.launchCommand).font(.system(size: 10)).foregroundStyle(.secondary)
+            Text(ChromeInstances.shellCommand(config))
+                .font(.system(size: 10, design: .monospaced))
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            IconButton(systemImage: copied ? "checkmark" : "doc.on.doc",
+                       help: copied ? l10n.copied : l10n.copyLaunchCommand,
+                       tint: copied ? .green : .secondary) {
+                chrome.copyCommand(config)
+                copied = true
+            }
+            .task(id: copied) {
+                guard copied else { return }
+                try? await Task.sleep(for: .seconds(1.5))
+                copied = false
+            }
+        }
+        .padding(8)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.04)))
+    }
+}
+
 /// Compact Chrome list for the menu-bar popover's Projects tab: running state,
 /// port, memory, and start / quit. Editing lives in the main window.
 struct PopoverChromeSection: View {
@@ -367,8 +416,12 @@ private struct PopoverChromeRow: View {
                 if let port = c.debugPort {
                     IconButton(systemImage: "ladybug", help: l10n.openDevToolsList) { chrome.openDevToolsList(port: port) }
                 }
+                if entry.preset == nil {
+                    IconButton(systemImage: "star", help: l10n.saveChromePreset) { chrome.save(r) }
+                }
                 quit(r)
             } else if let preset = entry.preset {
+                IconButton(systemImage: "doc.on.doc", help: l10n.copyLaunchCommand) { chrome.copyCommand(preset.config) }
                 IconButton(systemImage: "play.fill", help: l10n.startChrome, tint: .green) {
                     chrome.start(preset.config, running: store.chrome, listening: store.state.listeningPorts)
                     Task {

@@ -15,6 +15,7 @@ final class ProjectStore: ObservableObject {
         var listeningPorts: Set<UInt16> = []
         var apps: [AppUsage] = []
         var system: SystemMemoryStats?
+        var volumes: [DiskVolume] = []
         var history = MemoryHistory(window: 3600, minInterval: 10)
         var lastScan: Date?
     }
@@ -27,6 +28,7 @@ final class ProjectStore: ObservableObject {
     var chrome: [ChromeInstance] { state.chrome }
     var apps: [AppUsage] { state.apps }
     var system: SystemMemoryStats? { state.system }
+    var volumes: [DiskVolume] { state.volumes }
     var history: MemoryHistory { state.history }
     var lastScan: Date? { state.lastScan }
     var isScanning: Bool { activity.isScanning }
@@ -54,13 +56,28 @@ final class ProjectStore: ObservableObject {
     private let backgroundSeconds: TimeInterval = 30
     private var timer: Timer?
     private var viewers = 0
+    private var mountObservers: [NSObjectProtocol] = []
 
     init() {
         let saved = UserDefaults.standard.integer(forKey: Keys.refresh)
         refreshSeconds = saved > 0 ? saved : 5
         showSystem = UserDefaults.standard.bool(forKey: Keys.showSystem)
         scheduleTimer()
+        // A drive plugged in or ejected shows up right away, not at the next poll.
+        let center = NSWorkspace.shared.notificationCenter
+        mountObservers = [NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification,
+                          NSWorkspace.didRenameVolumeNotification].map { name in
+            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in await self?.refreshVolumes() }
+            }
+        }
         Task { await refresh() }
+    }
+
+    deinit {
+        timer?.invalidate()
+        let center = NSWorkspace.shared.notificationCenter
+        mountObservers.forEach(center.removeObserver)
     }
 
     var totalMemory: UInt64 { projects.reduce(0) { $0 + $1.memoryBytes } }
@@ -99,7 +116,7 @@ final class ProjectStore: ObservableObject {
         activity.isScanning = true
         defer { activity.isScanning = false }
         let include = showSystem
-        let (projects, chrome, ports, apps, system) = await Task.detached(priority: .utility) {
+        let (projects, chrome, ports, apps, system, volumes) = await Task.detached(priority: .utility) {
             let all = ProcessScanner.scan()
             let chrome = ChromeInstances.find(in: all)
             // Chrome instances get their own page; keep debug-port browsers out
@@ -109,7 +126,8 @@ final class ProjectStore: ObservableObject {
                     chrome,
                     Set(all.flatMap { $0.ports.map(\.port) }),
                     AppGrouper.group(all),
-                    SystemMemory.read())
+                    SystemMemory.read(),
+                    DiskVolumes.read())
         }.value
         let now = Date()
         var next = state
@@ -118,6 +136,7 @@ final class ProjectStore: ObservableObject {
         next.listeningPorts = ports
         next.apps = apps
         if let system { next.system = system }
+        next.volumes = volumes
         next.history.append(MemorySample(
             date: now,
             systemUsed: system?.used ?? 0,
@@ -128,6 +147,15 @@ final class ProjectStore: ObservableObject {
         let alive = stubborn.intersection(projects.map(\.id))
         if alive != stubborn { stubborn = alive }
         ChromeStore.shared.clearStubborn(keeping: Set(chrome.map(\.id)))
+    }
+
+    private func refreshVolumes() async {
+        let volumes = await Task.detached(priority: .utility) { DiskVolumes.read() }.value
+        if volumes != state.volumes { state.volumes = volumes }
+    }
+
+    func revealVolume(_ v: DiskVolume) {
+        NSWorkspace.shared.open(URL(fileURLWithPath: v.path, isDirectory: true))
     }
 
     // MARK: - Actions

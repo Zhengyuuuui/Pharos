@@ -95,6 +95,9 @@ func testByteFormat() {
     expectEq(ByteFormat.short(84 * 1024 * 1024), "84M", "MB")
     expectEq(ByteFormat.short(UInt64(1.25 * 1024 * 1024 * 1024)), "1.2G", "GB 1 decimal")
     expectEq(ByteFormat.short(12 * 1024 * 1024 * 1024), "12G", "GB no decimal ≥10")
+    expectEq(ByteFormat.disk(3_996_329_328_640), "4.0 TB", "disk: decimal units like Finder")
+    expectEq(ByteFormat.disk(416_000_000_000), "416 GB", "disk: GB")
+    expectEq(ByteFormat.disk(54_000_000), "54 MB", "disk: MB")
 }
 
 /// Live smoke test: our own test process opens a loopback listener and must find it.

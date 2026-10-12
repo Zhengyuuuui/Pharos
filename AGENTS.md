@@ -76,6 +76,9 @@ Swift 通过 **ARC（自动引用计数）** 管理内存：编译器自动插�
   `ProjectGrouper.swift`；二者纯逻辑、可单测。
 - 缓存目录扫描/清理只在 `Sources/PharosCore/DiskCleaner.swift`
   （固定目标列表，按分组展示；逐文件判定，按 mtime 保留期跳过新文件，目标目录本身保留）。
+- 磁盘用量（卷容量）只在 `Sources/PharosCore/DiskVolumes.swift`
+  （`URLResourceValues` + DiskArbitration 只读描述，口径与 Finder 一致，十进制单位 `ByteFormat.disk`）；
+  分类逻辑 `classify` 纯函数可单测。只读：不写入、不推出、不卸载任何卷。
 - 纯逻辑放 `Sources/PharosCore/`，保持可被 `pharos-tests` 单测；
   Core 不得 import SwiftUI/AppKit。
 - App 状态在 `Sources/Pharos/ProjectStore.swift`（窗口可见时按设置间隔轮询，不可见时 30s 低频采样以保留 1 小时内存历史）；

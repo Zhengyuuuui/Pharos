@@ -271,6 +271,11 @@ struct PopoverOverview: View {
                 }
             }
 
+            if !store.volumes.isEmpty {
+                Divider()
+                PopoverDiskSection()
+            }
+
             Divider()
 
             VStack(alignment: .leading, spacing: 6) {
