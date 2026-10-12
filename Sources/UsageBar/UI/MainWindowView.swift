@@ -5,6 +5,7 @@ struct MainWindowView: View {
     @EnvironmentObject var store: ProjectStore
     @ObservedObject private var cleanup = CleanupStoreHolder.shared
     @ObservedObject private var workspaces = WorkspaceStore.shared
+    @ObservedObject private var router = WindowRouter.shared
     @ObservedObject private var l10n = L10n.shared
     @State private var selection: SidebarItem?
     /// Entry point from the menu-bar popover (e.g. "Disk Cleanup").
@@ -18,6 +19,7 @@ struct MainWindowView: View {
         case systemMemory
         case portsOverview
         case diskCleanup
+        case chrome
         case favorite(String)
         case project(String)
         case settings
@@ -53,6 +55,14 @@ struct MainWindowView: View {
                             .foregroundStyle(.secondary)
                     }
                     .tag(SidebarItem.diskCleanup)
+                    HStack {
+                        Label(l10n.chromeTitle, systemImage: "globe")
+                        Spacer()
+                        Text("\(store.chrome.count)")
+                            .font(.system(size: 10).monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                    .tag(SidebarItem.chrome)
                 }
                 Section {
                     ForEach(workspaces.statuses(store.projects), id: \.favorite.id) { s in
@@ -137,6 +147,8 @@ struct MainWindowView: View {
                 FavoriteDetailView(favoriteId: id) { selection = .portsOverview }
             case .diskCleanup:
                 CleanupView()
+            case .chrome:
+                ChromeView()
             case .project(let id):
                 if let project = store.project(id: id) {
                     ProjectDetailView(project: project)
@@ -162,6 +174,11 @@ struct MainWindowView: View {
             if selection == nil { selection = initialSelection ?? .portsOverview }
         }
         .onDisappear { store.viewDisappeared() }
+        .onChange(of: router.request) { _, request in
+            guard let request else { return }
+            selection = request
+            router.request = nil
+        }
         .onChange(of: store.lastScan) { _, _ in
             workspaces.recordPorts(workspaces.running(in: store.projects))
         }

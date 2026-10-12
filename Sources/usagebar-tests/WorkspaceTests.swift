@@ -64,6 +64,50 @@ func testLaunchDetectionOthers() {
     expect(LaunchDetector.candidates(in: bad).isEmpty, "broken package.json is ignored, not a crash")
 }
 
+/// Plain-script projects (most of the user's real folders): no manifest, just
+/// an entry file. These used to detect nothing.
+func testLaunchDetectionEntryFiles() {
+    let (py, pyDone) = makeProject(["serve.py": "", "register.py": "", "requirements.txt": ""])
+    defer { pyDone() }
+    expectEq(LaunchDetector.candidates(in: py).map(\.command), ["python3 serve.py"],
+             "python entry file guessed; helper scripts (register.py) ignored")
+    expectEq(LaunchDetector.autoFill(in: py)?.command, "python3 serve.py", "guessed entry is auto-filled")
+
+    let (node, nodeDone) = makeProject(["server.mjs": "", "README.md": ""])
+    defer { nodeDone() }
+    expectEq(LaunchDetector.autoFill(in: node)?.command, "node server.mjs", "node entry file without package.json")
+
+    let (both, bothDone) = makeProject(["package.json": #"{"scripts":{"dev":"vite"}}"#, "server.js": ""])
+    defer { bothDone() }
+    expectEq(LaunchDetector.candidates(in: both).map(\.command), ["npm run dev"],
+             "package.json present → its scripts, no bare node guess")
+
+    let (uv, uvDone) = makeProject([
+        "pyproject.toml": "[project]\nname='x'\n[project.scripts]\ncodebuddy-proxy = \"codebuddy_proxy:main\"\n# c = \"x\"\n[build-system]\nrequires=[]\n",
+        "uv.lock": "",
+    ])
+    defer { uvDone() }
+    expectEq(LaunchDetector.candidates(in: uv).map(\.command), ["uv run codebuddy-proxy"],
+             "pyproject [project.scripts] → uv run <script>")
+
+    let (sh, shDone) = makeProject([
+        "start.sh": "git fetch --all\ngit reset --hard origin/main\npython web.py\n",
+        "run.sh": "# rm -rf / is just a comment here\nexec python app.py\n",
+        "web.py": "",
+    ])
+    defer { shDone() }
+    let c = LaunchDetector.candidates(in: sh)
+    expectEq(c.map(\.command), ["python3 web.py", "./start.sh", "./run.sh"], "shell scripts listed after entry files")
+    expectEq(c.first { $0.command == "./start.sh" }?.destructive, true, "git reset --hard flagged")
+    expectEq(c.first { $0.command == "./run.sh" }?.destructive, false, "commented-out rm -rf not flagged")
+    expectEq(LaunchDetector.autoFill(in: sh)?.command, "python3 web.py", "scripts never auto-filled")
+
+    let (onlySh, onlyShDone) = makeProject(["start.sh": "npm start"])
+    defer { onlyShDone() }
+    expectEq(LaunchDetector.autoFill(in: onlySh)?.command, nil, "only a shell script → nothing auto-filled")
+    expectEq(LaunchDetector.candidates(in: onlySh).map(\.command), ["./start.sh"], "but it is offered")
+}
+
 func testRunningCommandMapping() {
     let (dir, done) = makeProject([
         "package.json": #"{"scripts":{"dev":"next dev --turbo","start":"next start","x":"vite"}}"#,

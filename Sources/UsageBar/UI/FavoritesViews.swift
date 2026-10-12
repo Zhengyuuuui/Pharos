@@ -327,8 +327,19 @@ struct FavoriteDetailView: View {
                 HStack(spacing: 8) {
                     Text(c.command).font(.system(size: 11, design: .monospaced))
                     Text(c.origin).font(.system(size: 10)).foregroundStyle(.tertiary)
+                    if c.destructive {
+                        Label(l10n.destructiveScript, systemImage: "exclamationmark.triangle.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.orange)
+                            .help(l10n.destructiveScriptHelp)
+                    } else if c.confidence == .script {
+                        Text(l10n.reviewScript).font(.system(size: 10)).foregroundStyle(.secondary)
+                    }
                     Spacer()
-                    Button(l10n.useThis) { workspaces.useCandidate(id: fav.id, c) }.controlSize(.small)
+                    Button(l10n.useThis) { workspaces.useCandidate(id: fav.id, c) }
+                        .controlSize(.small)
+                        .disabled(c.destructive)
+                        .help(c.destructive ? l10n.destructiveScriptHelp : "")
                 }
             }
         }

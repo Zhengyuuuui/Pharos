@@ -53,7 +53,7 @@ final class WorkspaceStore: ObservableObject {
         for url in panel.urls {
             let dir = WorkspaceMatcher.normalize(url.path)
             if let existing = favorite(forDirectory: dir) { lastId = existing.id; continue }
-            let candidate = LaunchDetector.candidates(in: dir).first
+            let candidate = LaunchDetector.autoFill(in: dir)
             let fav = Favorite(name: url.lastPathComponent, directory: dir,
                                command: candidate?.command ?? "",
                                commandSource: candidate == nil ? .custom : .detected)
@@ -70,7 +70,7 @@ final class WorkspaceStore: ObservableObject {
         let running = project.listeners.first.flatMap {
             LaunchDetector.command(forRunning: $0.arguments, in: dir)
         }
-        let detected = LaunchDetector.candidates(in: dir).first?.command
+        let detected = LaunchDetector.autoFill(in: dir)?.command
         let command = running ?? detected ?? ""
         favorites.append(Favorite(
             name: project.name, directory: dir, command: command,

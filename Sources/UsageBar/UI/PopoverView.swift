@@ -58,33 +58,44 @@ struct PopoverView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
-        } else if store.projects.isEmpty {
-            VStack(spacing: 4) {
-                Image(systemName: "network.slash")
-                    .font(.system(size: 20))
-                    .foregroundStyle(.tertiary)
-                Text(l10n.noProjects)
-                    .font(.system(size: 12, weight: .medium))
-                Text(l10n.noProjectsDesc)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
         } else {
+            let chromeEntries = ChromeStore.shared.entries(store.chrome)
             let maxMem = store.projects.map(\.memoryBytes).max() ?? 1
             ScrollView {
-                VStack(spacing: 2) {
-                    ForEach(store.projects) { project in
-                        PopoverProjectRow(project: project,
-                                          fraction: Double(project.memoryBytes) / Double(max(1, maxMem)))
+                VStack(alignment: .leading, spacing: 2) {
+                    if store.projects.isEmpty {
+                        emptyProjects
+                    } else {
+                        ForEach(store.projects) { project in
+                            PopoverProjectRow(project: project,
+                                              fraction: Double(project.memoryBytes) / Double(max(1, maxMem)))
+                        }
+                    }
+                    if !chromeEntries.isEmpty {
+                        PopoverChromeSection(entries: chromeEntries)
+                            .padding(.top, 8)
                     }
                 }
             }
-            .frame(maxHeight: 420)
-            .fixedSize(horizontal: false, vertical: store.projects.count <= 6)
+            .frame(maxHeight: 460)
+            .fixedSize(horizontal: false, vertical: store.projects.count + chromeEntries.count <= 7)
         }
+    }
+
+    private var emptyProjects: some View {
+        VStack(spacing: 4) {
+            Image(systemName: "network.slash")
+                .font(.system(size: 20))
+                .foregroundStyle(.tertiary)
+            Text(l10n.noProjects)
+                .font(.system(size: 12, weight: .medium))
+            Text(l10n.noProjectsDesc)
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
     }
 
     private var footer: some View {
@@ -107,13 +118,13 @@ struct PopoverView: View {
             .buttonStyle(RowButtonStyle())
 
             menuRow(l10n.diskCleanup, icon: "trash") {
-                (NSApp.delegate as? AppDelegate)?.showMainWindow(selecting: .diskCleanup)
+                AppDelegate.shared?.showMainWindow(selecting: .diskCleanup)
             }
             menuRow(l10n.settingsEllipsis, icon: "gearshape") {
                 withAnimation(.easeOut(duration: 0.2)) { showSettings = true }
             }
             menuRow(l10n.mainWindow, icon: "macwindow") {
-                (NSApp.delegate as? AppDelegate)?.showMainWindow()
+                AppDelegate.shared?.showMainWindow()
             }
             menuRow(l10n.quit, icon: "power") {
                 NSApplication.shared.terminate(nil)

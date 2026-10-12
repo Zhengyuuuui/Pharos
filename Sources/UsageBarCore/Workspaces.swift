@@ -33,13 +33,29 @@ public struct Favorite: Codable, Identifiable, Hashable, Sendable {
 }
 
 public struct LaunchCandidate: Hashable, Sendable {
+    public enum Confidence: Int, Comparable, Sendable {
+        /// Declared start entry (package.json dev script, manage.py…): auto-filled.
+        case declared = 2
+        /// Guessed from file names (server.mjs, run.py): auto-filled if nothing better.
+        case guessed = 1
+        /// Shell scripts: shown, never auto-filled — they may do anything.
+        case script = 0
+
+        public static func < (a: Confidence, b: Confidence) -> Bool { a.rawValue < b.rawValue }
+    }
+
     public let command: String
     /// Where it came from, e.g. "package.json · dev". Shown under the command.
     public let origin: String
+    public let confidence: Confidence
+    /// Script contains commands that discard work (git reset --hard, rm -rf…).
+    public let destructive: Bool
 
-    public init(command: String, origin: String) {
+    public init(command: String, origin: String, confidence: Confidence = .declared, destructive: Bool = false) {
         self.command = command
         self.origin = origin
+        self.confidence = confidence
+        self.destructive = destructive
     }
 }
 
@@ -85,12 +101,38 @@ public enum LaunchDetector {
         if has("Cargo.toml") { out.append(LaunchCandidate(command: "cargo run", origin: "Cargo.toml")) }
         if has("go.mod") { out.append(LaunchCandidate(command: "go run .", origin: "go.mod")) }
         if has("Package.swift") { out.append(LaunchCandidate(command: "swift run", origin: "Package.swift")) }
-        for entry in ["main.py", "app.py", "server.py"] where has(entry) && !has("manage.py") {
-            out.append(LaunchCandidate(command: "\(python(has: has)) \(entry)", origin: entry))
+        for (name, _) in pyprojectScripts(dir) {
+            out.append(LaunchCandidate(command: "\(python(has: has, module: true)) \(ShellQuote.quote(name))",
+                                       origin: "pyproject.toml · \(name)"))
+        }
+
+        let files = (try? FileManager.default.contentsOfDirectory(atPath: dir)) ?? []
+        if !has("manage.py") {
+            for entry in pythonEntries(files) {
+                out.append(LaunchCandidate(command: "\(python(has: has)) \(ShellQuote.quote(entry))",
+                                           origin: entry, confidence: .guessed))
+            }
+        }
+        if !has("package.json") {
+            for entry in nodeEntries(files) {
+                out.append(LaunchCandidate(command: "node \(ShellQuote.quote(entry))", origin: entry, confidence: .guessed))
+            }
+        }
+        for script in shellScripts(files) {
+            let body = (try? String(contentsOfFile: dir + "/" + script, encoding: .utf8)) ?? ""
+            out.append(LaunchCandidate(command: "./\(ShellQuote.quote(script))", origin: script,
+                                       confidence: .script, destructive: isDestructive(body)))
         }
 
         var seen = Set<String>()
         return out.filter { seen.insert($0.command).inserted }
+    }
+
+    /// The command to pre-fill for a new favorite: the best non-script
+    /// candidate. Shell scripts are never auto-filled.
+    public static func autoFill(in directory: String) -> LaunchCandidate? {
+        let candidates = candidates(in: directory).filter { $0.confidence > .script }
+        return candidates.first { $0.confidence == .declared } ?? candidates.first
     }
 
     /// Turns a running listener's command line back into a start command.
@@ -175,11 +217,56 @@ public enum LaunchDetector {
 
     // MARK: - Others
 
-    static func python(has: (String) -> Bool) -> String {
+    /// How to run Python here. `module: true` = running a console script name
+    /// (uv run X / poetry run X), not a .py file.
+    static func python(has: (String) -> Bool, module: Bool = false) -> String {
         if has("uv.lock") { return "uv run" }
-        if has("poetry.lock") { return "poetry run python" }
-        if has(".venv/bin/python") { return ".venv/bin/python" }
-        return "python3"
+        if has("poetry.lock") { return module ? "poetry run" : "poetry run python" }
+        if has(".venv/bin/python") { return module ? ".venv/bin/python -m" : ".venv/bin/python" }
+        return module ? "python3 -m" : "python3"
+    }
+
+    /// Typical server entry files, most likely first. Helper scripts
+    /// (register.py, checkin.py…) are deliberately not guessed.
+    static let pythonEntryNames = ["main.py", "app.py", "server.py", "run.py", "serve.py", "web.py",
+                                   "gateway.py", "bridge.py", "api.py", "wsgi.py", "asgi.py"]
+    static let nodeEntryNames = ["server.mjs", "server.js", "index.mjs", "index.js", "main.mjs", "main.js",
+                                 "app.mjs", "app.js", "console_server.mjs"]
+    static let shellScriptNames = ["start.sh", "run.sh", "dev.sh", "serve.sh"]
+
+    static func pythonEntries(_ files: [String]) -> [String] { pythonEntryNames.filter(files.contains) }
+    static func nodeEntries(_ files: [String]) -> [String] { nodeEntryNames.filter(files.contains) }
+    static func shellScripts(_ files: [String]) -> [String] { shellScriptNames.filter(files.contains) }
+
+    static let destructivePatterns = [
+        #"git\s+reset\s+--hard"#, #"git\s+clean\s+-[a-z]*f"#, #"git\s+checkout\s+--\s"#,
+        #"rm\s+-[a-z]*r[a-z]*f"#, #"rm\s+-[a-z]*f[a-z]*r"#, #"\bsudo\b"#,
+    ]
+
+    static func isDestructive(_ script: String) -> Bool {
+        let code = script.split(separator: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("#") }
+            .joined(separator: "\n")
+        return destructivePatterns.contains { code.range(of: $0, options: .regularExpression) != nil }
+    }
+
+    /// `[project.scripts]` names from pyproject.toml — just enough TOML for
+    /// `name = "module:func"` lines inside that one table.
+    static func pyprojectScripts(_ dir: String) -> [(String, String)] {
+        guard let text = try? String(contentsOfFile: dir + "/pyproject.toml", encoding: .utf8) else { return [] }
+        var inTable = false
+        var out: [(String, String)] = []
+        for raw in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("[") { inTable = line == "[project.scripts]"; continue }
+            guard inTable, !line.hasPrefix("#"), let eq = line.firstIndex(of: "=") else { continue }
+            let name = line[..<eq].trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+            let value = line[line.index(after: eq)...].trimmingCharacters(in: .whitespaces)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+            if !name.isEmpty, name.allSatisfy({ $0.isLetter || $0.isNumber || "-_.".contains($0) }) {
+                out.append((name, value))
+            }
+        }
+        return out
     }
 
     static func makefileTargets(_ dir: String) -> [String] {

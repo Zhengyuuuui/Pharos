@@ -38,10 +38,15 @@ After a day of work you end up with a pile of `npm run dev`, `python -m http.ser
 - Port map chart (log scale, ◆ = exposed), memory-by-project bars, stacked dev-memory trend
 
 **Favorites (saved workspaces)**
-- **Add Workspace…** (sidebar ＋ or Ports Overview): pick project folders; the start command is detected from the folder's own files — `package.json` scripts (npm/pnpm/yarn/bun from the lockfile or `packageManager`), `deno.json`, `manage.py`, `bin/dev`, `Makefile` targets, docker compose, `Cargo.toml`, `go.mod`, `Package.swift`
+- **Add Workspace…** (sidebar ＋ or Ports Overview): pick project folders; the start command is detected from the folder's own files — `package.json` scripts (npm/pnpm/yarn/bun from the lockfile or `packageManager`), `deno.json`, `manage.py`, `bin/dev`, `Makefile` targets, docker compose, `Cargo.toml`, `go.mod`, `Package.swift`, `pyproject.toml` `[project.scripts]`, and entry files for script-only projects (`run.py`, `serve.py`, `gateway.py`, `server.mjs`…). The best match is filled in automatically; `start.sh`/`run.sh` are listed but never auto-filled, and scripts containing `git reset --hard`, `rm -rf` or `sudo` are flagged and can't be applied with one click
 - **☆ on any running project** saves it with the command it is *actually running with* (e.g. a running `next dev` maps back to `pnpm run dev`). Inline code (`node -e`, `python -c`), multi-line or huge command lines are never saved — they often contain tokens
 - Favorites show running (ports, memory, stop) or stopped (last seen ports) in the sidebar and on Ports Overview; edit the command, pick another detected one, copy `cd … && command`
 - **Open in Terminal** runs the command in a new Terminal.app window with your login shell (PATH, nvm, pyenv as usual); the process belongs to that window — Ctrl-C there stops it. UsageBar never runs commands in the background
+
+**Chrome instances**
+- Every running Chrome browser, identified by its profile folder (`--user-data-dir`): debug port, proxy, start URL, signed-in profiles, memory incl. all helper processes, folder size on demand. Debug-profile browsers no longer clutter the project list
+- ☆ saves a running instance as a preset with its exact flags; **New Instance** creates one (next free port, `~/chromeNNNN` folder); every field is editable
+- **Start** runs `open -na "Google Chrome" --args …` after checking the folder isn't already open and the port is free; **Quit** sends SIGTERM (normal Chrome shutdown), force quit only if it stays open; 🐞 opens `http://127.0.0.1:<port>` (DevTools target list). UsageBar itself never connects to debug ports
 
 **Disk Cleanup**
 - **Pinned "Temp files" group** on top: `/tmp`, `/var/tmp`, and your `/var/folders/…/T` and `…/C` — where AI agents, CLIs and build tools constantly write scratch files. One **Clean Temp Files** button, plus an adjustable retention (keep files newer than none / 1 h / 6 h / 1 day / 3 days; default 1 day, saved across restarts), meant for cleaning every day or two
@@ -83,6 +88,7 @@ Every write action is user-initiated:
 - **Stop** (`SIGTERM`, then `SIGKILL` only if still alive) — never PID ≤ 1, other users' processes, or UsageBar itself
 - **Disk cleanup** — only inside the fixed list of temp/cache folders, only your own regular files past the retention window
 - **Open in Terminal** for a favorite — writes a small `.command` script to `~/Library/Application Support/UsageBar/launch/` and hands it to Terminal.app
+- **Start / Quit Chrome** — `open -na "Google Chrome" --args …` with the preset's flags; quit = SIGTERM to the browser process, SIGKILL only on explicit force quit
 
 ### Project structure
 
@@ -95,12 +101,14 @@ Sources/
 │   ├── SystemMemory     #   machine-wide memory stats
 │   ├── MemoryHistory    #   rolling 1-hour samples for charts
 │   ├── DiskCleaner      #   temp/cache scan + clean (one shared per-file rule)
-│   └── Workspaces       #   favorites model, start-command detection, launch script
+│   ├── Workspaces       #   favorites model, start-command detection, launch script
+│   └── ChromeInstances  #   Chrome flags parsing, presets, launch args
 ├── UsageBar/            # SwiftUI app
 │   ├── ProjectStore     #   polling, state, actions
 │   ├── CleanupStore     #   disk cleanup state
 │   ├── WorkspaceStore   #   favorites: persist, pin, open in Terminal
-│   └── UI/              #   popover, main window, charts, cleanup, favorites, settings, L10n
+│   ├── ChromeStore      #   Chrome presets, start / quit
+│   └── UI/              #   popover, main window, charts, cleanup, favorites, Chrome, settings, L10n
 └── usagebar-tests/      # Test suite (`make test`)
 ```
 
@@ -143,10 +151,15 @@ swift build
 - 端口分布图（对数轴，◆ = 对外暴露）、各项目内存柱状图、开发项目内存堆叠趋势
 
 **常用项目（工作区）**
-- **添加工作区…**（侧栏 ＋ 或端口总览）：选择项目文件夹，从文件夹自身的文件识别启动命令——`package.json` 脚本（按锁文件或 `packageManager` 选 npm/pnpm/yarn/bun）、`deno.json`、`manage.py`、`bin/dev`、`Makefile` 目标、docker compose、`Cargo.toml`、`go.mod`、`Package.swift`
+- **添加工作区…**（侧栏 ＋ 或端口总览）：选择项目文件夹，从文件夹自身的文件识别启动命令——`package.json` 脚本（按锁文件或 `packageManager` 选 npm/pnpm/yarn/bun）、`deno.json`、`manage.py`、`bin/dev`、`Makefile` 目标、docker compose、`Cargo.toml`、`go.mod`、`Package.swift`、`pyproject.toml` 的 `[project.scripts]`，以及纯脚本项目的入口文件（`run.py`、`serve.py`、`gateway.py`、`server.mjs`…）。最佳匹配会自动填入；`start.sh`/`run.sh` 只列出不自动填入，含 `git reset --hard`、`rm -rf`、`sudo` 的脚本会被标记，不能一键设为启动命令
 - 在任意运行中项目上点 **☆**，会连同它**实际运行的命令**一起保存（例如正在运行的 `next dev` 会还原成 `pnpm run dev`）。内联代码（`node -e`、`python -c`）、多行或超长命令行不会被保存——它们常含 token
 - 常用项目在侧栏和端口总览里显示运行状态（端口、内存、结束）或未运行（上次端口）；可编辑命令、换用其他识别到的命令、复制 `cd … && 命令`
 - **在终端中启动**：在新的 Terminal.app 窗口里用你的登录 shell 运行（PATH、nvm、pyenv 照常生效）；进程归该窗口所有，在那里按 Ctrl-C 即停止。UsageBar 不会在后台运行任何命令
+
+**Chrome 实例**
+- 列出所有运行中的 Chrome 浏览器，按配置文件夹（`--user-data-dir`）区分：调试端口、代理、启动网址、已登录账号、内存（含全部 Helper 进程）、按需计算文件夹大小。调试用的 Chrome 不再混在项目列表里
+- ☆ 把运行中的实例连同全部参数保存为预设；**新建实例**会自动选下一个空闲端口和 `~/chromeNNNN` 文件夹；所有字段可编辑
+- **启动**：检查文件夹未被占用、端口空闲后执行 `open -na "Google Chrome" --args …`；**退出**：发送 SIGTERM（Chrome 正常关闭），仍未退出才提供强制结束；🐞 打开 `http://127.0.0.1:端口`（DevTools 调试列表）。UsageBar 本身不连接调试端口
 
 **磁盘清理**
 - **置顶的「临时文件」组**：`/tmp`、`/var/tmp`、你的 `/var/folders/…/T` 和 `…/C`——AI 助手、命令行工具和构建工具不断往这里写临时文件。一个**一键清理临时文件**按钮，加可调的保留期（保留最近：不保留 / 1 小时 / 6 小时 / 1 天 / 3 天；默认 1 天，重启后保留设置），适合每 1–2 天清理一次
@@ -178,6 +191,7 @@ UsageBar **不发起任何网络请求**，只读取**当前用户自己**的进
 - **结束进程**（先 `SIGTERM`，仍存活才 `SIGKILL`）——不会作用于 PID ≤ 1、其他用户的进程或 UsageBar 自身
 - **磁盘清理**——只在固定的临时/缓存目录内，只删属于你、超过保留期的普通文件
 - 常用项目的**在终端中启动**——把一个小 `.command` 脚本写到 `~/Library/Application Support/UsageBar/launch/` 后交给 Terminal.app 打开
+- **启动 / 退出 Chrome**——用预设参数执行 `open -na "Google Chrome" --args …`；退出即向浏览器主进程发 SIGTERM，只有点「强制结束」才用 SIGKILL
 
 纯 Swift + Apple 原生 SDK，**零第三方依赖**。贡献规则见 [`AGENTS.md`](AGENTS.md)。
 

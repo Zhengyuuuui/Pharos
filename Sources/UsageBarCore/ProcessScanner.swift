@@ -14,14 +14,18 @@ public enum ProcessScanner {
             guard let info = bsdInfo(pid), info.pbi_uid == uid else { continue }
             let ports = listeningPorts(pid)
             let listening = !ports.isEmpty
+            // Needed for every process: per-app memory rolls up by .app bundle.
+            let path = executablePath(pid)
+            // Chrome browser processes need their flags (profile dir, debug
+            // port) even when not listening; helpers are skipped by name.
+            let isChrome = ChromeInstances.isChromeExecutable(path: path, argv0: nil)
             result.append(ProcessSnapshot(
                 pid: pid,
                 ppid: Int32(info.pbi_ppid),
                 name: name(of: info),
-                // Needed for every process: per-app memory rolls up by .app bundle.
-                executablePath: executablePath(pid),
+                executablePath: path,
                 cwd: listening ? currentDirectory(pid) : nil,
-                arguments: listening ? arguments(pid) : [],
+                arguments: listening || isChrome ? arguments(pid) : [],
                 memoryBytes: footprint(pid),
                 ports: ports
             ))

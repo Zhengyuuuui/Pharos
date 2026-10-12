@@ -7,8 +7,18 @@ import UsageBarCore
 /// is open (`.regular`).
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+    /// `NSApp.delegate` is SwiftUI's adaptor wrapper, so `as? AppDelegate`
+    /// fails at runtime; views reach the delegate through this instead.
+    /// Weak: the @NSApplicationDelegateAdaptor owns the instance.
+    private(set) static weak var shared: AppDelegate?
+
     let store = ProjectStore()
     private var window: NSWindow?
+
+    override init() {
+        super.init()
+        AppDelegate.shared = self
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         showMainWindow()
@@ -22,6 +32,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func showMainWindow(selecting select: MainWindowView.SidebarItem? = nil) {
         NSApp.setActivationPolicy(.regular)
+        if window != nil, let select {
+            // Window already exists: switch its page instead of ignoring the request.
+            WindowRouter.shared.request = select
+        }
         if window == nil {
             let hosting = NSHostingController(
                 rootView: MainWindowView(initialSelection: select).environmentObject(store)
@@ -35,6 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             w.delegate = self
             window = w
         }
+        if window?.isMiniaturized == true { window?.deminiaturize(nil) }
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -51,6 +66,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             self?.window = nil
         }
     }
+}
+
+/// Page-switch requests for an already-open main window (from the popover).
+@MainActor
+final class WindowRouter: ObservableObject {
+    static let shared = WindowRouter()
+    @Published var request: MainWindowView.SidebarItem?
 }
 
 @main

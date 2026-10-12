@@ -10,6 +10,9 @@ final class ProjectStore: ObservableObject {
     /// @Published write re-renders every observing view (and its GPU layers).
     struct ScanState {
         var projects: [Project] = []
+        var chrome: [ChromeInstance] = []
+        /// Every TCP port any of the user's processes listens on (for launch conflict checks).
+        var listeningPorts: Set<UInt16> = []
         var apps: [AppUsage] = []
         var system: SystemMemoryStats?
         var history = MemoryHistory(window: 3600, minInterval: 10)
@@ -21,6 +24,7 @@ final class ProjectStore: ObservableObject {
     let activity = ScanActivity()
 
     var projects: [Project] { state.projects }
+    var chrome: [ChromeInstance] { state.chrome }
     var apps: [AppUsage] { state.apps }
     var system: SystemMemoryStats? { state.system }
     var history: MemoryHistory { state.history }
@@ -95,15 +99,23 @@ final class ProjectStore: ObservableObject {
         activity.isScanning = true
         defer { activity.isScanning = false }
         let include = showSystem
-        let (projects, apps, system) = await Task.detached(priority: .utility) {
+        let (projects, chrome, ports, apps, system) = await Task.detached(priority: .utility) {
             let all = ProcessScanner.scan()
-            return (ProjectGrouper.group(all, includeSystem: include),
+            let chrome = ChromeInstances.find(in: all)
+            // Chrome instances get their own page; keep debug-port browsers out
+            // of the project list even when "show background apps" is on.
+            let chromePIDs = Set(chrome.flatMap(\.allPIDs))
+            return (ProjectGrouper.group(all.filter { !chromePIDs.contains($0.pid) }, includeSystem: include),
+                    chrome,
+                    Set(all.flatMap { $0.ports.map(\.port) }),
                     AppGrouper.group(all),
                     SystemMemory.read())
         }.value
         let now = Date()
         var next = state
         next.projects = projects
+        next.chrome = chrome
+        next.listeningPorts = ports
         next.apps = apps
         if let system { next.system = system }
         next.history.append(MemorySample(
@@ -115,6 +127,7 @@ final class ProjectStore: ObservableObject {
         state = next
         let alive = stubborn.intersection(projects.map(\.id))
         if alive != stubborn { stubborn = alive }
+        ChromeStore.shared.clearStubborn(keeping: Set(chrome.map(\.id)))
     }
 
     // MARK: - Actions

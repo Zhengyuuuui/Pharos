@@ -219,6 +219,12 @@ final class L10n: ObservableObject {
     }
     var detectedCommands: String { en ? "Other detected commands" : "识别到的其他命令" }
     var useThis: String { en ? "Use" : "使用" }
+    var reviewScript: String { en ? "shell script — check it first" : "shell 脚本——请先确认内容" }
+    var destructiveScript: String { en ? "discards changes" : "会丢弃改动" }
+    var destructiveScriptHelp: String {
+        en ? "This script runs commands like git reset --hard or rm -rf. Not offered as a one-click start command; type it yourself if you really want it."
+           : "这个脚本含有 git reset --hard、rm -rf 等命令，不提供一键设为启动命令；确实需要请手动填写。"
+    }
     var runningNow: String { en ? "Running now" : "当前运行" }
     var dismiss: String { en ? "Dismiss" : "关闭" }
     func folderMissing(_ dir: String) -> String { en ? "Folder not found: \(dir)" : "找不到文件夹：\(dir)" }
@@ -227,6 +233,58 @@ final class L10n: ObservableObject {
         en ? "Saved favorites couldn't be read and were reset." : "已保存的常用项目无法读取，已重置。"
     }
     var favoritesSaveFailed: String { en ? "Couldn't save favorites." : "常用项目保存失败。" }
+
+    // MARK: - Chrome instances
+
+    var chromeTitle: String { en ? "Chrome" : "Chrome 实例" }
+    var manage: String { en ? "Manage…" : "管理…" }
+    var chromeRunning: String { en ? "Running" : "运行中" }
+    var chromePresets: String { en ? "Saved" : "已保存" }
+    var chromeMain: String { en ? "Chrome (main)" : "Chrome（主）" }
+    var newChromePreset: String { en ? "New Instance" : "新建实例" }
+    var measureFolders: String { en ? "Measure Folders" : "计算文件夹大小" }
+    var measuring: String { en ? "Measuring…" : "计算中…" }
+    var notSaved: String { en ? "not saved" : "未保存" }
+    var saveChromePreset: String { en ? "Save as preset (keeps its exact flags)" : "保存为预设（保留它的全部参数）" }
+    var startChrome: String { en ? "Start" : "启动" }
+    var quitChrome: String { en ? "Quit" : "退出" }
+    var openDevToolsList: String { en ? "Open DevTools target list in browser" : "在浏览器中打开 DevTools 调试列表" }
+    var profileFolder: String { en ? "Profile folder" : "配置文件夹" }
+    var defaultProfile: String { en ? "default (~/Library/…/Google/Chrome)" : "默认（~/Library/…/Google/Chrome）" }
+    var proxy: String { en ? "Proxy" : "代理" }
+    var startURL: String { en ? "Start URL" : "启动网址" }
+    var chromeAccounts: String { en ? "Profiles" : "账号/配置" }
+    var folderSize: String { en ? "Folder size" : "文件夹大小" }
+    var extraFlags: String { en ? "Extra flags" : "其他参数" }
+    var presetName: String { en ? "Name" : "名称" }
+    var debugPort: String { en ? "Debug port" : "调试端口" }
+    var invalidPort: String { en ? "Port must be 1024–65535." : "端口必须在 1024–65535 之间。" }
+    var flagsMustStartWithDash: String { en ? "Each extra flag must start with -" : "每个附加参数都必须以 - 开头" }
+    var chromeEmpty: String { en ? "No Chrome running" : "没有运行中的 Chrome" }
+    var chromeEmptyDesc: String {
+        en ? "Running instances appear here automatically. Use “New Instance” to save a debug profile you start often."
+           : "运行中的实例会自动出现在这里。用「新建实例」保存一个常用的调试配置。"
+    }
+    var chromeAlreadyRunning: String {
+        en ? "This profile folder is already in use by a running Chrome." : "这个配置文件夹已被一个运行中的 Chrome 使用。"
+    }
+    func portInUse(_ port: UInt16) -> String {
+        en ? "Port \(port) is already in use by another process." : "端口 \(port) 已被其他进程占用。"
+    }
+    var defaultProfileDebugWarning: String {
+        en ? "Chrome ignores --remote-debugging-port on the default profile; set a profile folder."
+           : "Chrome 在默认配置上会忽略 --remote-debugging-port，请设置一个配置文件夹。"
+    }
+    var chromeNotInstalled: String {
+        en ? "Google Chrome not found in /Applications." : "在 /Applications 中找不到 Google Chrome。"
+    }
+    func chromeStartFailed(_ reason: String) -> String { en ? "Couldn't start Chrome: \(reason)" : "无法启动 Chrome：\(reason)" }
+    var chromeLoadFailed: String { en ? "Saved Chrome presets couldn't be read and were reset." : "已保存的 Chrome 预设无法读取，已重置。" }
+    var chromeSaveFailed: String { en ? "Couldn't save Chrome presets." : "Chrome 预设保存失败。" }
+    var chromeNotice: String {
+        en ? "Instances are identified by profile folder (Chrome allows one per folder). Start runs `open -na \"Google Chrome\" --args …`; Quit sends SIGTERM (Chrome's normal shutdown, tabs restore next time), force quit only if it stays open. UsageBar doesn't connect to the debug ports."
+           : "实例按配置文件夹区分（Chrome 每个文件夹只能开一个）。启动即执行 `open -na \"Google Chrome\" --args …`；退出发送 SIGTERM（Chrome 正常关闭，下次可恢复标签页），仍未退出才提供强制结束。UsageBar 不会连接调试端口。"
+    }
 
     // MARK: - Disk cleanup
 
