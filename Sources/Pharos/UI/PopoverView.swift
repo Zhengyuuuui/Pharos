@@ -4,10 +4,9 @@ import PharosCore
 struct PopoverView: View {
     @EnvironmentObject var store: ProjectStore
     @ObservedObject private var l10n = L10n.shared
+    @ObservedObject private var layoutStore = PopoverLayoutStore.shared
     @State private var showSettings = false
-    @AppStorage("popoverTab") private var tab: Tab = .projects
-
-    enum Tab: String { case overview, projects }
+    @AppStorage("popoverTab") private var tab: PopoverTab = .projects
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -15,17 +14,7 @@ struct PopoverView: View {
                 SettingsView(isPresented: $showSettings)
             } else {
                 header
-                Picker("", selection: $tab) {
-                    Text(l10n.overview).tag(Tab.overview)
-                    Text(l10n.projects).tag(Tab.projects)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                if tab == .overview {
-                    PopoverOverview()
-                } else {
-                    content
-                }
+                PopoverTabsContent(layout: layoutStore.layout, tab: $tab)
                 Divider()
                 footer
             }
@@ -47,55 +36,6 @@ struct PopoverView: View {
                     .foregroundStyle(.secondary)
             }
         }
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        if store.lastScan == nil {
-            HStack {
-                ProgressView().controlSize(.small)
-                Text(l10n.loading).font(.system(size: 11)).foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-        } else {
-            let chromeEntries = ChromeStore.shared.entries(store.chrome)
-            let maxMem = store.projects.map(\.memoryBytes).max() ?? 1
-            ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
-                    if store.projects.isEmpty {
-                        emptyProjects
-                    } else {
-                        ForEach(store.projects) { project in
-                            PopoverProjectRow(project: project,
-                                              fraction: Double(project.memoryBytes) / Double(max(1, maxMem)))
-                        }
-                    }
-                    if !chromeEntries.isEmpty {
-                        PopoverChromeSection(entries: chromeEntries)
-                            .padding(.top, 8)
-                    }
-                }
-            }
-            .frame(maxHeight: 460)
-            .fixedSize(horizontal: false, vertical: store.projects.count + chromeEntries.count <= 7)
-        }
-    }
-
-    private var emptyProjects: some View {
-        VStack(spacing: 4) {
-            Image(systemName: "network.slash")
-                .font(.system(size: 20))
-                .foregroundStyle(.tertiary)
-            Text(l10n.noProjects)
-                .font(.system(size: 12, weight: .medium))
-            Text(l10n.noProjectsDesc)
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 10)
     }
 
     private var footer: some View {
@@ -120,6 +60,9 @@ struct PopoverView: View {
             menuRow(l10n.diskCleanup, icon: "trash") {
                 AppDelegate.shared?.showMainWindow(selecting: .diskCleanup)
             }
+            menuRow(l10n.customizePopover, icon: "square.grid.2x2") {
+                AppDelegate.shared?.showMainWindow(selecting: .customize)
+            }
             menuRow(l10n.settingsEllipsis, icon: "gearshape") {
                 withAnimation(.easeOut(duration: 0.2)) { showSettings = true }
             }
@@ -143,6 +86,60 @@ struct PopoverView: View {
         }
         .buttonStyle(RowButtonStyle())
     }
+}
+
+/// Tab picker + the blocks of the selected tab, following the saved layout.
+/// A tab with no blocks is hidden; with one tab left, the picker disappears.
+struct PopoverTabsContent: View {
+    @EnvironmentObject var store: ProjectStore
+    @ObservedObject private var l10n = L10n.shared
+    let layout: PopoverLayout
+    @Binding var tab: PopoverTab
+    /// false in the Customize preview: blocks render but don't take clicks.
+    var interactive = true
+
+    var body: some View {
+        let tabs = layout.visibleTabs
+        let current = tabs.contains(tab) ? tab : (tabs.first ?? .overview)
+        VStack(alignment: .leading, spacing: 10) {
+            if tabs.count > 1 {
+                Picker("", selection: $tab) {
+                    ForEach(tabs, id: \.self) { Text(l10n.popoverTabName($0)).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            }
+            if store.lastScan == nil {
+                HStack {
+                    ProgressView().controlSize(.small)
+                    Text(l10n.loading).font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+            } else if tabs.isEmpty {
+                Text(l10n.popoverEmpty).font(.system(size: 11)).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity).padding(.vertical, 12)
+            } else {
+                ScrollView {
+                    PopoverBlockStack(blocks: layout[current])
+                        .allowsHitTesting(interactive)
+                        .background(GeometryReader { geo in
+                            Color.clear.preference(key: ContentHeightKey.self, value: geo.size.height)
+                        })
+                }
+                // Grow with the content, scroll past 520 pt.
+                .frame(height: min(max(contentHeight, 40), 520))
+                .onPreferenceChange(ContentHeightKey.self) { contentHeight = $0 }
+            }
+        }
+    }
+
+    @State private var contentHeight: CGFloat = 200
+}
+
+private struct ContentHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
 struct PopoverProjectRow: View {
@@ -234,85 +231,6 @@ struct StopButton: View {
                 Label(l10n.stopProject, systemImage: "stop.circle")
             }
             .controlSize(.small)
-        }
-    }
-}
-
-/// Compact version of the main window's overview pages.
-struct PopoverOverview: View {
-    @EnvironmentObject var store: ProjectStore
-    @ObservedObject private var l10n = L10n.shared
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if let s = store.system {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(l10n.systemMemory).font(.system(size: 12, weight: .semibold))
-                        Spacer()
-                        Text("\(ByteFormat.short(s.used)) / \(ByteFormat.short(s.total))")
-                            .font(.system(size: 11, weight: .medium).monospacedDigit())
-                        Text("· \(l10n.availableMemory) \(ByteFormat.short(s.available))")
-                            .font(.system(size: 11, weight: .medium).monospacedDigit())
-                            .foregroundStyle(.green)
-                    }
-                    MemoryCompositionBar(stats: s, height: 10, showLegend: false)
-                    HStack {
-                        PressureBadge(pressure: s.pressure)
-                        Spacer()
-                        Text("\(l10n.swapUsed) \(ByteFormat.short(s.swapUsed))")
-                            .font(.system(size: 10).monospacedDigit())
-                            .foregroundStyle(.secondary)
-                    }
-                    if store.history.samples.count >= 2 {
-                        SystemTrendChart(samples: store.history.samples, total: s.total, compact: true)
-                            .frame(height: 70)
-                    }
-                }
-            }
-
-            if !store.volumes.isEmpty {
-                Divider()
-                PopoverDiskSection()
-            }
-
-            if store.thermals != nil {
-                Divider()
-                PopoverThermalSection()
-            }
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(l10n.devProjects).font(.system(size: 12, weight: .semibold))
-                    Spacer()
-                    Text("\(store.totalPorts) \(l10n.ports) · \(ByteFormat.short(store.totalMemory))")
-                        .font(.system(size: 11, weight: .medium).monospacedDigit())
-                }
-                if store.history.samples.count >= 2 && !store.projects.isEmpty {
-                    DevTrendChart(history: store.history, limit: 5, compact: true)
-                        .frame(height: 80)
-                }
-                if !store.projects.isEmpty {
-                    ProjectMemoryBars(projects: Array(store.projects.sorted { $0.memoryBytes > $1.memoryBytes }.prefix(5)))
-                }
-            }
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(l10n.topApps).font(.system(size: 12, weight: .semibold))
-                ForEach(store.apps.prefix(5)) { app in
-                    HStack {
-                        Text(app.name).font(.system(size: 11)).lineLimit(1)
-                        Spacer()
-                        Text(ByteFormat.short(app.memoryBytes))
-                            .font(.system(size: 11).monospacedDigit())
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
         }
     }
 }

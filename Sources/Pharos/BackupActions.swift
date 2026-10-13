@@ -18,7 +18,8 @@ enum BackupActions {
         NSApp.activate(ignoringOtherApps: true)
         guard panel.runModal() == .OK, let url = panel.url else { return nil }
         do {
-            try Backup(favorites: favorites, browserPresets: presets).encoded().write(to: url, options: .atomic)
+            try Backup(favorites: favorites, browserPresets: presets,
+                       popoverLayout: PopoverLayoutStore.shared.layout).encoded().write(to: url, options: .atomic)
             return l10n.exported(favorites.count, presets.count)
         } catch {
             return l10n.backupFailed(error.localizedDescription)
@@ -37,6 +38,7 @@ enum BackupActions {
             let m = backup.merge(into: WorkspaceStore.shared.favorites, presets: ChromeStore.shared.presets)
             WorkspaceStore.shared.add(m.favorites)
             ChromeStore.shared.add(m.presets)
+            if let layout = backup.popoverLayout { PopoverLayoutStore.shared.update { $0 = layout } }
             return l10n.imported(m.favorites.count, m.presets.count, m.skipped)
         } catch let e as Backup.ReadError {
             switch e {

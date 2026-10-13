@@ -24,6 +24,7 @@ struct MainWindowView: View {
         case chrome
         case favorite(String)
         case project(String)
+        case customize
         case settings
     }
 
@@ -143,6 +144,8 @@ struct MainWindowView: View {
                     }
                 }
                 Section {
+                    Label(l10n.customizeTitle, systemImage: "square.grid.2x2")
+                        .tag(SidebarItem.customize)
                     Label(l10n.settings, systemImage: "gearshape")
                         .tag(SidebarItem.settings)
                 }
@@ -191,6 +194,8 @@ struct MainWindowView: View {
                     ContentUnavailableView(l10n.noProjects, systemImage: "network.slash",
                                            description: Text(l10n.noProjectsDesc))
                 }
+            case .customize:
+                CustomizePopoverView()
             case .settings:
                 MainSettingsView()
             case nil:

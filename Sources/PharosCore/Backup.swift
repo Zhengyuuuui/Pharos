@@ -1,6 +1,6 @@
 import Foundation
 
-/// Export / import file for favorites and browser presets.
+/// Export / import file for favorites, browser presets and the popover layout.
 public struct Backup: Codable, Sendable {
     public static let currentVersion = 1
     public static let format = "pharos-backup"
@@ -10,13 +10,17 @@ public struct Backup: Codable, Sendable {
     public var exportedAt: Date
     public var favorites: [Favorite]
     public var browserPresets: [ChromePreset]
+    /// Optional so backups made before popover customization still import.
+    public var popoverLayout: PopoverLayout?
 
-    public init(favorites: [Favorite], browserPresets: [ChromePreset], exportedAt: Date = Date()) {
+    public init(favorites: [Favorite], browserPresets: [ChromePreset], popoverLayout: PopoverLayout? = nil,
+                exportedAt: Date = Date()) {
         format = Self.format
         version = Self.currentVersion
         self.exportedAt = exportedAt
         self.favorites = favorites
         self.browserPresets = browserPresets
+        self.popoverLayout = popoverLayout
     }
 
     public func encoded() throws -> Data {

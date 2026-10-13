@@ -26,4 +26,11 @@ func testBackup() {
     expectEq(m.presets.count, 0, "same browser + profile skipped")
     expectEq(m.skipped, 2, "skipped count")
     expect(m.favorites.first?.id != other.id, "imported entries get fresh ids")
+
+    var custom = PopoverLayout.standard
+    custom.insert(.favorites, into: .overview, before: .memory)
+    let withLayout = try? Backup(favorites: [], browserPresets: [], popoverLayout: custom).encoded()
+    expectEq(withLayout.flatMap { try? Backup.decode($0) }?.popoverLayout, custom, "popover layout round-trips")
+    let old = String(decoding: data ?? Data(), as: UTF8.self)
+    expectEq((try? Backup.decode(Data(old.utf8)))?.popoverLayout, nil, "backups without a layout still import")
 }

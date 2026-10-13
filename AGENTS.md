@@ -87,6 +87,9 @@ Swift 通过 **ARC（自动引用计数）** 管理内存：编译器自动插�
 - App 状态在 `Sources/Pharos/ProjectStore.swift`（窗口可见时按设置间隔轮询，不可见时 30s 低频采样以保留 1 小时内存历史）；
   磁盘清理状态在 `Sources/Pharos/CleanupStore.swift`（懒扫描：仅清理页可见时扫描）；
   UI 组件放 `Sources/Pharos/UI/`。
+- 菜单栏下拉框由 `PopoverLayout`（Core，纯逻辑可单测）描述：每个块（`PopoverBlock`）最多出现一次，
+  视图在 `UI/PopoverBlocks.swift`；「自定义」页的预览必须复用同一组块视图（保证所见即所得），且预览中块不可点击。
+  新增块时：加 `PopoverBlock` case、`PopoverBlockView` 分支和 `L10n.blockName/blockDescription`。
 - **国际化**：所有 UI 文案必须走 `L10n`（`UI/L10n.swift`），同时提供
   `en` 与 `zh-Hans` 两种语言；禁止在 View 里硬编码用户可见字符串。
   视图用 `@ObservedObject private var l10n = L10n.shared` 观察以便即时切换。

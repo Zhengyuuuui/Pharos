@@ -225,8 +225,8 @@ final class L10n: ObservableObject {
     var exportSettings: String { en ? "Export…" : "导出…" }
     var importSettings: String { en ? "Import…" : "导入…" }
     var backupHint: String {
-        en ? "Favorite projects and browser presets as one JSON file. Importing adds new entries and skips ones you already have."
-           : "把常用项目和浏览器预设导出为一个 JSON 文件。导入时只添加新的条目，已有的会跳过。"
+        en ? "Favorite projects, browser presets and the popover layout as one JSON file. Importing adds new entries, skips ones you already have, and applies the saved popover layout."
+           : "把常用项目、浏览器预设和下拉框布局导出为一个 JSON 文件。导入时只添加新的条目（已有的跳过），并应用备份里的下拉框布局。"
     }
     func exported(_ favorites: Int, _ presets: Int) -> String {
         en ? "Exported \(favorites) projects and \(presets) browser presets." : "已导出 \(favorites) 个常用项目和 \(presets) 个浏览器预设。"
@@ -461,6 +461,64 @@ final class L10n: ObservableObject {
     var fanSafety: String {
         en ? "Safety: fans go back to macOS when Pharos quits, crashes or stops responding for 15 s, after sleep the setting is re-applied, and any CPU/GPU sensor at 95 °C forces max. Speeds are limited to each fan's rated range."
            : "安全措施：Pharos 退出、崩溃或 15 秒无响应时，风扇自动交还系统；睡眠唤醒后重新应用；任一 CPU/GPU 传感器达到 95°C 时强制满速。转速限制在每个风扇的额定范围内。"
+    }
+
+    // MARK: - Customize popover
+
+    var customizePopover: String { en ? "Customize Popover…" : "自定义下拉框…" }
+    var customizeTitle: String { en ? "Customize" : "自定义" }
+    var customizeIntro: String {
+        en ? "Arrange the menu bar popover like widgets: drag blocks between the two tabs to reorder them, drag one out to the library to hide it, or drag one in from the library. The preview on the left is the real popover with live data."
+           : "像编辑小组件一样排列菜单栏下拉框：在两个页签之间拖动块来调整顺序，拖到右侧组件库即可隐藏，从组件库拖进来即可添加。左边的预览就是实际的下拉框，显示实时数据。"
+    }
+    var componentLibrary: String { en ? "Library" : "组件库" }
+    var libraryEmpty: String { en ? "Every block is in use." : "所有组件都已使用。" }
+    var dropHere: String { en ? "Drop a block here" : "把组件拖到这里" }
+    var dropToRemove: String { en ? "Drop here to remove" : "拖到这里移除" }
+    var resetLayout: String { en ? "Reset to Default" : "恢复默认" }
+    var moveUp: String { en ? "Move up" : "上移" }
+    var moveDown: String { en ? "Move down" : "下移" }
+    var removeBlock: String { en ? "Remove" : "移除" }
+    func addTo(_ tab: String) -> String { en ? "Add to \(tab)" : "添加到「\(tab)」" }
+    var popoverEmpty: String {
+        en ? "No blocks. Add some in Main window → Customize." : "没有组件，可在主窗口 →「自定义」中添加。"
+    }
+    var favoritesEmptyShort: String { en ? "No favorite projects yet." : "还没有常用项目。" }
+    var projectRowsTitle: String { en ? "Running projects shown" : "运行中的项目显示个数" }
+    func projectRowsRange(_ lo: Int, _ hi: Int, running: Int) -> String {
+        en ? "\(running) running · range \(lo)–\(hi)" : "当前运行 \(running) 个 · 可设 \(lo)–\(hi)"
+    }
+    func rowsAll(_ n: Int) -> String { en ? "All (\(n))" : "全部（\(n)）" }
+    var projectsUnit: String { en ? "projects" : "个" }
+    func popoverTabName(_ t: PopoverTab) -> String {
+        switch t {
+        case .overview: return overview
+        case .projects: return projects
+        }
+    }
+    func blockName(_ b: PopoverBlock) -> String {
+        switch b {
+        case .memory: return systemMemory
+        case .disk: return diskUsage
+        case .thermals: return thermalTitle
+        case .devProjects: return devProjects
+        case .topApps: return topApps
+        case .projects: return en ? "Running projects" : "运行中的项目"
+        case .browsers: return chromeTitle
+        case .favorites: return favorites
+        }
+    }
+    func blockDescription(_ b: PopoverBlock) -> String {
+        switch b {
+        case .memory: return en ? "Used / available, pressure, 1-hour trend" : "已用 / 可用、内存压力、1 小时趋势"
+        case .disk: return en ? "Every volume incl. external drives" : "所有卷，含外接硬盘"
+        case .thermals: return en ? "Fan speeds, CPU / GPU temperature" : "风扇转速、CPU / GPU 温度"
+        case .devProjects: return en ? "Dev memory trend and top projects" : "开发项目内存趋势与排行"
+        case .topApps: return en ? "Apps using the most memory" : "内存占用最多的应用"
+        case .projects: return en ? "Ports, memory, stop" : "端口、内存、结束"
+        case .browsers: return en ? "Start / quit browser instances" : "启动 / 退出浏览器实例"
+        case .favorites: return en ? "Saved projects, open in Terminal" : "常用项目，一键在终端启动"
+        }
     }
 
     // MARK: - Disk usage

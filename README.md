@@ -20,11 +20,11 @@
   <img src="https://img.shields.io/badge/dependencies-none-brightgreen" alt="Dependencies">
   <img src="https://img.shields.io/badge/network-none-lightgrey" alt="No network">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.1-blue" alt="Version 2.1">
+  <img src="https://img.shields.io/badge/version-2.2-blue" alt="Version 2.2">
   <img src="https://img.shields.io/badge/updated-2026--10--13-informational" alt="Last updated 2026-10-13">
 </p>
 
-<p align="center"><sub>Last updated / 最后更新：2026-10-13 13:27 (UTC+8) · v2.1</sub></p>
+<p align="center"><sub>Last updated / 最后更新：2026-10-13 14:23 (UTC+8) · v2.2</sub></p>
 
 <p align="center"><a href="#english">English</a> · <a href="#简体中文">简体中文</a> · <a href="#changelog--更新记录">Changelog / 更新记录</a></p>
 
@@ -56,6 +56,8 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 - **Overview** tab: system memory, pressure, disk usage of every volume (incl. external drives), top apps
 - **Projects** tab: running projects with ports and memory, plus your browser instances (start / quit / open debug list, “Manage…” jumps to the Browsers page)
 - Quick buttons to open the main window or jump straight to Disk Cleanup
+- **Customizable like widgets** (Main window → Customize): a live snapshot of the popover next to its two tabs and a component library — drag blocks to reorder them, move them between tabs, drag them out to hide or in to add (memory, disk, fans & temperature, dev projects, top apps, running projects, browser instances, favorite projects). Empty tabs disappear; Reset to Default restores the original layout
+- Below the library, **Running projects shown** sets how many projects the popover lists before scrolling: quick picks (3 / 5 / 8 / 10 / 15 / all running) or type a number — minimum 3, maximum the number of projects running right now (default 5). Extra projects scroll inside the list
 
 **Projects**
 - Every process of yours that **listens on a TCP port**, grouped into projects by working directory
@@ -125,7 +127,7 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 - Optional number next to the menu bar icon: port count, memory used % or startup disk used %
 - Optional global shortcut to open the popover (⌥⌘P, ⌃⌥P or ⌥⌘Space; off by default, no Accessibility permission needed)
 - Optional local notifications (all off by default): memory pressure becomes high, a disk reaches 95 %, a favorite project stops on its own. Each fires once and re-arms only after it clears
-- **Backup**: export favorites and browser presets to one JSON file, import on another Mac (adds new entries, skips existing ones)
+- **Backup**: export favorites, browser presets and the popover layout to one JSON file, import on another Mac (adds new entries, skips existing ones)
 
 ### Install
 
@@ -179,7 +181,8 @@ Sources/
 │   ├── Backup           #   export / import format and merge rules
 │   ├── SMC / Thermals   #   read fans and temperatures from the SMC
 │   ├── FanPolicy        #   fan safety rules + helper protocol
-│   └── FanHelperInstall #   helper paths, launchd plist, install script
+│   ├── FanHelperInstall #   helper paths, launchd plist, install script
+│   └── PopoverLayout    #   which blocks each popover tab shows (customizable)
 ├── Pharos/              # SwiftUI app
 │   ├── ProjectStore     #   polling, state, actions
 │   ├── CleanupStore     #   disk cleanup state
@@ -236,6 +239,8 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 - **概览**页：本机内存、内存压力、所有磁盘的用量（含外接硬盘）、应用内存排行
 - **项目**页：运行中的项目（端口、内存）以及浏览器实例（启动 / 退出 / 打开调试列表，「管理…」直达「浏览器实例」页面）
 - 快捷按钮：打开主窗口、直达磁盘清理
+- **像小组件一样自定义**（主窗口 →「自定义」）：左边是下拉框的实时快照，旁边是两个页签和组件库——拖动组件调整顺序、在页签之间移动、拖出隐藏或拖入添加（内存、磁盘、风扇与温度、开发项目、应用排行、运行中的项目、浏览器实例、常用项目）。空页签会自动隐藏；「恢复默认」可还原原始布局
+- 组件库下方的**运行中的项目显示个数**：设置下拉框里最多列出几个项目，可点快捷选项（3 / 5 / 8 / 10 / 15 / 全部运行中）或直接输入数字——最少 3 个，最多为当前正在运行的项目数（默认 5 个）。多出来的项目在列表内滚动
 
 **项目**
 - 列出你自己**正在监听 TCP 端口**的进程，按工作目录归组为项目
@@ -305,7 +310,7 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 - 可选在菜单栏图标旁显示数字：端口数、内存占用 % 或启动磁盘占用 %
 - 可选全局快捷键打开下拉框（⌥⌘P、⌃⌥P 或 ⌥⌘Space；默认关闭，不需要辅助功能权限）
 - 可选本地通知（默认全部关闭）：内存压力升高、磁盘用量达到 95%、常用项目自己停止。每种情况只提醒一次，恢复后才会再次提醒
-- **备份**：把常用项目和浏览器预设导出为一个 JSON 文件，在另一台 Mac 上导入（只添加新的条目，已有的跳过）
+- **备份**：把常用项目、浏览器预设和下拉框布局导出为一个 JSON 文件，在另一台 Mac 上导入（只添加新的条目，已有的跳过）
 
 ### 安装
 
@@ -359,7 +364,8 @@ Sources/
 │   ├── Backup           #   导出 / 导入格式与合并规则
 │   ├── SMC / Thermals   #   从 SMC 读取风扇和温度
 │   ├── FanPolicy        #   风扇安全规则 + 助手通信协议
-│   └── FanHelperInstall #   助手路径、launchd 配置、安装脚本
+│   ├── FanHelperInstall #   助手路径、launchd 配置、安装脚本
+│   └── PopoverLayout    #   下拉框各页签显示哪些组件（可自定义）
 ├── Pharos/              # SwiftUI 应用
 │   ├── ProjectStore     #   轮询、状态、操作
 │   ├── CleanupStore     #   磁盘清理状态
@@ -393,6 +399,18 @@ make icon                           # 用 Scripts/make-icon.swift 重新生成 A
 ## Changelog / 更新记录
 
 Times are UTC+8. 时间为北京时间（UTC+8）。
+
+### v2.2 — 2026-10-13 14:23
+
+**English**
+- **Customize the popover like widgets** (Main window → Customize): live snapshot of the popover, its two tabs and a component library; drag blocks to reorder, move between tabs, hide or add. Eight blocks incl. a new **Favorite projects** block; empty tabs hide; Reset to Default
+- **Running projects shown**: set how many projects the popover lists before the list scrolls (3 up to the number running, default 5)
+- Popover layout is included in backups
+
+**简体中文**
+- **像小组件一样自定义下拉框**（主窗口 →「自定义」）：下拉框实时快照、两个页签和组件库；拖动组件调整顺序、在页签间移动、隐藏或添加。共 8 个组件，新增**常用项目**组件；空页签自动隐藏；可恢复默认
+- **运行中的项目显示个数**：设置下拉框最多列出几个项目，超过后列表内滚动（最少 3 个，最多为当前运行数，默认 5 个）
+- 备份中包含下拉框布局
 
 ### v2.1 — 2026-10-13 13:27
 
