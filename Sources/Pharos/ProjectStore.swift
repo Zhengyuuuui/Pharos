@@ -16,6 +16,8 @@ final class ProjectStore: ObservableObject {
         var apps: [AppUsage] = []
         var system: SystemMemoryStats?
         var volumes: [DiskVolume] = []
+        var thermals: ThermalSnapshot?
+        var thermalState: ProcessInfo.ThermalState = .nominal
         var history = MemoryHistory(window: 3600, minInterval: 10)
         var lastScan: Date?
     }
@@ -29,6 +31,8 @@ final class ProjectStore: ObservableObject {
     var apps: [AppUsage] { state.apps }
     var system: SystemMemoryStats? { state.system }
     var volumes: [DiskVolume] { state.volumes }
+    var thermals: ThermalSnapshot? { state.thermals }
+    var thermalState: ProcessInfo.ThermalState { state.thermalState }
     var history: MemoryHistory { state.history }
     var lastScan: Date? { state.lastScan }
     var isScanning: Bool { activity.isScanning }
@@ -117,6 +121,7 @@ final class ProjectStore: ObservableObject {
         defer { activity.isScanning = false }
         // Not awaited: a slow or disconnected network share must not delay ports/memory.
         Task { await refreshVolumes() }
+        Task { await refreshThermals() }
         let include = showSystem
         let (projects, chrome, ports, apps, system) = await Task.detached(priority: .utility) {
             let all = ProcessScanner.scan()
@@ -158,6 +163,24 @@ final class ProjectStore: ObservableObject {
         defer { readingVolumes = false }
         let volumes = await Task.detached(priority: .utility) { DiskVolumes.read() }.value
         if volumes != state.volumes { state.volumes = volumes }
+    }
+
+    private var readingThermals = false
+
+    /// Separate task like volumes: SMC reads are fast (~50 ms) but the first one
+    /// enumerates every key (~300 ms) and must not hold up the process scan.
+    func refreshThermals() async {
+        guard !readingThermals else { return }
+        readingThermals = true
+        defer { readingThermals = false }
+        let snap = await Task.detached(priority: .utility) { Thermals.read() }.value
+        let level = ProcessInfo.processInfo.thermalState
+        if snap != state.thermals || level != state.thermalState {
+            var next = state
+            next.thermals = snap
+            next.thermalState = level
+            state = next
+        }
     }
 
     func revealVolume(_ v: DiskVolume) {

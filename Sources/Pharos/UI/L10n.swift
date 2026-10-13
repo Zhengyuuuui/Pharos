@@ -378,6 +378,91 @@ final class L10n: ObservableObject {
            : "支持 Chrome、Chrome Beta / Canary、Chromium、Edge 和 Brave。实例按配置文件夹区分（每个文件夹只能开一个浏览器）。启动即执行 `open -na \"<浏览器>\" --args …`；退出发送 SIGTERM（浏览器正常关闭，下次可恢复标签页），仍未退出才提供强制结束。Pharos 不会连接调试端口。"
     }
 
+    // MARK: - Thermals / fans
+
+    var thermalTitle: String { en ? "Fans & Temperature" : "风扇与温度" }
+    var fansTitle: String { en ? "Fans" : "风扇" }
+    var temperaturesTitle: String { en ? "Temperatures" : "温度" }
+    func fanName(_ i: Int, of count: Int) -> String {
+        if count == 2 { return en ? (i == 0 ? "Left fan" : "Right fan") : (i == 0 ? "左风扇" : "右风扇") }
+        return en ? "Fan \(i + 1)" : "风扇 \(i + 1)"
+    }
+    var fanStopped: String { en ? "stopped" : "停转" }
+    func fanRange(_ min: Int, _ max: Int) -> String { en ? "\(min)–\(max) rpm" : "\(min)–\(max) 转/分" }
+    func fanMode(_ m: FanReading.Mode) -> String {
+        switch m {
+        case .system: return en ? "macOS" : "系统控制"
+        case .auto: return en ? "Auto" : "自动"
+        case .manual: return en ? "Manual" : "手动"
+        case .unknown: return en ? "Unknown" : "未知"
+        }
+    }
+    func sensorGroup(_ g: SensorGroup) -> String {
+        switch g {
+        case .cpu: return "CPU"
+        case .gpu: return "GPU"
+        case .memory: return en ? "Memory" : "内存"
+        case .ssd: return "SSD"
+        case .battery: return en ? "Battery" : "电池"
+        case .power: return en ? "Power" : "供电"
+        case .ambient: return en ? "Inside case" : "机身内部"
+        }
+    }
+    var thermalStateTitle: String { en ? "Thermal state" : "散热状态" }
+    func thermalStateName(_ s: ProcessInfo.ThermalState) -> String {
+        switch s {
+        case .nominal: return en ? "Normal" : "正常"
+        case .fair: return en ? "Warm" : "略高"
+        case .serious: return en ? "Hot — throttling" : "较高（降频中）"
+        case .critical: return en ? "Critical" : "严重"
+        @unknown default: return "—"
+        }
+    }
+    var thermalUnavailable: String {
+        en ? "Fan and temperature sensors couldn't be read on this Mac." : "这台 Mac 上无法读取风扇和温度传感器。"
+    }
+    var thermalReadNotice: String {
+        en ? "Read directly from the System Management Controller (no permission needed). Sensor names aren't public Apple API, so groups show the hottest sensor of each kind; numbers may differ slightly from other tools."
+           : "直接从系统管理控制器（SMC）读取，无需权限。传感器名称不是 Apple 公开接口，所以每组显示同类中最热的传感器；数值可能与其他工具略有差异。"
+    }
+    var openEnergySettings: String { en ? "Energy Mode Settings…" : "能耗模式设置…" }
+
+    // Fan control
+    var fanControlTitle: String { en ? "Fan control" : "风扇控制" }
+    var fanControlIntro: String {
+        en ? "Keep fans faster than macOS would when your Mac runs hot. Needs a small helper that runs as root (installed once with your administrator password). Not supported by Apple — use at your own risk."
+           : "在 Mac 发热时让风扇比系统默认转得更快。需要安装一个以 root 运行的小助手（输入一次管理员密码）。这不是 Apple 支持的功能，风险自负。"
+    }
+    var fanInstall: String { en ? "Install Fan Control…" : "安装风扇控制…" }
+    var fanUninstall: String { en ? "Uninstall" : "卸载" }
+    var fanInstallPrompt: String { en ? "Pharos wants to install its fan control helper." : "Pharos 要安装风扇控制助手。" }
+    var fanUninstallPrompt: String { en ? "Pharos wants to remove its fan control helper." : "Pharos 要卸载风扇控制助手。" }
+    func fanInstallFailed(_ reason: String) -> String { en ? "Fan helper install failed: \(reason)" : "风扇助手安装失败：\(reason)" }
+    var fanHelperMissing: String {
+        en ? "The fan helper isn't in this build. Reinstall Pharos with `make install`." : "当前版本缺少风扇助手，请用 `make install` 重新安装 Pharos。"
+    }
+    var fanNotResponding: String {
+        en ? "Fan helper installed but not responding. Try uninstalling and installing again." : "风扇助手已安装但没有响应，请卸载后重新安装。"
+    }
+    var fanCommandFailed: String { en ? "The fan helper didn't respond." : "风扇助手没有响应。" }
+    var fanModeSystem: String { en ? "macOS" : "系统控制" }
+    var fanModeFixed: String { en ? "Fixed speed" : "固定转速" }
+    var fanModeMax: String { en ? "Max" : "满速" }
+    var fanApply: String { en ? "Apply" : "应用" }
+    var fanOverheat: String {
+        en ? "Above 95 °C — all fans forced to max until it cools below 88 °C."
+           : "温度超过 95°C——所有风扇强制满速，降到 88°C 以下才恢复。"
+    }
+    var fanUnsupported: String {
+        en ? "This Mac's firmware refused manual fan control. Fans stay with macOS."
+           : "这台 Mac 的固件拒绝了手动风扇控制，风扇仍由系统控制。"
+    }
+    var fanHeld: String { en ? "Fans held by Pharos" : "风扇由 Pharos 控制中" }
+    var fanSafety: String {
+        en ? "Safety: fans go back to macOS when Pharos quits, crashes or stops responding for 15 s, after sleep the setting is re-applied, and any CPU/GPU sensor at 95 °C forces max. Speeds are limited to each fan's rated range."
+           : "安全措施：Pharos 退出、崩溃或 15 秒无响应时，风扇自动交还系统；睡眠唤醒后重新应用；任一 CPU/GPU 传感器达到 95°C 时强制满速。转速限制在每个风扇的额定范围内。"
+    }
+
     // MARK: - Disk usage
 
     var diskUsage: String { en ? "Disk Usage" : "磁盘用量" }

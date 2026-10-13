@@ -20,11 +20,11 @@
   <img src="https://img.shields.io/badge/dependencies-none-brightgreen" alt="Dependencies">
   <img src="https://img.shields.io/badge/network-none-lightgrey" alt="No network">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.0-blue" alt="Version 2.0">
+  <img src="https://img.shields.io/badge/version-2.1-blue" alt="Version 2.1">
   <img src="https://img.shields.io/badge/updated-2026--10--13-informational" alt="Last updated 2026-10-13">
 </p>
 
-<p align="center"><sub>Last updated / 最后更新：2026-10-13 12:33 (UTC+8) · v2.0</sub></p>
+<p align="center"><sub>Last updated / 最后更新：2026-10-13 13:27 (UTC+8) · v2.1</sub></p>
 
 <p align="center"><a href="#english">English</a> · <a href="#简体中文">简体中文</a> · <a href="#changelog--更新记录">Changelog / 更新记录</a></p>
 
@@ -44,6 +44,7 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 |---|---|
 | **Ports & memory** | Every dev project listening on a TCP port, grouped by folder, with memory incl. child processes; machine-wide memory, pressure and a 1-hour trend |
 | **Disk usage** | Startup disk, external drives, network shares and disk images — used / available like Finder, updated the moment a drive is plugged in |
+| **Fans & temperature** | Fan speeds and CPU / GPU / memory / SSD / battery temperatures; optional fan control (fixed speed or max) with built-in safety rules |
 | **Stop processes** | `SIGTERM` first, `SIGKILL` only if it refuses; never system or other users' processes |
 | **Disk cleanup** | Temp folders and dev caches, file by file, with a retention window; the size shown is exactly what gets freed |
 | **Favorite projects** | Save project folders, start commands detected automatically, open in Terminal with one click |
@@ -76,6 +77,13 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 - Format (APFS, ExFAT…), connection (USB, Thunderbolt…) and mount point; bars turn orange at 85 % and red at 95 %
 - Plugging in or ejecting a drive updates the list immediately; click a volume to open it in Finder
 - Hidden system volumes (VM, Preboot, simulator runtimes) are skipped. Read only — Pharos never writes to, unmounts or ejects drives
+
+**Fans & temperature**
+- Each fan's current speed, rated range (e.g. 2317–6800 rpm) and who controls it; CPU, GPU, memory, SSD, battery, power and in-case temperatures (hottest sensor of each kind), plus macOS's thermal state
+- Read straight from the System Management Controller — no permission or helper needed for monitoring
+- **Fan control (optional)**: when macOS keeps the fans too slow under load, hold them at a fixed speed or at max. Requires a small helper (`pharos-fand`) that runs as root — installed once from the Fans & Temperature page with macOS's own administrator password dialog, removable the same way. No Apple Developer account needed
+- Safety rules enforced by the helper itself, even if Pharos is closed: any CPU/GPU sensor ≥ 95 °C forces all fans to max (released below 88 °C); no heartbeat from Pharos for 15 s → fans go back to macOS; quitting Pharos, uninstalling or shutting down hands fans back; speeds are clamped to each fan's rated range; if the firmware refuses manual mode, fans stay with macOS
+- Uses undocumented SMC keys (research by [agoodkind/macos-smc-fan](https://github.com/agoodkind/macos-smc-fan) and [ThermalForge](https://github.com/ProducerGuy/ThermalForge), both MIT) — not supported by Apple, may stop working after a macOS update. Use at your own risk
 
 **Ports overview**
 - Projects / ports / exposed ports / total dev memory at a glance
@@ -144,12 +152,14 @@ Pharos makes **no network requests**, uploads nothing, and only reads **your own
 | Per-process memory | `proc_pid_rusage` → `ri_phys_footprint` |
 | System memory | `host_statistics64(HOST_VM_INFO64)`, `vm.swapusage`, `kern.memorystatus_vm_pressure_level` |
 | Disk volumes | `FileManager.mountedVolumeURLs` + `URLResourceValues` (capacity, available incl. purgeable), DiskArbitration `DADiskCopyDescription` (connection, disk image) |
+| Fans & temperatures | IOKit `AppleSMC` user client (read-only keys `FNum`, `F%dAc/Mn/Mx/Tg`, `T*` sensors); `ProcessInfo.thermalState` |
 
 Every write action is user-initiated and confirmed:
 - **Stop** (`SIGTERM`, then `SIGKILL` only if still alive) — never PID ≤ 1, other users' processes, or Pharos itself
 - **Disk cleanup** — only inside the fixed list of temp/cache folders, only your own regular files past the retention window
 - **Open in Terminal** — writes a small `.command` script (mode 0700) to `~/Library/Application Support/Pharos/launch/` and hands it to the terminal you chose (falls back to Terminal.app if it can't open it); paths and commands are shell-quoted
 - **Start / Quit a browser** — `open -na "<browser>" --args …` with the preset's flags passed one by one (no shell); quit = `SIGTERM` to the browser process, `SIGKILL` only on explicit force quit
+- **Fan control** (only after you install the helper) — the root helper `pharos-fand` accepts five fixed commands (`status`, `ping`, `system`, `max`, `fixed <rpm>`) on a socket only your user can open, and writes only the fan keys (`Ftst`, `F%dMd`, `F%dTg`). Installed to `/Library/PrivilegedHelperTools/local.pharos.fand` + `/Library/LaunchDaemons/local.pharos.fand.plist`; Uninstall removes both
 
 ### Project structure
 
@@ -166,7 +176,10 @@ Sources/
 │   ├── Workspaces       #   favorites model, start-command detection, launch script
 │   ├── ChromeInstances  #   Chromium browsers: flags parsing, presets, launch args
 │   ├── Alerts           #   when to notify (fires once, re-arms after clearing)
-│   └── Backup           #   export / import format and merge rules
+│   ├── Backup           #   export / import format and merge rules
+│   ├── SMC / Thermals   #   read fans and temperatures from the SMC
+│   ├── FanPolicy        #   fan safety rules + helper protocol
+│   └── FanHelperInstall #   helper paths, launchd plist, install script
 ├── Pharos/              # SwiftUI app
 │   ├── ProjectStore     #   polling, state, actions
 │   ├── CleanupStore     #   disk cleanup state
@@ -175,8 +188,10 @@ Sources/
 │   ├── Notifier         #   local notifications
 │   ├── MenuBarSettings  #   menu bar text, global shortcut
 │   ├── BackupActions    #   export / import panels
+│   ├── FanStore         #   fan helper install, commands, heartbeat
 │   ├── LegacyDefaults   #   one-time settings migration from UsageBar
 │   └── UI/              #   popover, main window, charts, cleanup, favorites, Chrome, settings, L10n
+├── pharos-fand/         # optional root helper for fan control (installed only on request)
 └── pharos-tests/        # Test suite (`make test`)
 Scripts/make-icon.swift  # draws the app icon in CoreGraphics; `make icon` rebuilds Resources/Pharos.icns
 ```
@@ -209,6 +224,7 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 |---|---|
 | **端口与内存监控** | 列出所有监听 TCP 端口的开发项目，按目录归组，内存含子进程；整机内存、内存压力与近 1 小时趋势 |
 | **磁盘用量** | 启动磁盘、外接硬盘、网络共享和磁盘映像的已用 / 可用，口径与 Finder 一致；接入硬盘后立即显示 |
+| **风扇与温度** | 风扇转速以及 CPU / GPU / 内存 / SSD / 电池温度；可选风扇控制（固定转速或满速），内置安全规则 |
 | **结束进程** | 先 `SIGTERM`，拒不退出才 `SIGKILL`；不碰系统进程和其他用户的进程 |
 | **磁盘清理** | 临时目录与开发缓存，按单个文件、按保留期判断；显示的体积就是实际能释放的体积 |
 | **常用项目** | 收藏项目文件夹，自动识别启动命令，一键在终端中启动 |
@@ -241,6 +257,13 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 - 显示格式（APFS、ExFAT…）、接口（USB、雷雳…）和挂载位置；用量超过 85% 变橙色，超过 95% 变红色
 - 接入或推出硬盘后列表立即更新；点击某个卷即在 Finder 中打开
 - 隐藏的系统卷（VM、Preboot、模拟器运行时）不列出。只读——Pharos 不会写入、卸载或推出任何磁盘
+
+**风扇与温度**
+- 每个风扇的当前转速、额定范围（如 2317–6800 转/分）和当前由谁控制；CPU、GPU、内存、SSD、电池、供电和机身内部温度（每类显示最热的传感器），以及 macOS 的散热状态
+- 直接从系统管理控制器（SMC）读取——监控不需要任何权限或助手
+- **风扇控制（可选）**：负载高而系统风扇转得太慢时，可把风扇固定在某个转速或满速。需要一个以 root 运行的小助手（`pharos-fand`）——在「风扇与温度」页通过 macOS 自带的管理员密码框安装一次，也用同样方式卸载。不需要 Apple 开发者账号
+- 安全规则由助手自己执行，即使 Pharos 关闭也有效：任一 CPU/GPU 传感器 ≥ 95°C 时所有风扇强制满速（降到 88°C 以下解除）；15 秒没有收到 Pharos 心跳即交还系统；退出 Pharos、卸载或关机时交还系统；转速限制在每个风扇的额定范围内；固件拒绝手动模式时保持系统控制
+- 使用未公开的 SMC 键（参考 [agoodkind/macos-smc-fan](https://github.com/agoodkind/macos-smc-fan) 与 [ThermalForge](https://github.com/ProducerGuy/ThermalForge) 的研究，均为 MIT）——不是 Apple 支持的功能，macOS 更新后可能失效，风险自负
 
 **端口总览**
 - 项目数 / 端口数 / 对外暴露端口数 / 开发项目总内存
@@ -309,12 +332,14 @@ Pharos **不发起任何网络请求**、不上传任何数据，只读取**当�
 | 单进程内存 | `proc_pid_rusage` → `ri_phys_footprint` |
 | 本机内存 | `host_statistics64(HOST_VM_INFO64)`、`vm.swapusage`、`kern.memorystatus_vm_pressure_level` |
 | 磁盘卷 | `FileManager.mountedVolumeURLs` + `URLResourceValues`（容量、含可清除空间的可用量），DiskArbitration `DADiskCopyDescription`（接口、是否磁盘映像） |
+| 风扇与温度 | IOKit `AppleSMC` 用户客户端（只读键 `FNum`、`F%dAc/Mn/Mx/Tg`、`T*` 传感器）；`ProcessInfo.thermalState` |
 
 所有写操作都由用户主动触发并二次确认：
 - **结束进程**（先 `SIGTERM`，仍存活才 `SIGKILL`）——不会作用于 PID ≤ 1、其他用户的进程或 Pharos 自身
 - **磁盘清理**——只在固定的临时/缓存目录内，只删属于你、超过保留期的普通文件
 - **在终端中启动**——把一个小 `.command` 脚本（权限 0700）写到 `~/Library/Application Support/Pharos/launch/` 后交给你选的终端打开（打不开时回退到「终端」）；路径和命令都经过 shell 转义
 - **启动 / 退出浏览器**——用预设参数执行 `open -na "<浏览器>" --args …`，参数逐个传入（不经过 shell）；退出即向浏览器主进程发 `SIGTERM`，只有点「强制结束」才用 `SIGKILL`
+- **风扇控制**（仅在你安装助手之后）——root 助手 `pharos-fand` 只在一个仅你本人能打开的 socket 上接受五条固定指令（`status`、`ping`、`system`、`max`、`fixed <转速>`），只写风扇相关的键（`Ftst`、`F%dMd`、`F%dTg`）。安装位置为 `/Library/PrivilegedHelperTools/local.pharos.fand` 和 `/Library/LaunchDaemons/local.pharos.fand.plist`；卸载会删除两者
 
 ### 项目结构
 
@@ -331,7 +356,10 @@ Sources/
 │   ├── Workspaces       #   常用项目模型、启动命令识别、启动脚本
 │   ├── ChromeInstances  #   Chromium 系浏览器：参数解析、预设、启动参数
 │   ├── Alerts           #   何时发通知（只提醒一次，恢复后再触发）
-│   └── Backup           #   导出 / 导入格式与合并规则
+│   ├── Backup           #   导出 / 导入格式与合并规则
+│   ├── SMC / Thermals   #   从 SMC 读取风扇和温度
+│   ├── FanPolicy        #   风扇安全规则 + 助手通信协议
+│   └── FanHelperInstall #   助手路径、launchd 配置、安装脚本
 ├── Pharos/              # SwiftUI 应用
 │   ├── ProjectStore     #   轮询、状态、操作
 │   ├── CleanupStore     #   磁盘清理状态
@@ -340,8 +368,10 @@ Sources/
 │   ├── Notifier         #   本地通知
 │   ├── MenuBarSettings  #   菜单栏数字、全局快捷键
 │   ├── BackupActions    #   导出 / 导入面板
+│   ├── FanStore         #   风扇助手安装、指令、心跳
 │   ├── LegacyDefaults   #   从 UsageBar 一次性迁移设置
 │   └── UI/              #   弹窗、主窗口、图表、清理、常用项目、Chrome、设置、L10n
+├── pharos-fand/         # 可选的风扇控制 root 助手（仅在用户要求时安装）
 └── pharos-tests/        # 测试（`make test`）
 Scripts/make-icon.swift  # 用 CoreGraphics 绘制 App 图标；`make icon` 重新生成 Resources/Pharos.icns
 ```
@@ -363,6 +393,20 @@ make icon                           # 用 Scripts/make-icon.swift 重新生成 A
 ## Changelog / 更新记录
 
 Times are UTC+8. 时间为北京时间（UTC+8）。
+
+### v2.1 — 2026-10-13 13:27
+
+**English**
+- **Fans & Temperature** page and popover section: each fan's speed, rated range and controller; CPU / GPU / memory / SSD / battery / power / in-case temperatures; macOS thermal state; shortcut to Energy Mode settings
+- **Fan control (optional, experimental)**: hold fans at a fixed speed or max via the `pharos-fand` root helper, installed with macOS's administrator password dialog — no Apple Developer account needed
+- Helper-enforced safety: ≥ 95 °C forces max (released < 88 °C), no heartbeat for 15 s or quitting Pharos hands fans back to macOS, speeds clamped to each fan's range
+- Note: monitoring is verified on M3 Pro; manual fan control is not yet verified on M3 Pro
+
+**简体中文**
+- **风扇与温度**页面和下拉框分区：每个风扇的转速、额定范围和控制方；CPU / GPU / 内存 / SSD / 电池 / 供电 / 机身内部温度；macOS 散热状态；一键打开能耗模式设置
+- **风扇控制（可选，实验性）**：通过 root 助手 `pharos-fand` 把风扇固定在某个转速或满速，用 macOS 自带的管理员密码框安装，不需要 Apple 开发者账号
+- 安全规则由助手执行：≥ 95°C 强制满速（< 88°C 解除）；15 秒无心跳或退出 Pharos 时交还系统；转速限制在额定范围内
+- 说明：监控已在 M3 Pro 上验证；手动风扇控制尚未在 M3 Pro 上验证
 
 ### v2.0 — 2026-10-13 12:33
 

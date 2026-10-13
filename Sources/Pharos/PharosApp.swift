@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         _ = MenuBarSettings.shared
+        _ = FanStore.shared
         Notifier.shared.start(observing: store)
         showMainWindow()
     }
@@ -98,6 +99,13 @@ struct PharosApp: App {
             }
             for v in DiskVolumes.read() {
                 print("disk\t\(v.name)\t\(v.kind)\tused \(ByteFormat.disk(v.used)) / \(ByteFormat.disk(v.total))\tavailable \(ByteFormat.disk(v.available))\t\(v.connection ?? "-")\t\(v.path)")
+            }
+            if let t = Thermals.read() {
+                for f in t.fans {
+                    print("fan\t\(f.index)\t\(f.actualRPM) rpm\t(\(f.minRPM)–\(f.maxRPM))\t\(f.mode.rawValue)")
+                }
+                let temps = SensorGroup.allCases.compactMap { g in t.groups[g].map { "\(g.rawValue) \($0)°C" } }
+                print("temps\t" + temps.joined(separator: "\t") + "\tthermalState \(ProcessInfo.processInfo.thermalState.rawValue)")
             }
             for p in ProjectGrouper.group(procs, includeSystem: all) {
                 let ports = p.ports.map { ":\($0.port)\($0.loopbackOnly ? "" : "*")" }.joined(separator: " ")

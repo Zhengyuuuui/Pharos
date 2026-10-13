@@ -18,6 +18,7 @@ struct MainWindowView: View {
     enum SidebarItem: Hashable {
         case systemMemory
         case diskUsage
+        case thermals
         case portsOverview
         case diskCleanup
         case chrome
@@ -57,6 +58,18 @@ struct MainWindowView: View {
                         }
                     }
                     .tag(SidebarItem.diskUsage)
+                    if store.thermals != nil {
+                        HStack {
+                            Label(l10n.thermalTitle, systemImage: "fanblades")
+                            Spacer()
+                            if let c = store.thermals?.peakChipTemperature {
+                                Text(ThermalStyle.temp(c))
+                                    .font(.system(size: 10).monospacedDigit())
+                                    .foregroundStyle(c >= 85 ? ThermalStyle.color(c) : .secondary)
+                            }
+                        }
+                        .tag(SidebarItem.thermals)
+                    }
                     HStack {
                         Label(l10n.portsOverview, systemImage: "point.3.connected.trianglepath.dotted")
                         Spacer()
@@ -160,6 +173,8 @@ struct MainWindowView: View {
                 SystemMemoryView()
             case .diskUsage:
                 DiskUsageView()
+            case .thermals:
+                ThermalView()
             case .portsOverview:
                 PortsOverviewView(onSelect: { selection = .project($0.id) },
                                   onSelectFavorite: { selection = .favorite($0.id) })

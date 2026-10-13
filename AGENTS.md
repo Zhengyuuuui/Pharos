@@ -64,7 +64,8 @@ Swift 通过 **ARC（自动引用计数）** 管理内存：编译器自动插�
 - [ ] delegate 均为 `weak`
 - [ ] Timer / 通知观察者在适当生命周期移除
 - [ ] 无手动 `malloc`/`free`/`UnsafeMutablePointer` 业务用法
-  （例外：`PharosCore/ProcessScanner.swift` 调用 libproc/sysctl 系统接口，
+  （例外：`PharosCore/ProcessScanner.swift` 调用 libproc/sysctl 系统接口、`PharosCore/SMC.swift` 调用 IOKit，
+  以及 `pharos-fand` / `FanStore` 的 Unix socket 系统调用，
   只允许 `withUnsafe…` 作用域内借用 Swift 数组/结构体的缓冲区，不得手动分配）
 - [ ] 新类型默认考虑 struct，确需 class 时无属性↔闭包强引用环
 - [ ] `swift build` 通过，`make test` 全绿
@@ -76,6 +77,8 @@ Swift 通过 **ARC（自动引用计数）** 管理内存：编译器自动插�
   `ProjectGrouper.swift`；二者纯逻辑、可单测。
 - 缓存目录扫描/清理只在 `Sources/PharosCore/DiskCleaner.swift`
   （固定目标列表，按分组展示；逐文件判定，按 mtime 保留期跳过新文件，目标目录本身保留）。
+- 风扇/温度读取只在 `Sources/PharosCore/SMC.swift` + `Thermals.swift`（IOKit 读 SMC，普通用户可读，非 Apple 公开接口，
+  键名参考 agoodkind/macos-smc-fan 与 ThermalForge，均 MIT）；风扇安全规则 `FanPolicy.swift` 纯函数可单测。
 - 磁盘用量（卷容量）只在 `Sources/PharosCore/DiskVolumes.swift`
   （`URLResourceValues` + DiskArbitration 只读描述，口径与 Finder 一致，十进制单位 `ByteFormat.disk`）；
   分类逻辑 `classify` 纯函数可单测。只读：不写入、不推出、不卸载任何卷。
@@ -91,7 +94,7 @@ Swift 通过 **ARC（自动引用计数）** 管理内存：编译器自动插�
 ## 4. 行为与安全约定
 
 - **只读原则**：只读取当前用户自己的进程信息，不发起网络请求，不上传任何数据。
-- 写操作仅限以下两类（另有「常用项目」的终端启动和「浏览器实例」的启动/退出，见下），都必须用户显式点击并二次确认：
+- 写操作仅限以下两类（另有「常用项目」的终端启动、「浏览器实例」的启动/退出和「风扇控制」，见下），都必须用户显式点击并二次确认：
   1. 「结束进程」：先 SIGTERM，仍存活才提供 SIGKILL；不得结束其他用户或
      PID ≤ 1 的进程，不得结束自身。
   2. 「磁盘清理」（`DiskCleaner`）：只在固定目标列表的目录内，按**单个文件**
@@ -125,6 +128,17 @@ Swift 通过 **ARC（自动引用计数）** 管理内存：编译器自动插�
   `RegisterEventHotKey`，不需要辅助功能权限，不监听其他按键。
 - 备份（`PharosCore/Backup.swift` + `BackupActions.swift`）：只读写用户在保存/打开面板中选的那个文件；
   导入只添加新条目，已有的跳过，不覆盖、不删除。
+- 风扇控制（`pharos-fand` + `FanStore.swift` + `FanPolicy.swift`）——**唯一以 root 运行的部分**：
+  - 默认不安装。只有用户在「风扇与温度」页点击「安装风扇控制」并在 macOS 自带的管理员密码框中确认后，
+    才把 `pharos-fand` 复制到 `/Library/PrivilegedHelperTools/local.pharos.fand`、
+    写入 `/Library/LaunchDaemons/local.pharos.fand.plist` 并由 launchd 启动；Pharos 不接触密码。卸载同样走密码框。
+  - 只通过 `/var/run/pharos-fand.sock`（属主为安装用户、权限 0600，并校验对端 uid）接收 `FanProtocol`
+    中的固定指令（status / ping / system / max / fixed <rpm>）；不得增加任意 SMC 读写或执行命令的接口。
+  - 只写风扇相关 SMC 键（`Ftst`、`F%dMd`/`F%dmd`、`F%dTg`）；目标转速限制在各风扇额定范围内。
+  - 安全规则由助手自己执行、不依赖 App：任一 CPU/GPU 传感器 ≥ 95°C 强制满速，< 88°C 才解除；
+    15 秒没有心跳（Pharos 退出/崩溃）即交还系统；收到 SIGTERM（卸载、关机）先交还系统再退出；
+    固件拒绝手动模式时保持系统控制并提示「不支持」。
+  - 默认状态与一切失败路径都回到「系统控制」。
 - 配置变更需持久化，重启后生效；错误态必须有可见文案，不静默失败。
 
 ## 5. 代码风格

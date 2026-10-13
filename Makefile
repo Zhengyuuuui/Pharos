@@ -19,6 +19,8 @@ app: build
 	rm -rf $(DIST)
 	mkdir -p $(DIST)/Contents/MacOS $(DIST)/Contents/Resources
 	cp .build/release/$(APP) $(DIST)/Contents/MacOS/$(APP)
+	# Optional fan-control helper; only installed if the user asks (Thermal page).
+	cp .build/release/pharos-fand $(DIST)/Contents/MacOS/pharos-fand
 	cp Resources/Info.plist $(DIST)/Contents/Info.plist
 	cp Resources/Pharos.icns $(DIST)/Contents/Resources/Pharos.icns
 	codesign --force --sign - $(DIST)

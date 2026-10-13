@@ -276,6 +276,11 @@ struct PopoverOverview: View {
                 PopoverDiskSection()
             }
 
+            if store.thermals != nil {
+                Divider()
+                PopoverThermalSection()
+            }
+
             Divider()
 
             VStack(alignment: .leading, spacing: 6) {
