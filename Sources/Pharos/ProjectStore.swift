@@ -115,8 +115,10 @@ final class ProjectStore: ObservableObject {
         guard !activity.isScanning else { return }
         activity.isScanning = true
         defer { activity.isScanning = false }
+        // Not awaited: a slow or disconnected network share must not delay ports/memory.
+        Task { await refreshVolumes() }
         let include = showSystem
-        let (projects, chrome, ports, apps, system, volumes) = await Task.detached(priority: .utility) {
+        let (projects, chrome, ports, apps, system) = await Task.detached(priority: .utility) {
             let all = ProcessScanner.scan()
             let chrome = ChromeInstances.find(in: all)
             // Chrome instances get their own page; keep debug-port browsers out
@@ -126,8 +128,7 @@ final class ProjectStore: ObservableObject {
                     chrome,
                     Set(all.flatMap { $0.ports.map(\.port) }),
                     AppGrouper.group(all),
-                    SystemMemory.read(),
-                    DiskVolumes.read())
+                    SystemMemory.read())
         }.value
         let now = Date()
         var next = state
@@ -136,7 +137,6 @@ final class ProjectStore: ObservableObject {
         next.listeningPorts = ports
         next.apps = apps
         if let system { next.system = system }
-        next.volumes = volumes
         next.history.append(MemorySample(
             date: now,
             systemUsed: system?.used ?? 0,
@@ -149,7 +149,13 @@ final class ProjectStore: ObservableObject {
         ChromeStore.shared.clearStubborn(keeping: Set(chrome.map(\.id)))
     }
 
+    /// At most one read in flight: if a share hangs, later polls skip instead of piling up threads.
+    private var readingVolumes = false
+
     private func refreshVolumes() async {
+        guard !readingVolumes else { return }
+        readingVolumes = true
+        defer { readingVolumes = false }
         let volumes = await Task.detached(priority: .utility) { DiskVolumes.read() }.value
         if volumes != state.volumes { state.volumes = volumes }
     }
@@ -161,6 +167,7 @@ final class ProjectStore: ObservableObject {
     // MARK: - Actions
 
     func terminate(_ project: Project) {
+        recentlyStopped[project.directory ?? project.id] = Date()
         let pids = killablePIDs(project)
         ProcessControl.send(.terminate, to: pids)
         Task { [weak self] in
@@ -174,12 +181,23 @@ final class ProjectStore: ObservableObject {
     }
 
     func forceKill(_ project: Project) {
+        recentlyStopped[project.directory ?? project.id] = Date()
         ProcessControl.send(.kill, to: killablePIDs(project))
         stubborn.remove(project.id)
         Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(500))
             await self?.refresh()
         }
+    }
+
+    /// Project folders stopped from Pharos, so the "stopped unexpectedly"
+    /// notification skips them. Entries expire after a minute.
+    private var recentlyStopped: [String: Date] = [:]
+
+    func stoppedByUser(within seconds: TimeInterval = 60) -> Set<String> {
+        let cutoff = Date().addingTimeInterval(-seconds)
+        recentlyStopped = recentlyStopped.filter { $0.value > cutoff }
+        return Set(recentlyStopped.keys)
     }
 
     private func killablePIDs(_ project: Project) -> [Int32] {

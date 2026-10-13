@@ -4,8 +4,8 @@
     <key>CFBundleName</key><string>Pharos</string>
     <key>CFBundleDisplayName</key><string>Pharos</string>
     <key>CFBundleIdentifier</key><string>local.pharos</string>
-    <key>CFBundleVersion</key><string>1.1</string>
-    <key>CFBundleShortVersionString</key><string>1.1</string>
+    <key>CFBundleVersion</key><string>2.0</string>
+    <key>CFBundleShortVersionString</key><string>2.0</string>
     <key>CFBundleExecutable</key><string>Pharos</string>
     <key>CFBundleIconFile</key><string>Pharos</string>
     <key>CFBundlePackageType</key><string>APPL</string>

@@ -24,6 +24,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        _ = MenuBarSettings.shared
+        Notifier.shared.start(observing: store)
         showMainWindow()
     }
 
@@ -110,8 +112,23 @@ struct PharosApp: App {
             PopoverView()
                 .environmentObject(appDelegate.store)
         } label: {
-            Image(systemName: "point.3.connected.trianglepath.dotted")
+            MenuBarLabel(store: appDelegate.store)
         }
         .menuBarExtraStyle(.window)
+    }
+}
+
+/// Icon plus the optional number chosen in Settings → "Menu bar shows".
+private struct MenuBarLabel: View {
+    @ObservedObject var store: ProjectStore
+    @ObservedObject private var settings = MenuBarSettings.shared
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "point.3.connected.trianglepath.dotted")
+            if let text = settings.label(for: store) {
+                Text(text).monospacedDigit()
+            }
+        }
     }
 }

@@ -355,6 +355,29 @@ public enum ShellQuote {
     }
 }
 
+/// Terminal apps that can open the generated `.command` script.
+public enum TerminalApp: String, Codable, CaseIterable, Sendable {
+    case terminal, iterm, ghostty, warp
+
+    public var displayName: String {
+        switch self {
+        case .terminal: return "Terminal"
+        case .iterm: return "iTerm2"
+        case .ghostty: return "Ghostty"
+        case .warp: return "Warp"
+        }
+    }
+
+    public var bundleIdentifier: String {
+        switch self {
+        case .terminal: return "com.apple.Terminal"
+        case .iterm: return "com.googlecode.iterm2"
+        case .ghostty: return "com.mitchellh.ghostty"
+        case .warp: return "dev.warp.Warp-Stable"
+        }
+    }
+}
+
 /// The `.command` script handed to the user's terminal app. It runs the command
 /// in the user's own login shell, so PATH, nvm, pyenv etc. behave exactly as
 /// when typing it by hand.

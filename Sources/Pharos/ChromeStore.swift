@@ -21,6 +21,11 @@ final class ChromeStore: ObservableObject {
     @Published private(set) var presets: [ChromePreset] = []
     @Published private(set) var folderSizes: [String: UInt64] = [:]
     @Published private(set) var sizing = false
+    /// Signed-in profile names per user-data-dir. Read off the main thread and
+    /// cached by the file's mtime, so card redraws never touch the disk.
+    @Published private(set) var profileNames: [String: [String]] = [:]
+    private var profileStamps: [String: Date] = [:]
+    private var loadingProfiles: Set<String> = []
     /// Instances that survived SIGTERM; UI offers force quit.
     @Published private(set) var stubborn: Set<String> = []
     @Published var errorMessage: String?
@@ -28,21 +33,62 @@ final class ChromeStore: ObservableObject {
     private static let key = "chromePresets.v1"
 
     private init() {
-        if let data = UserDefaults.standard.data(forKey: Self.key) {
+        let d = UserDefaults.standard
+        hiddenBrowsers = Set((d.stringArray(forKey: Self.hiddenKey) ?? []).compactMap(ChromiumBrowser.init))
+        defaultBrowser = d.string(forKey: Self.defaultBrowserKey).flatMap(ChromiumBrowser.init)
+            ?? installedBrowsers.first ?? .chrome
+        if let data = d.data(forKey: Self.key) {
             do { presets = try JSONDecoder().decode([ChromePreset].self, from: data) }
             catch { errorMessage = L10n.shared.chromeLoadFailed }
         }
     }
 
-    var chromeInstalled: Bool { FileManager.default.fileExists(atPath: ChromeInstances.appPath) }
+    var chromeInstalled: Bool { !installedBrowsers.isEmpty }
+    /// Checked once: installing a browser while Pharos runs is rare, and a
+    /// stale list only hides the picker entry until the next launch.
+    let installedBrowsers = ChromeInstances.installedBrowsers()
 
-    func entries(_ running: [ChromeInstance]) -> [Entry] {
-        var byProfile = Dictionary(running.map { ($0.config.profileKey, $0) }, uniquingKeysWith: { a, _ in a })
-        var out: [Entry] = presets.map { preset in
-            Entry(preset: preset, running: byProfile.removeValue(forKey: preset.config.profileKey))
+    func isInstalled(_ b: ChromiumBrowser) -> Bool { FileManager.default.fileExists(atPath: b.appPath) }
+
+    /// Browsers hidden from the instances page (Settings → Browsers). Presets are kept.
+    @Published var hiddenBrowsers: Set<ChromiumBrowser> {
+        didSet { UserDefaults.standard.set(hiddenBrowsers.map(\.rawValue).sorted(), forKey: Self.hiddenKey) }
+    }
+    /// Browser used by "New Instance".
+    @Published var defaultBrowser: ChromiumBrowser {
+        didSet { UserDefaults.standard.set(defaultBrowser.rawValue, forKey: Self.defaultBrowserKey) }
+    }
+    private static let hiddenKey = "hiddenBrowsers"
+    private static let defaultBrowserKey = "defaultBrowser"
+
+    func isVisible(_ b: ChromiumBrowser) -> Bool { !hiddenBrowsers.contains(b) }
+
+    func setVisible(_ b: ChromiumBrowser, _ visible: Bool) {
+        if visible { hiddenBrowsers.remove(b) } else { hiddenBrowsers.insert(b) }
+    }
+
+    func revealDefaultProfile(_ b: ChromiumBrowser) {
+        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: b.defaultUserDataDir)
+    }
+
+    /// Presets and running instances of visible browsers, matched by browser + profile folder.
+    func entries(_ running: [ChromeInstance], browser: ChromiumBrowser? = nil) -> [Entry] {
+        func key(_ c: ChromeConfig) -> String { c.browser.rawValue + ":" + c.profileKey }
+        let shown: (ChromeConfig) -> Bool = { c in
+            self.isVisible(c.browser) && (browser == nil || c.browser == browser)
         }
-        out += running.filter { byProfile[$0.config.profileKey] != nil }.map { Entry(preset: nil, running: $0) }
-        return out
+        var byProfile = Dictionary(running.map { (key($0.config), $0) }, uniquingKeysWith: { a, _ in a })
+        var out: [Entry] = presets.map { preset in
+            Entry(preset: preset, running: byProfile.removeValue(forKey: key(preset.config)))
+        }
+        out += running.filter { byProfile[key($0.config)] != nil }.map { Entry(preset: nil, running: $0) }
+        return out.filter { shown($0.config) }
+    }
+
+    /// Browsers that have something to show (installed, or with a preset / running instance).
+    func browsersInUse(_ running: [ChromeInstance]) -> [ChromiumBrowser] {
+        let used = Set(presets.map(\.config.browser) + running.map(\.config.browser))
+        return ChromiumBrowser.allCases.filter { isVisible($0) && (used.contains($0) || isInstalled($0)) }
     }
 
     func preset(id: String) -> ChromePreset? { presets.first { $0.id == id } }
@@ -50,8 +96,9 @@ final class ChromeStore: ObservableObject {
     // MARK: - Presets
 
     func save(_ instance: ChromeInstance) {
-        guard !presets.contains(where: { $0.config.profileKey == instance.config.profileKey }) else { return }
-        presets.append(ChromePreset(name: defaultName(instance.config), config: instance.config))
+        let c = instance.config
+        guard !presets.contains(where: { $0.config.browser == c.browser && $0.config.profileKey == c.profileKey }) else { return }
+        presets.append(ChromePreset(name: defaultName(c), config: c))
         persist()
     }
 
@@ -68,11 +115,13 @@ final class ChromeStore: ObservableObject {
     }
 
     @discardableResult
-    func addPreset() -> String {
+    func addPreset(browser: ChromiumBrowser? = nil) -> String {
+        let b = browser ?? defaultBrowser
         let used = Set(presets.compactMap(\.config.debugPort))
         let port = (9222...9999).first { !used.contains(UInt16($0)) }.map(UInt16.init) ?? 9222
-        let preset = ChromePreset(name: "Chrome \(port)", config: ChromeConfig(
-            userDataDir: NSHomeDirectory() + "/chrome\(port)", debugPort: port,
+        let folder = b == .chrome ? "chrome" : b.rawValue.lowercased()
+        let preset = ChromePreset(name: "\(b.appName) \(port)", config: ChromeConfig(
+            browser: b, userDataDir: NSHomeDirectory() + "/\(folder)\(port)", debugPort: port,
             extraFlags: ["--no-first-run", "--no-default-browser-check"]))
         presets.append(preset)
         persist()
@@ -90,11 +139,17 @@ final class ChromeStore: ObservableObject {
         persist()
     }
 
+    func add(_ imported: [ChromePreset]) {
+        guard !imported.isEmpty else { return }
+        presets += imported
+        persist()
+    }
+
     // MARK: - Actions
 
     func start(_ config: ChromeConfig, running: [ChromeInstance], listening: Set<UInt16>) {
         let l10n = L10n.shared
-        guard chromeInstalled else { errorMessage = l10n.chromeNotInstalled; return }
+        guard isInstalled(config.browser) else { errorMessage = l10n.browserNotInstalled(config.browser.appName); return }
         let problems = ChromeInstances.problems(for: config, running: running, listeningPorts: listening)
         if problems.contains(.alreadyRunning) { errorMessage = l10n.chromeAlreadyRunning; return }
         if let port = problems.compactMap({ if case .portInUse(let p) = $0 { return p } else { return nil } }).first {
@@ -109,7 +164,7 @@ final class ChromeStore: ObservableObject {
         // the same as launching it from a terminal; it isn't our child.
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-        p.arguments = ["-na", ChromeInstances.appPath, "--args"] + ChromeInstances.launchArguments(config)
+        p.arguments = ["-na", config.browser.appPath, "--args"] + ChromeInstances.launchArguments(config)
         let errPipe = Pipe()
         p.standardError = errPipe
         p.terminationHandler = { [weak self] proc in
@@ -171,8 +226,33 @@ final class ChromeStore: ObservableObject {
 
     // MARK: - Private
 
+    /// Reloads names only for folders whose "Local State" changed since last time.
+    func loadProfileNames(_ dirs: [String]) {
+        let todo = Set(dirs).subtracting(loadingProfiles)
+        guard !todo.isEmpty else { return }
+        loadingProfiles.formUnion(todo)
+        let known = profileStamps
+        Task { [weak self] in
+            let result = await Task.detached(priority: .utility) { () -> [(String, Date?, [String])?] in
+                todo.map { dir in
+                    let stamp = (try? FileManager.default.attributesOfItem(atPath: dir + "/Local State"))?[.modificationDate] as? Date
+                    if let stamp, known[dir] == stamp { return nil }
+                    return (dir, stamp, ChromeInstances.profileNames(in: dir))
+                }
+            }.value
+            guard let self else { return }
+            self.loadingProfiles.subtract(todo)
+            var names = self.profileNames
+            for case let (dir, stamp, list)? in result {
+                names[dir] = list
+                self.profileStamps[dir] = stamp
+            }
+            if names != self.profileNames { self.profileNames = names }
+        }
+    }
+
     private func defaultName(_ c: ChromeConfig) -> String {
-        if c.isDefaultProfile { return L10n.shared.chromeMain }
+        if c.isDefaultProfile { return L10n.shared.browserMain(c.browser.appName) }
         let folder = (c.profileKey as NSString).lastPathComponent
         return c.debugPort.map { "\(folder) · \($0)" } ?? folder
     }

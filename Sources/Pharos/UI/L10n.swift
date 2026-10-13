@@ -170,6 +170,74 @@ final class L10n: ObservableObject {
            : "仅在已安装的应用（/Applications）中可用。"
     }
 
+    // Terminal
+    var terminalTitle: String { en ? "Open projects in" : "项目启动终端" }
+    var notInstalled: String { en ? "not installed" : "未安装" }
+    func terminalFallback(_ app: String) -> String {
+        en ? "\(app) couldn't open the launch script, so Terminal was used instead."
+           : "\(app) 无法打开启动脚本，已改用「终端」。"
+    }
+
+    // Menu bar text
+    var menuBarText: String { en ? "Menu bar shows" : "菜单栏显示" }
+    func menuBarTextOption(_ o: MenuBarText) -> String {
+        switch o {
+        case .none: return en ? "Icon only" : "仅图标"
+        case .ports: return en ? "Port count" : "端口数"
+        case .memory: return en ? "Memory used %" : "内存占用 %"
+        case .disk: return en ? "Startup disk used %" : "启动磁盘占用 %"
+        }
+    }
+
+    // Global shortcut
+    var hotkeyTitle: String { en ? "Open popover shortcut" : "打开菜单栏快捷键" }
+    var hotkeyNone: String { en ? "Off" : "关闭" }
+    var hotkeyFailed: String {
+        en ? "That shortcut is already taken by another app." : "这个快捷键已被其他应用占用。"
+    }
+
+    // Notifications
+    var notificationsTitle: String { en ? "Notifications" : "通知" }
+    var notifyMemory: String { en ? "Memory pressure becomes high" : "内存压力升高时" }
+    var notifyDisk: String { en ? "A disk is almost full (≥ 95 %)" : "磁盘快满时（≥ 95%）" }
+    var notifyFavoriteExit: String { en ? "A favorite project stops unexpectedly" : "常用项目意外停止时" }
+    var notificationsDenied: String {
+        en ? "Notifications are turned off for Pharos in System Settings → Notifications."
+           : "Pharos 的通知已在「系统设置 → 通知」中关闭。"
+    }
+    var notifyMemoryTitle: String { en ? "Memory pressure is high" : "内存压力较高" }
+    func notifyMemoryBody(_ used: String, _ total: String) -> String {
+        en ? "\(used) of \(total) in use. Quit apps or stop dev servers you don't need."
+           : "已用 \(used) / \(total)。可以退出不用的应用或结束不需要的开发服务。"
+    }
+    func notifyDiskTitle(_ name: String) -> String { en ? "\(name) is almost full" : "\(name) 快满了" }
+    func notifyDiskBody(_ free: String) -> String {
+        en ? "Only \(free) available. Disk Cleanup can free temp files and caches."
+           : "仅剩 \(free) 可用。可以用「磁盘清理」清理临时文件和缓存。"
+    }
+    func notifyExitTitle(_ name: String) -> String { en ? "\(name) stopped" : "\(name) 已停止" }
+    func notifyExitBody(_ ports: String) -> String {
+        en ? "It was listening on \(ports) and is no longer running." : "它之前监听 \(ports)，现在已不在运行。"
+    }
+
+    // Backup
+    var backupTitle: String { en ? "Backup" : "备份" }
+    var exportSettings: String { en ? "Export…" : "导出…" }
+    var importSettings: String { en ? "Import…" : "导入…" }
+    var backupHint: String {
+        en ? "Favorite projects and browser presets as one JSON file. Importing adds new entries and skips ones you already have."
+           : "把常用项目和浏览器预设导出为一个 JSON 文件。导入时只添加新的条目，已有的会跳过。"
+    }
+    func exported(_ favorites: Int, _ presets: Int) -> String {
+        en ? "Exported \(favorites) projects and \(presets) browser presets." : "已导出 \(favorites) 个常用项目和 \(presets) 个浏览器预设。"
+    }
+    func imported(_ favorites: Int, _ presets: Int, _ skipped: Int) -> String {
+        en ? "Imported \(favorites) projects and \(presets) browser presets\(skipped > 0 ? ", skipped \(skipped) already present" : "")."
+           : "已导入 \(favorites) 个常用项目和 \(presets) 个浏览器预设\(skipped > 0 ? "，跳过 \(skipped) 个已存在的" : "")。"
+    }
+    func backupFailed(_ reason: String) -> String { en ? "Backup failed: \(reason)" : "备份失败：\(reason)" }
+    var backupInvalid: String { en ? "This file isn't a Pharos backup." : "这不是 Pharos 的备份文件。" }
+
     // MARK: - Favorites (saved workspaces)
 
     var favorites: String { en ? "Favorites" : "常用项目" }
@@ -234,13 +302,13 @@ final class L10n: ObservableObject {
     }
     var favoritesSaveFailed: String { en ? "Couldn't save favorites." : "常用项目保存失败。" }
 
-    // MARK: - Chrome instances
+    // MARK: - Browser instances (Chromium-based)
 
-    var chromeTitle: String { en ? "Chrome" : "Chrome 实例" }
+    var chromeTitle: String { en ? "Browsers" : "浏览器实例" }
     var manage: String { en ? "Manage…" : "管理…" }
     var chromeRunning: String { en ? "Running" : "运行中" }
     var chromePresets: String { en ? "Saved" : "已保存" }
-    var chromeMain: String { en ? "Chrome (main)" : "Chrome（主）" }
+    func browserMain(_ app: String) -> String { en ? "\(app) (main)" : "\(app)（主）" }
     var newChromePreset: String { en ? "New Instance" : "新建实例" }
     var measureFolders: String { en ? "Measure Folders" : "计算文件夹大小" }
     var measuring: String { en ? "Measuring…" : "计算中…" }
@@ -259,7 +327,7 @@ final class L10n: ObservableObject {
     var quitChrome: String { en ? "Quit" : "退出" }
     var openDevToolsList: String { en ? "Open DevTools target list in browser" : "在浏览器中打开 DevTools 调试列表" }
     var profileFolder: String { en ? "Profile folder" : "配置文件夹" }
-    var defaultProfile: String { en ? "default (~/Library/…/Google/Chrome)" : "默认（~/Library/…/Google/Chrome）" }
+    var defaultProfile: String { en ? "default profile folder" : "默认配置文件夹" }
     var proxy: String { en ? "Proxy" : "代理" }
     var startURL: String { en ? "Start URL" : "启动网址" }
     var chromeAccounts: String { en ? "Profiles" : "账号/配置" }
@@ -269,30 +337,45 @@ final class L10n: ObservableObject {
     var debugPort: String { en ? "Debug port" : "调试端口" }
     var invalidPort: String { en ? "Port must be 1024–65535." : "端口必须在 1024–65535 之间。" }
     var flagsMustStartWithDash: String { en ? "Each extra flag must start with -" : "每个附加参数都必须以 - 开头" }
-    var chromeEmpty: String { en ? "No Chrome running" : "没有运行中的 Chrome" }
+    var chromeEmpty: String { en ? "No browser instances" : "没有浏览器实例" }
     var chromeEmptyDesc: String {
         en ? "Running instances appear here automatically. Use “New Instance” to save a debug profile you start often."
            : "运行中的实例会自动出现在这里。用「新建实例」保存一个常用的调试配置。"
     }
     var chromeAlreadyRunning: String {
-        en ? "This profile folder is already in use by a running Chrome." : "这个配置文件夹已被一个运行中的 Chrome 使用。"
+        en ? "This profile folder is already in use by a running browser." : "这个配置文件夹已被一个运行中的浏览器使用。"
     }
     func portInUse(_ port: UInt16) -> String {
         en ? "Port \(port) is already in use by another process." : "端口 \(port) 已被其他进程占用。"
     }
     var defaultProfileDebugWarning: String {
-        en ? "Chrome ignores --remote-debugging-port on the default profile; set a profile folder."
-           : "Chrome 在默认配置上会忽略 --remote-debugging-port，请设置一个配置文件夹。"
+        en ? "Chromium browsers ignore --remote-debugging-port on the default profile; set a profile folder."
+           : "Chromium 系浏览器在默认配置上会忽略 --remote-debugging-port，请设置一个配置文件夹。"
     }
     var chromeNotInstalled: String {
-        en ? "Google Chrome not found in /Applications." : "在 /Applications 中找不到 Google Chrome。"
+        en ? "No Chromium browser (Chrome, Edge, Brave, Chromium…) found in /Applications." : "在 /Applications 中找不到 Chromium 系浏览器（Chrome、Edge、Brave、Chromium…）。"
     }
-    func chromeStartFailed(_ reason: String) -> String { en ? "Couldn't start Chrome: \(reason)" : "无法启动 Chrome：\(reason)" }
-    var chromeLoadFailed: String { en ? "Saved Chrome presets couldn't be read and were reset." : "已保存的 Chrome 预设无法读取，已重置。" }
-    var chromeSaveFailed: String { en ? "Couldn't save Chrome presets." : "Chrome 预设保存失败。" }
+    func chromeStartFailed(_ reason: String) -> String { en ? "Couldn't start the browser: \(reason)" : "无法启动浏览器：\(reason)" }
+    func browserNotInstalled(_ app: String) -> String {
+        en ? "\(app) not found in /Applications." : "在 /Applications 中找不到 \(app)。"
+    }
+    var browserTitle: String { en ? "Browser" : "浏览器" }
+    var allBrowsers: String { en ? "All" : "全部" }
+    var browsersSettings: String { en ? "Browsers" : "浏览器" }
+    var browsersSettingsHint: String {
+        en ? "Chromium-based browsers share the same flags. Hidden browsers aren't listed on the Browsers page; their saved presets are kept."
+           : "Chromium 系浏览器使用相同的启动参数。隐藏的浏览器不会出现在「浏览器实例」页面，已保存的预设会保留。"
+    }
+    var showInList: String { en ? "Show" : "显示" }
+    var defaultBrowserForNew: String { en ? "New instances use" : "新建实例使用" }
+    func runningCount(_ n: Int) -> String { en ? "\(n) running" : "\(n) 个运行中" }
+    func presetCount(_ n: Int) -> String { en ? "\(n) saved" : "\(n) 个已保存" }
+    var revealProfiles: String { en ? "Show default profile folder in Finder" : "在 Finder 中显示默认配置文件夹" }
+    var chromeLoadFailed: String { en ? "Saved browser presets couldn't be read and were reset." : "已保存的浏览器预设无法读取，已重置。" }
+    var chromeSaveFailed: String { en ? "Couldn't save browser presets." : "浏览器预设保存失败。" }
     var chromeNotice: String {
-        en ? "Instances are identified by profile folder (Chrome allows one per folder). Start runs `open -na \"Google Chrome\" --args …`; Quit sends SIGTERM (Chrome's normal shutdown, tabs restore next time), force quit only if it stays open. Pharos doesn't connect to the debug ports."
-           : "实例按配置文件夹区分（Chrome 每个文件夹只能开一个）。启动即执行 `open -na \"Google Chrome\" --args …`；退出发送 SIGTERM（Chrome 正常关闭，下次可恢复标签页），仍未退出才提供强制结束。Pharos 不会连接调试端口。"
+        en ? "Works with Chrome, Chrome Beta / Canary, Chromium, Edge and Brave. Instances are identified by profile folder (one browser per folder). Start runs `open -na \"<browser>\" --args …`; Quit sends SIGTERM (the browser's normal shutdown, tabs restore next time), force quit only if it stays open. Pharos doesn't connect to the debug ports."
+           : "支持 Chrome、Chrome Beta / Canary、Chromium、Edge 和 Brave。实例按配置文件夹区分（每个文件夹只能开一个浏览器）。启动即执行 `open -na \"<浏览器>\" --args …`；退出发送 SIGTERM（浏览器正常关闭，下次可恢复标签页），仍未退出才提供强制结束。Pharos 不会连接调试端口。"
     }
 
     // MARK: - Disk usage

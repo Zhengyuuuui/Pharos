@@ -76,7 +76,7 @@ struct MainWindowView: View {
                     HStack {
                         Label(l10n.chromeTitle, systemImage: "globe")
                         Spacer()
-                        Text("\(store.chrome.count)")
+                        Text("\(store.chrome.filter { ChromeStore.shared.isVisible($0.config.browser) }.count)")
                             .font(.system(size: 10).monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
@@ -348,6 +348,16 @@ struct MainSettingsView: View {
                     SettingsForm()
                         .padding(12)
                         .frame(maxWidth: 400, alignment: .leading)
+                }
+                GroupBox {
+                    ExtraSettingsForm()
+                        .padding(12)
+                        .frame(maxWidth: 460, alignment: .leading)
+                }
+                GroupBox {
+                    BrowserSettingsForm()
+                        .padding(12)
+                        .frame(maxWidth: 520, alignment: .leading)
                 }
                 Text(l10n.dataNotice)
                     .font(.system(size: 11))

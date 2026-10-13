@@ -91,7 +91,7 @@ Swift 通过 **ARC（自动引用计数）** 管理内存：编译器自动插�
 ## 4. 行为与安全约定
 
 - **只读原则**：只读取当前用户自己的进程信息，不发起网络请求，不上传任何数据。
-- 写操作仅限以下两类（另有「常用项目」的终端启动和「Chrome 实例」的启动/退出，见下），都必须用户显式点击并二次确认：
+- 写操作仅限以下两类（另有「常用项目」的终端启动和「浏览器实例」的启动/退出，见下），都必须用户显式点击并二次确认：
   1. 「结束进程」：先 SIGTERM，仍存活才提供 SIGKILL；不得结束其他用户或
      PID ≤ 1 的进程，不得结束自身。
   2. 「磁盘清理」（`DiskCleaner`）：只在固定目标列表的目录内，按**单个文件**
@@ -105,16 +105,26 @@ Swift 通过 **ARC（自动引用计数）** 管理内存：编译器自动插�
   - 从运行中进程取命令时，**不得保存内联代码**（`-e`/`-c`/`--eval` 等）、多行参数或超长命令行
     ——它们常含 token/请求头。
   - 「在终端中启动」是唯一的启动方式：只能由用户点击触发；把一个 `.command` 脚本写到
-    `~/Library/Application Support/Pharos/launch/`（权限 0700）后交给 Terminal.app 打开，
+    `~/Library/Application Support/Pharos/launch/`（权限 0700）后交给用户在设置中选的终端
+    （Terminal.app 默认，另支持 iTerm2 / Ghostty / Warp；打不开时回退到 Terminal.app 并提示）打开，
     进程归终端窗口所有，Pharos 不托管、不后台运行任何命令。路径和命令必须经 `ShellQuote` 转义。
   - 自动填入只用「声明式」或「入口文件」候选；`start.sh` 等 shell 脚本只列出、不自动填入；
     含 `git reset --hard`、`rm -rf`、`sudo` 等的脚本标记为危险，不提供一键设为启动命令。
-- 「Chrome 实例」（`ChromeInstances.swift` + `ChromeStore.swift`）：
-  - 实例以 `--user-data-dir` 区分（Chrome 每个文件夹只允许一个浏览器进程）；参数从进程命令行只读解析。
-  - 启动：用户点击后执行 `/usr/bin/open -na "/Applications/Google Chrome.app" --args …`，参数逐个传入
+- 「浏览器实例」（`ChromeInstances.swift` + `ChromeStore.swift`，历史原因沿用 Chrome 命名）：
+  - 支持 `ChromiumBrowser` 中列出的 Chromium 系浏览器（Chrome / Beta / Canary、Chromium、Edge、Brave），
+    只认 `/Applications/<名称>.app/Contents/MacOS/<名称>` 主程序；各浏览器有自己的默认配置文件夹；实例身份 = 浏览器 + 配置文件夹。
+  - 「设置 → 浏览器」只控制显示（隐藏的浏览器不在列表中出现，预设保留）和「新建实例」默认浏览器，不改动任何浏览器。
+  - 实例以 `--user-data-dir` 区分（每个文件夹只允许一个浏览器进程）；参数从进程命令行只读解析。
+  - 启动：用户点击后执行 `/usr/bin/open -na "/Applications/<浏览器>.app" --args …`，参数逐个传入
     （不经过 shell）；启动前检查同一文件夹是否已在运行、调试端口是否被占用。
   - 退出：只向浏览器主进程发 SIGTERM（Chrome 正常关闭）；3 秒后仍存活才提供强制结束（SIGKILL 整个进程树）。
   - 不连接调试端口（不发 CDP 请求）；「调试列表」只是用默认浏览器打开 `http://127.0.0.1:<port>`。
+- 本地通知（`Notifier.swift`，判定逻辑 `PharosCore/Alerts.swift` 可单测）：默认全部关闭，用户逐项开启；
+  只用 `UNUserNotificationCenter` 本地通知；每种情况触发一次，恢复后才重新触发，不刷屏。
+- 全局快捷键（`MenuBarSettings.swift`）：默认关闭，只能从固定的几个组合中选；用 Carbon
+  `RegisterEventHotKey`，不需要辅助功能权限，不监听其他按键。
+- 备份（`PharosCore/Backup.swift` + `BackupActions.swift`）：只读写用户在保存/打开面板中选的那个文件；
+  导入只添加新条目，已有的跳过，不覆盖、不删除。
 - 配置变更需持久化，重启后生效；错误态必须有可见文案，不静默失败。
 
 ## 5. 代码风格

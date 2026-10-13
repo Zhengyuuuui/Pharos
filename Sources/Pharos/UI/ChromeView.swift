@@ -1,16 +1,22 @@
 import SwiftUI
 import PharosCore
 
-/// Main window page: every Chrome instance (running or saved preset) with
-/// port, profile folder, proxy, memory, folder size, start/quit and editing.
+/// Main window page: every Chromium browser instance (running or saved preset)
+/// with port, profile folder, proxy, memory, folder size, start/quit and editing.
+/// Filterable by browser; with "All", instances are grouped per browser.
 struct ChromeView: View {
     @EnvironmentObject var store: ProjectStore
     @ObservedObject private var chrome = ChromeStore.shared
     @ObservedObject private var l10n = L10n.shared
     @State private var editing: String?
+    /// nil = all browsers.
+    @State private var filter: ChromiumBrowser?
 
     var body: some View {
-        let entries = chrome.entries(store.chrome)
+        let browsers = chrome.browsersInUse(store.chrome)
+        let active = filter.flatMap { browsers.contains($0) ? $0 : nil }
+        let entries = chrome.entries(store.chrome, browser: active)
+        let running = entries.compactMap(\.running)
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(alignment: .firstTextBaseline) {
@@ -23,17 +29,25 @@ struct ChromeView: View {
                     }
                     .controlSize(.small)
                     .disabled(chrome.sizing)
-                    Button { editing = chrome.addPreset() } label: {
-                        Label(l10n.newChromePreset, systemImage: "plus")
+                    newInstanceButton(active)
+                }
+
+                if browsers.count > 1 {
+                    Picker("", selection: $filter) {
+                        Text(l10n.allBrowsers).tag(ChromiumBrowser?.none)
+                        ForEach(browsers, id: \.self) { b in
+                            Text(b.appName).tag(ChromiumBrowser?.some(b))
+                        }
                     }
-                    .controlSize(.small)
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
                 }
 
                 HStack(spacing: 12) {
-                    StatCard(title: l10n.chromeRunning, value: "\(store.chrome.count)", icon: "globe")
-                    StatCard(title: l10n.chromePresets, value: "\(chrome.presets.count)", icon: "star")
+                    StatCard(title: l10n.chromeRunning, value: "\(running.count)", icon: "globe")
+                    StatCard(title: l10n.chromePresets, value: "\(entries.filter { $0.preset != nil }.count)", icon: "star")
                     StatCard(title: l10n.memory,
-                             value: ByteFormat.short(store.chrome.reduce(0) { $0 + $1.memoryBytes }),
+                             value: ByteFormat.short(running.reduce(0) { $0 + $1.memoryBytes }),
                              icon: "memorychip")
                 }
 
@@ -57,8 +71,19 @@ struct ChromeView: View {
                         .frame(height: 180)
                 }
 
-                ForEach(entries) { entry in
-                    ChromeCard(entry: entry, editing: $editing)
+                if active == nil && browsers.count > 1 {
+                    // "All": one group per browser so the work environments stay apart.
+                    ForEach(browsers, id: \.self) { b in
+                        let group = entries.filter { $0.config.browser == b }
+                        if !group.isEmpty {
+                            BrowserGroupHeader(browser: b, entries: group)
+                            ForEach(group) { ChromeCard(entry: $0, editing: $editing) }
+                        }
+                    }
+                } else {
+                    ForEach(entries) { entry in
+                        ChromeCard(entry: entry, editing: $editing)
+                    }
                 }
 
                 Text(l10n.chromeNotice)
@@ -69,6 +94,57 @@ struct ChromeView: View {
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .onAppear { chrome.loadProfileNames(entries.map(\.config.profileKey)) }
+        .onChange(of: store.lastScan) { _, _ in chrome.loadProfileNames(entries.map(\.config.profileKey)) }
+    }
+
+    /// With a browser filter selected, "New Instance" uses that browser;
+    /// otherwise it's a menu defaulting to Settings → Browsers.
+    @ViewBuilder
+    private func newInstanceButton(_ active: ChromiumBrowser?) -> some View {
+        if let active {
+            Button { editing = chrome.addPreset(browser: active) } label: {
+                Label(l10n.newChromePreset, systemImage: "plus")
+            }
+            .controlSize(.small)
+        } else if chrome.installedBrowsers.count > 1 {
+            Menu {
+                ForEach(chrome.installedBrowsers, id: \.self) { b in
+                    Button(b.appName) { editing = chrome.addPreset(browser: b) }
+                }
+            } label: {
+                Label(l10n.newChromePreset, systemImage: "plus")
+            } primaryAction: {
+                editing = chrome.addPreset()
+            }
+            .controlSize(.small)
+            .fixedSize()
+        } else {
+            Button { editing = chrome.addPreset() } label: {
+                Label(l10n.newChromePreset, systemImage: "plus")
+            }
+            .controlSize(.small)
+        }
+    }
+}
+
+private struct BrowserGroupHeader: View {
+    @ObservedObject private var l10n = L10n.shared
+    let browser: ChromiumBrowser
+    let entries: [ChromeStore.Entry]
+
+    var body: some View {
+        let running = entries.compactMap(\.running)
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(browser.appName).font(.system(size: 13, weight: .semibold))
+            Text(l10n.runningCount(running.count)).font(.system(size: 10)).foregroundStyle(.secondary)
+            if !running.isEmpty {
+                Text("· " + ByteFormat.short(running.reduce(0) { $0 + $1.memoryBytes }))
+                    .font(.system(size: 10).monospacedDigit()).foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(.top, 4)
     }
 }
 
@@ -111,10 +187,11 @@ private struct ChromeCard: View {
             }
 
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
+                if c.browser != .chrome { row(l10n.browserTitle, c.browser.appName, mono: false) }
                 row(l10n.profileFolder, c.isDefaultProfile ? l10n.defaultProfile : c.profileKey, mono: !c.isDefaultProfile)
                 if let proxy = c.proxyServer { row(l10n.proxy, proxy, mono: true) }
                 if let url = c.startURL { row(l10n.startURL, url, mono: true) }
-                let accounts = ChromeInstances.profileNames(in: c.profileKey)
+                let accounts = chrome.profileNames[c.profileKey] ?? []
                 if !accounts.isEmpty { row(l10n.chromeAccounts, accounts.joined(separator: ", "), mono: false) }
                 if let size = chrome.folderSizes[c.profileKey] {
                     row(l10n.folderSize, ByteFormat.short(size), mono: false)
@@ -238,7 +315,7 @@ private struct ChromeCard: View {
     }
 
     private func defaultName(_ c: ChromeConfig) -> String {
-        if c.isDefaultProfile { return l10n.chromeMain }
+        if c.isDefaultProfile { return l10n.browserMain(c.browser.appName) }
         return (c.profileKey as NSString).lastPathComponent
     }
 }
@@ -250,6 +327,7 @@ private struct ChromePresetEditor: View {
     let onDone: () -> Void
 
     @State private var name = ""
+    @State private var browser: ChromiumBrowser = .chrome
     @State private var dir = ""
     @State private var port = ""
     @State private var proxy = ""
@@ -260,6 +338,18 @@ private struct ChromePresetEditor: View {
         VStack(alignment: .leading, spacing: 6) {
             Divider()
             field(l10n.presetName, $name, "grok 9223")
+            HStack {
+                Text(l10n.browserTitle).font(.system(size: 10)).foregroundStyle(.secondary).frame(width: 90, alignment: .leading)
+                Picker("", selection: $browser) {
+                    // Keep the saved browser selectable even if it was uninstalled.
+                    ForEach(ChromiumBrowser.allCases.filter { chrome.isInstalled($0) || $0 == preset.config.browser },
+                            id: \.self) { Text($0.appName).tag($0) }
+                }
+                .labelsHidden()
+                .controlSize(.small)
+                .fixedSize()
+                Spacer()
+            }
             field(l10n.profileFolder, $dir, "~/chrome-dig")
             field(l10n.debugPort, $port, "9223")
             field(l10n.proxy, $proxy, "http://127.0.0.1:7890")
@@ -276,6 +366,7 @@ private struct ChromePresetEditor: View {
                     p.name = name.trimmingCharacters(in: .whitespaces).isEmpty ? preset.name : name
                     let d = dir.trimmingCharacters(in: .whitespaces)
                     p.config = ChromeConfig(
+                        browser: browser,
                         userDataDir: d.isEmpty ? nil : d,
                         debugPort: UInt16(port.trimmingCharacters(in: .whitespaces)),
                         proxyServer: proxy.trimmingCharacters(in: .whitespaces).nilIfEmpty,
@@ -291,6 +382,7 @@ private struct ChromePresetEditor: View {
         }
         .onAppear {
             name = preset.name
+            browser = preset.config.browser
             dir = preset.config.userDataDir ?? ""
             port = preset.config.debugPort.map(String.init) ?? ""
             proxy = preset.config.proxyServer ?? ""
@@ -403,6 +495,12 @@ private struct PopoverChromeRow: View {
                 .font(.system(size: 12, weight: .medium))
                 .lineLimit(1)
                 .truncationMode(.middle)
+            if c.browser != .chrome, entry.preset != nil || !c.isDefaultProfile {
+                Text(c.browser.appName)
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
             if let port = c.debugPort {
                 Text(":\(String(port))")
                     .font(.system(size: 10.5, weight: .medium).monospacedDigit())
@@ -463,7 +561,7 @@ private struct PopoverChromeRow: View {
 
     private func name(_ c: ChromeConfig) -> String {
         if let preset = entry.preset { return preset.name }
-        if c.isDefaultProfile { return l10n.chromeMain }
+        if c.isDefaultProfile { return l10n.browserMain(c.browser.appName) }
         return (c.profileKey as NSString).lastPathComponent
     }
 }

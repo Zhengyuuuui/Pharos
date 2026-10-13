@@ -46,6 +46,36 @@ func testChromeLaunchArgsRoundTrip() {
     expectEq(ChromeInstances.launchArguments(defaultDir), [], "explicit default dir isn't passed")
 }
 
+func testChromiumBrowsers() {
+    expectEq(ChromiumBrowser.identify(path: "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"), .edge, "Edge")
+    expectEq(ChromiumBrowser.identify(path: "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"), .brave, "Brave")
+    expectEq(ChromiumBrowser.identify(path: "/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary"),
+             .chromeCanary, "Canary isn't mistaken for Chrome")
+    expectEq(ChromiumBrowser.identify(path: "/Applications/Chromium.app/Contents/MacOS/Chromium"), .chromium, "Chromium")
+    expectEq(ChromiumBrowser.identify(path: "/Applications/Microsoft Edge.app/Contents/Frameworks/x/Microsoft Edge Helper"),
+             nil, "helpers aren't browsers")
+    expectEq(ChromiumBrowser.identify(path: "/usr/bin/node"), nil, "unrelated")
+
+    let edgeExe = "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"
+    let found = ChromeInstances.find(in: [
+        ProcessSnapshot(pid: 10, ppid: 1, name: "Microsoft Edge", executablePath: edgeExe,
+                        arguments: [edgeExe, "--user-data-dir=/Users/me/edge1", "--remote-debugging-port=9500"], memoryBytes: 5),
+        ProcessSnapshot(pid: 11, ppid: 1, name: "Microsoft Edge", executablePath: edgeExe,
+                        arguments: [edgeExe], memoryBytes: 5),
+    ])
+    expectEq(found.map(\.config.browser), [.edge, .edge], "running Edge instances detected")
+    expectEq(found.first { $0.pid == 11 }?.config.profileKey, ChromiumBrowser.edge.defaultUserDataDir,
+             "Edge default profile is Edge's own folder, not Chrome's")
+    expectEq(ChromeInstances.shellCommand(ChromeConfig(browser: .brave, userDataDir: "/Users/me/b")),
+             "open -na 'Brave Browser' --args --user-data-dir=/Users/me/b", "launch command uses the right app")
+
+    // Presets saved before multi-browser support have no "browser" key.
+    let old = Data(#"[{"id":"1","name":"grok","config":{"userDataDir":"/Users/me/x","debugPort":9223,"extraFlags":[]}}]"#.utf8)
+    let decoded = try? JSONDecoder().decode([ChromePreset].self, from: old)
+    expectEq(decoded?.first?.config.browser, .chrome, "old presets decode as Chrome")
+    expectEq(decoded?.first?.config.debugPort, 9223, "old presets keep their fields")
+}
+
 func testChromeShellCommand() {
     let c = ChromeConfig(userDataDir: "/Users/me/chrome 9367", debugPort: 9367,
                          proxyServer: "http://127.0.0.1:7890", startURL: "https://x.com/?a=1&b=2",
@@ -86,7 +116,7 @@ func testChromeFindInstances() {
     expectEq(found[0].processCount, 3, "browser + 2 helpers")
     expectEq(found[1].memoryBytes, 340, "debug instance memory")
     expectEq(Set(found[1].allPIDs), Set<Int32>([200, 201, 300]), "helper tree PIDs")
-    expectEq(found[1].id, "/Users/me/chrome9366-clean", "instance identity = profile folder")
+    expectEq(found[1].id, "chrome:/Users/me/chrome9366-clean", "instance identity = browser + profile folder")
 }
 
 func testChromeLaunchProblems() {

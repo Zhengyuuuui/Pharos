@@ -10,10 +10,15 @@ final class WorkspaceStore: ObservableObject {
     @Published private(set) var favorites: [Favorite] = []
     /// Last failure (save, launch). Shown as a banner; never silent.
     @Published var errorMessage: String?
+    @Published var terminal: TerminalApp {
+        didSet { UserDefaults.standard.set(terminal.rawValue, forKey: Self.terminalKey) }
+    }
 
     private static let key = "favoriteWorkspaces.v1"
+    private static let terminalKey = "terminalApp"
 
     private init() {
+        terminal = UserDefaults.standard.string(forKey: Self.terminalKey).flatMap(TerminalApp.init) ?? .terminal
         if let data = UserDefaults.standard.data(forKey: Self.key) {
             do {
                 favorites = try JSONDecoder().decode([Favorite].self, from: data)
@@ -87,6 +92,12 @@ final class WorkspaceStore: ObservableObject {
         save()
     }
 
+    func add(_ imported: [Favorite]) {
+        guard !imported.isEmpty else { return }
+        favorites += imported
+        save()
+    }
+
     func update(id: String, name: String? = nil, command: String? = nil) {
         guard let i = favorites.firstIndex(where: { $0.id == id }) else { return }
         if let name, !name.trimmingCharacters(in: .whitespaces).isEmpty { favorites[i].name = name }
@@ -123,9 +134,9 @@ final class WorkspaceStore: ObservableObject {
 
     // MARK: - Actions
 
-    /// Writes a small `.command` script and opens it with the user's default
-    /// handler (Terminal.app unless changed). The process then belongs to that
-    /// terminal window: output is visible and Ctrl-C stops it.
+    /// Writes a small `.command` script and opens it in the chosen terminal
+    /// app (Settings → Terminal; Terminal.app by default). The process then
+    /// belongs to that terminal window: output is visible and Ctrl-C stops it.
     func openInTerminal(_ fav: Favorite) {
         let l10n = L10n.shared
         guard !fav.command.isEmpty else { errorMessage = l10n.noCommandSet; return }
@@ -142,12 +153,31 @@ final class WorkspaceStore: ObservableObject {
             errorMessage = l10n.launchFailed(error.localizedDescription)
             return
         }
-        NSWorkspace.shared.open([url], withApplicationAt: Self.terminalURL,
+        let chosen = terminal
+        let app: URL
+        if let found = Self.appURL(chosen) {
+            app = found
+        } else {
+            errorMessage = l10n.terminalFallback(chosen.displayName)
+            app = Self.terminalAppURL
+        }
+        NSWorkspace.shared.open([url], withApplicationAt: app,
                                 configuration: NSWorkspace.OpenConfiguration()) { [weak self] _, error in
             guard let error else { return }
-            Task { @MainActor in self?.errorMessage = L10n.shared.launchFailed(error.localizedDescription) }
+            Task { @MainActor in
+                // Some terminals don't accept .command files; Terminal.app always does.
+                guard app != Self.terminalAppURL else {
+                    self?.errorMessage = L10n.shared.launchFailed(error.localizedDescription)
+                    return
+                }
+                self?.errorMessage = L10n.shared.terminalFallback(chosen.displayName)
+                NSWorkspace.shared.open([url], withApplicationAt: Self.terminalAppURL,
+                                        configuration: NSWorkspace.OpenConfiguration())
+            }
         }
     }
+
+    func isInstalled(_ t: TerminalApp) -> Bool { Self.appURL(t) != nil }
 
     func revealInFinder(_ fav: Favorite) {
         NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: fav.directory)
@@ -165,8 +195,13 @@ final class WorkspaceStore: ObservableObject {
             .appendingPathComponent("Pharos/launch", isDirectory: true)
     }
 
-    private static var terminalURL: URL {
-        NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal")
+    private static func appURL(_ t: TerminalApp) -> URL? {
+        if t == .terminal { return terminalAppURL }
+        return NSWorkspace.shared.urlForApplication(withBundleIdentifier: t.bundleIdentifier)
+    }
+
+    private static var terminalAppURL: URL {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: TerminalApp.terminal.bundleIdentifier)
             ?? URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app")
     }
 
