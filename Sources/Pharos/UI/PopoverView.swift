@@ -57,6 +57,9 @@ struct PopoverView: View {
             }
             .buttonStyle(RowButtonStyle())
 
+            menuRow(l10n.agentChats, icon: "bubble.left.and.text.bubble.right") {
+                AppDelegate.shared?.showMainWindow(selecting: .agentChats)
+            }
             menuRow(l10n.diskCleanup, icon: "trash") {
                 AppDelegate.shared?.showMainWindow(selecting: .diskCleanup)
             }

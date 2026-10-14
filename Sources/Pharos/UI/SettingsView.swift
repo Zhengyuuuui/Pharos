@@ -95,6 +95,32 @@ struct ExtraSettingsForm: View {
             }
             .font(.system(size: 12))
 
+            if menuBar.text == .projects {
+                HStack {
+                    Text(l10n.maxProjectsCapacity)
+                    Spacer()
+                    TextField("", value: $menuBar.maxProjects, format: .number)
+                        .frame(width: 44)
+                        .multilineTextAlignment(.trailing)
+                    Stepper("", value: $menuBar.maxProjects, in: 5...200, step: 5)
+                        .labelsHidden()
+                }
+                .font(.system(size: 12))
+                .help(l10n.capacityRingHint)
+            } else if menuBar.text == .ports {
+                HStack {
+                    Text(l10n.maxPortsCapacity)
+                    Spacer()
+                    TextField("", value: $menuBar.maxPorts, format: .number)
+                        .frame(width: 44)
+                        .multilineTextAlignment(.trailing)
+                    Stepper("", value: $menuBar.maxPorts, in: 5...300, step: 5)
+                        .labelsHidden()
+                }
+                .font(.system(size: 12))
+                .help(l10n.capacityRingHint)
+            }
+
             VStack(alignment: .leading, spacing: 3) {
                 Picker(l10n.hotkeyTitle, selection: $menuBar.hotkey) {
                     ForEach(PopoverHotkey.allCases) { Text($0.label).tag($0) }

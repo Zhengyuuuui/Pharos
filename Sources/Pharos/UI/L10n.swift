@@ -183,10 +183,17 @@ final class L10n: ObservableObject {
     func menuBarTextOption(_ o: MenuBarText) -> String {
         switch o {
         case .none: return en ? "Icon only" : "仅图标"
+        case .projects: return en ? "Project count" : "项目数"
         case .ports: return en ? "Port count" : "端口数"
         case .memory: return en ? "Memory used %" : "内存占用 %"
         case .disk: return en ? "Startup disk used %" : "启动磁盘占用 %"
         }
+    }
+    var maxProjectsCapacity: String { en ? "Max projects capacity" : "最多项目数（容量上限）" }
+    var maxPortsCapacity: String { en ? "Max ports capacity" : "最多端口数（容量上限）" }
+    var capacityRingHint: String {
+        en ? "Used to calculate the icon ring's fill percentage."
+           : "用于计算菜单栏小图标环形进度的已用占比。"
     }
 
     // Global shortcut
@@ -678,4 +685,90 @@ final class L10n: ObservableObject {
         en ? "Read-only: lists your own processes with listening TCP ports. Memory = Activity Monitor footprint (incl. child processes)."
            : "只读：列出你自己监听 TCP 端口的进程。内存 = 活动监视器口径（含子进程）。"
     }
+
+    // MARK: - AI Agent Chats
+    var agentChats: String { en ? "Agent Chats" : "AI 对话管理" }
+    var agentChatTitle: String { en ? "AI Agent Conversations" : "AI 对话管理" }
+    var agentChatSubtitle: String {
+        en ? "Inspect and manage conversation databases, workspace storage, and caches from Cursor, Trae, VS Code, Claude Code, and Windsurf."
+           : "管理本地 Cursor、Trae、VS Code、Claude Code 等 AI 编程助手的对话数据库、工作区存储与缓存。"
+    }
+    var totalDatabases: String { en ? "Databases" : "数据库总数" }
+    var totalConversations: String { en ? "Conversations" : "解析对话数" }
+    var totalStorageSize: String { en ? "Total Storage" : "占用总大小" }
+    var orphanedWorkspaces: String { en ? "Orphaned Projects" : "失效项目残留" }
+    var cleanOrphaned: String { en ? "Clean Orphaned" : "清理失效残留" }
+    var cleanOrphanedHelp: String {
+        en ? "Remove workspace storage folders whose corresponding project directory has been deleted from your Mac."
+           : "一键清理所有在本地已被删除或移动的项目残留的工作区数据库文件夹。"
+    }
+    var cleanOrphanedConfirm: String { en ? "Clean All Orphaned?" : "确定清理全部残留？" }
+    var allEditors: String { en ? "All Editors" : "全部编辑器" }
+    var allScopes: String { en ? "All Types" : "全部类型" }
+    var scopeGlobal: String { en ? "Global Sessions" : "全局会话" }
+    var scopeWorkspace: String { en ? "Workspace Storage" : "工作区存储" }
+    var scopeVectorCache: String { en ? "Knowledge & Cache" : "知识库与缓存" }
+    var onlyOrphaned: String { en ? "Only Orphaned" : "仅看残留" }
+    var searchDatabasesPlaceholder: String { en ? "Search project, conversation, or path…" : "搜索项目名、对话标题或路径…" }
+    var sortBy: String { en ? "Sort by" : "排序" }
+    var sortBySize: String { en ? "Size" : "文件大小" }
+    var sortByDate: String { en ? "Modified" : "修改时间" }
+    var sortByName: String { en ? "Name" : "名称" }
+    var projectFolder: String { en ? "Project Folder" : "关联项目" }
+    var databaseFile: String { en ? "Database File" : "数据库文件" }
+    var orphanedWarning: String { en ? "Project directory no longer exists on disk" : "关联的本地项目文件夹已不存在（残留）" }
+    var backupDatabase: String { en ? "Backup DB" : "备份数据库" }
+    var cleanDatabase: String { en ? "Delete DB" : "删除数据库" }
+    var confirmCleanDb: String { en ? "Confirm Delete?" : "确认删除？" }
+    var conversationsInDb: String { en ? "Conversations in Database" : "数据库内对话记录" }
+    var noConversationsParsed: String {
+        en ? "No individual session records parsed (internal state or binary cache)."
+           : "未解析到独立对话记录（可能为系统内部状态或索引缓存库）。"
+    }
+    var noAgentDbsFound: String { en ? "No AI agent databases found" : "未发现本地 AI Agent 对话数据库" }
+    var noAgentDbsFoundDesc: String {
+        en ? "Databases from Cursor, Trae, VS Code, Claude Code, or Windsurf will appear here once used."
+           : "在本地使用 Cursor、Trae、VS Code、Claude Code 或 Windsurf 后，相关对话与工作区数据库将显示在此。"
+    }
+    func agentDbCleanSuccess(_ name: String) -> String {
+        en ? "Successfully removed '\(name)'." : "已成功删除 '\(name)'。"
+    }
+    func agentDbBackupSuccess(_ path: String) -> String {
+        en ? "Backup saved to: \(path)" : "已备份至：\(path)"
+    }
+    func agentOrphanedCleanSuccess(count: Int, size: String) -> String {
+        en ? "Cleaned \(count) orphaned database(s), freed \(size)." : "已清理 \(count) 个残留工作区，释放 \(size) 空间。"
+    }
+    var showAll: String { en ? "Show All" : "显示全部" }
+    var loadMore: String { en ? "Load More (+60)" : "加载更多 (+60)" }
+    func showingCount(shown: Int, total: Int) -> String {
+        en ? "Showing \(shown) of \(total)" : "正在显示 \(shown) / \(total) 项"
+    }
+    var editorStorageChart: String { en ? "Database Storage by AI Editor" : "各 AI 编辑器数据库占用" }
+    var editorStorageDesc: String {
+        en ? "Compare database and cache usage across local AI editors. Click any bar to filter the list."
+           : "对比本地各 AI 编程助手的数据库与缓存占用。点击任一柱条可快速筛选下方列表。"
+    }
+    var chartModeTotal: String { en ? "Total" : "总占用" }
+    var chartModeBreakdown: String { en ? "By Type" : "分类构成" }
+
+    var configuredDbPaths: String { en ? "Database Storage Paths" : "数据库存储路径" }
+    var configuredDbPathsDesc: String {
+        en ? "Discovered and known database / cache locations on your Mac for this AI editor."
+           : "此 AI 编辑器在当前系统中的数据库、工作区存储及缓存索引路径。"
+    }
+    var loadedConversations: String { en ? "Loaded Conversations" : "已加载的会话记录" }
+    var noConversationsForEditor: String {
+        en ? "No conversation records found in this editor's database (or yet to initiate a chat)."
+           : "当前数据库中暂无独立对话记录（可能尚未发起会话或仅存储了配置与索引）。"
+    }
+    var appInstalled: String { en ? "Installed" : "已安装" }
+    var appNotInstalled: String { en ? "Not Installed" : "未检测到" }
+    var dbPathNotCreated: String { en ? "File not created yet" : "文件尚未生成" }
+    var editorPathInspectorTitle: String { en ? "Database Paths & Conversations" : "数据库路径与会话加载" }
+    var conversationsCountLabel: String { en ? "conversations" : "条对话" }
+    var databasesCountLabel: String { en ? "databases" : "个数据库" }
+    var inactiveEditors: String { en ? "Inactive / No Data" : "不常用 (无数据)" }
+    var uninstalledAppResidual: String { en ? "Uninstalled (Residual)" : "已卸载 (残留)" }
 }
+

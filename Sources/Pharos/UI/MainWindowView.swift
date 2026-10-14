@@ -5,6 +5,7 @@ struct MainWindowView: View {
     @EnvironmentObject var store: ProjectStore
     @ObservedObject private var cleanup = CleanupStoreHolder.shared
     @ObservedObject private var workspaces = WorkspaceStore.shared
+    @ObservedObject private var agentStore = AgentChatStore.shared
     @ObservedObject private var router = WindowRouter.shared
     @ObservedObject private var l10n = L10n.shared
     @State private var selection: SidebarItem?
@@ -22,6 +23,7 @@ struct MainWindowView: View {
         case portsOverview
         case diskCleanup
         case chrome
+        case agentChats
         case favorite(String)
         case project(String)
         case customize
@@ -95,6 +97,21 @@ struct MainWindowView: View {
                             .foregroundStyle(.secondary)
                     }
                     .tag(SidebarItem.chrome)
+                    HStack {
+                        Label(l10n.agentChats, systemImage: "bubble.left.and.text.bubble.right")
+                        Spacer()
+                        if agentStore.totalDatabases > 0 {
+                            Text("\(agentStore.totalDatabases)")
+                                .font(.system(size: 10).monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                        if agentStore.orphanedCount > 0 {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 8))
+                                .foregroundStyle(.red)
+                        }
+                    }
+                    .tag(SidebarItem.agentChats)
                 }
                 Section {
                     ForEach(workspaces.statuses(store.projects), id: \.favorite.id) { s in
@@ -187,6 +204,8 @@ struct MainWindowView: View {
                 CleanupView()
             case .chrome:
                 ChromeView()
+            case .agentChats:
+                AgentChatView()
             case .project(let id):
                 if let project = store.project(id: id) {
                     ProjectDetailView(project: project)

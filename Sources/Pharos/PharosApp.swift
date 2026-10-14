@@ -126,14 +126,103 @@ struct PharosApp: App {
     }
 }
 
+/// Dynamic gauge icon in the menu bar, reflecting active resource usage and pressure.
+private enum DynamicMenuBarIcon {
+    static func image(fraction: Double, pressure: MemoryPressure) -> NSImage {
+        let size = NSSize(width: 18, height: 18)
+        let image = NSImage(size: size, flipped: false) { rect in
+            guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
+
+            let center = CGPoint(x: rect.midX, y: rect.midY)
+            let radius: CGFloat = 6.2
+            let lineWidth: CGFloat = 2.0
+
+            // Background gray track circle (clearly visible gray area)
+            ctx.setStrokeColor(NSColor.labelColor.withAlphaComponent(0.32).cgColor)
+            ctx.setLineWidth(lineWidth)
+            ctx.addArc(center: center, radius: radius, startAngle: 0, endAngle: 2 * .pi, clockwise: false)
+            ctx.strokePath()
+
+            // Active progress arc (white area representing the percentage)
+            if fraction > 0 {
+                let startAngle: CGFloat = .pi / 2
+                let clamped = min(1.0, max(0.02, CGFloat(fraction)))
+                let endAngle: CGFloat = startAngle - (clamped * 2 * .pi)
+
+                let ringColor: NSColor
+                switch pressure {
+                case .critical:
+                    ringColor = .systemRed
+                case .warning:
+                    ringColor = .systemOrange
+                case .normal:
+                    if fraction >= 0.95 { ringColor = .systemRed }
+                    else if fraction >= 0.85 { ringColor = .systemOrange }
+                    else { ringColor = .labelColor }
+                }
+
+                ctx.setStrokeColor(ringColor.cgColor)
+                ctx.setLineWidth(lineWidth)
+                ctx.setLineCap(.round)
+                ctx.addArc(center: center, radius: radius, startAngle: startAngle, endAngle: endAngle, clockwise: true)
+                ctx.strokePath()
+            }
+
+            // Center status dot indicating health/pressure
+            let dotColor: NSColor
+            switch pressure {
+            case .normal: dotColor = .systemGreen
+            case .warning: dotColor = .systemYellow
+            case .critical: dotColor = .systemRed
+            }
+            ctx.setFillColor(dotColor.cgColor)
+            let dotRadius: CGFloat = 1.75
+            ctx.addArc(center: center, radius: dotRadius, startAngle: 0, endAngle: 2 * .pi, clockwise: false)
+            ctx.fillPath()
+
+            return true
+        }
+        image.isTemplate = false
+        return image
+    }
+}
+
 /// Icon plus the optional number chosen in Settings → "Menu bar shows".
 private struct MenuBarLabel: View {
     @ObservedObject var store: ProjectStore
     @ObservedObject private var settings = MenuBarSettings.shared
 
+    private var activeMetric: (fraction: Double, pressure: MemoryPressure) {
+        switch settings.text {
+        case .disk:
+            let disk = store.volumes.first { $0.kind == .startup }
+            let frac = disk?.usedFraction ?? 0
+            let press: MemoryPressure = frac >= 0.95 ? .critical : (frac >= 0.85 ? .warning : .normal)
+            return (frac, press)
+        case .memory:
+            return (store.system?.usedFraction ?? 0, store.system?.pressure ?? .normal)
+        case .projects:
+            let cap = max(1, settings.maxProjects)
+            let frac = Double(store.projects.count) / Double(cap)
+            let press: MemoryPressure = frac >= 1.0 ? .critical : (frac >= 0.85 ? .warning : .normal)
+            return (min(1.0, frac), press)
+        case .ports:
+            let cap = max(1, settings.maxPorts)
+            let frac = Double(store.totalPorts) / Double(cap)
+            let press: MemoryPressure = frac >= 1.0 ? .critical : (frac >= 0.85 ? .warning : .normal)
+            return (min(1.0, frac), press)
+        case .none:
+            return (store.system?.usedFraction ?? 0, store.system?.pressure ?? .normal)
+        }
+    }
+
     var body: some View {
-        HStack(spacing: 3) {
-            Image(systemName: "point.3.connected.trianglepath.dotted")
+        let metric = activeMetric
+        HStack(spacing: 4) {
+            Image(nsImage: DynamicMenuBarIcon.image(
+                fraction: metric.fraction,
+                pressure: metric.pressure
+            ))
             if let text = settings.label(for: store) {
                 Text(text).monospacedDigit()
             }

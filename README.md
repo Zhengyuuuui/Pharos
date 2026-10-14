@@ -20,11 +20,11 @@
   <img src="https://img.shields.io/badge/dependencies-none-brightgreen" alt="Dependencies">
   <img src="https://img.shields.io/badge/network-none-lightgrey" alt="No network">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.2-blue" alt="Version 2.2">
-  <img src="https://img.shields.io/badge/updated-2026--10--13-informational" alt="Last updated 2026-10-13">
+  <img src="https://img.shields.io/badge/version-2.3-blue" alt="Version 2.3">
+  <img src="https://img.shields.io/badge/updated-2026--10--14-informational" alt="Last updated 2026-10-14">
 </p>
 
-<p align="center"><sub>Last updated / 最后更新：2026-10-13 14:23 (UTC+8) · v2.2</sub></p>
+<p align="center"><sub>Last updated / 最后更新：2026-10-14 20:50 (UTC+8) · v2.3</sub></p>
 
 <p align="center"><a href="#english">English</a> · <a href="#简体中文">简体中文</a> · <a href="#changelog--更新记录">Changelog / 更新记录</a></p>
 
@@ -49,6 +49,7 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 | **Disk cleanup** | Temp folders and dev caches, file by file, with a retention window; the size shown is exactly what gets freed |
 | **Favorite projects** | Save project folders, start commands detected automatically, open in Terminal with one click |
 | **Browser instances** | Chrome, Chrome Beta / Canary, Chromium, Edge and Brave — every profile folder with its debug port, proxy and memory; save favorites that stay listed with their launch command after quitting; start and quit |
+| **AI agent chat databases** | Inspect, clean and backup local chat / session databases from 23+ AI IDEs and editors (Cursor, Trae, Windsurf, VS Code, Antigravity, OpenCode, Claude Code, MiniMax…); detect orphaned workspaces |
 
 ### Features
 
@@ -118,13 +119,20 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 - The size shown uses the exact same rule as the clean, so it's what you'll actually get back; a result banner reports freed space or why nothing could be freed
 - Nested dev caches under `~/Library/Caches` get their own rows and are excluded from the parent's size — no double counting
 
+**AI agent chat databases**
+- Scans local SQLite and state databases across 23+ AI IDEs and assistants (Cursor, Trae, Windsurf, VS Code, Antigravity, Qoder, Cherry Studio, CodeBuddy, Kiro, OpenCode, Claude Code, Zed, MiniMax Code, Doubao, etc.)
+- Database size, conversation counts, last modified date, and storage breakdown chart (by editor and database type)
+- Detects orphaned databases left behind from deleted projects or uninstalled editors
+- Safe database backup (`.db.bak`) and one-click cleanup with confirmation
+
 **General**
 - English / 简体中文, switchable live
 - Refresh every 2 / 5 / 10 / 30 s while a window is visible; low-frequency (30 s) background sampling keeps 1 hour of history
 - Optional “show background apps” (Spotify, AirPlay, Docker Desktop…)
 - Launch at login
 - Lives in the menu bar; a Dock icon appears only while the main window is open
-- Optional number next to the menu bar icon: port count, memory used % or startup disk used %
+- **Dynamic menu bar gauge icon**: real-time CoreGraphics ring icon reflecting live fill fraction (white progress arc vs. gray track) and pressure status dot (green / yellow / red)
+- **Menu bar number & capacity limits**: choose to display port count, project count, memory used % or startup disk used %; customize "Max projects" and "Max ports" capacity limits in Settings to dynamically scale the gauge ring
 - Optional global shortcut to open the popover (⌥⌘P, ⌃⌥P or ⌥⌘Space; off by default, no Accessibility permission needed)
 - Optional local notifications (all off by default): memory pressure becomes high, a disk reaches 95 %, a favorite project stops on its own. Each fires once and re-arms only after it clears
 - **Backup**: export favorites, browser presets and the popover layout to one JSON file, import on another Mac (adds new entries, skips existing ones)
@@ -182,12 +190,15 @@ Sources/
 │   ├── SMC / Thermals   #   read fans and temperatures from the SMC
 │   ├── FanPolicy        #   fan safety rules + helper protocol
 │   ├── FanHelperInstall #   helper paths, launchd plist, install script
+│   ├── AgentChats       #   AI agent chat databases & orphan detection
+│   ├── AgentSQLiteReader#   pure Swift SQLite header & page reader
 │   └── PopoverLayout    #   which blocks each popover tab shows (customizable)
 ├── Pharos/              # SwiftUI app
 │   ├── ProjectStore     #   polling, state, actions
 │   ├── CleanupStore     #   disk cleanup state
 │   ├── WorkspaceStore   #   favorites: persist, pin, open in Terminal
 │   ├── ChromeStore      #   Chrome presets, start / quit
+│   ├── AgentChatStore   #   agent chat databases state, backup, delete
 │   ├── Notifier         #   local notifications
 │   ├── MenuBarSettings  #   menu bar text, global shortcut
 │   ├── BackupActions    #   export / import panels
@@ -232,6 +243,7 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 | **磁盘清理** | 临时目录与开发缓存，按单个文件、按保留期判断；显示的体积就是实际能释放的体积 |
 | **常用项目** | 收藏项目文件夹，自动识别启动命令，一键在终端中启动 |
 | **浏览器实例** | 支持 Chrome、Chrome Beta / Canary、Chromium、Edge、Brave，按配置文件夹列出每个实例，显示调试端口、代理、内存；收藏后关闭也能看到端口和启动命令；启动与退出 |
+| **AI 助手会话管理** | 扫描、分析、备份与清理 23+ 种本地 AI 编程助手与编辑器（Cursor、Trae、Windsurf、VS Code、Antigravity、OpenCode、Claude Code、MiniMax 等）的会话数据库，识别孤立/残留工作区 |
 
 ### 功能
 
@@ -301,13 +313,20 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 - 显示的体积与清理用同一条规则，看到多少就能释放多少；结果横幅会显示释放了多少，或说明为什么没能释放
 - `~/Library/Caches` 下嵌套的开发缓存单列一行，并从父目录体积中排除——不会重复计数
 
+**AI 助手会话与数据库管理**
+- 自动发现 23+ 款主流 AI 编程助手（Cursor、Trae、Windsurf、VS Code、Antigravity、Qoder、Cherry Studio、CodeBuddy、Kiro、OpenCode、Claude Code、Zed、MiniMax Code、豆包 等）的本地会话 SQLite 数据库
+- 显示各数据库大小、会话条数、修改时间与空间占用可视化图表（按编辑器与按类型构成）
+- 智能检测已被删除或移除工作区的残留孤立数据库（Orphaned）
+- 支持一键安全备份（`.db.bak`）及二次确认清理，释放冗余磁盘空间
+
 **通用**
 - 中文 / English 即时切换
 - 窗口可见时每 2 / 5 / 10 / 30 秒刷新；后台 30 秒低频采样，保留 1 小时历史
 - 可选「显示后台应用」（Spotify、AirPlay、Docker Desktop…）
 - 登录时启动
 - 常驻菜单栏；只有主窗口打开时才显示程序坞图标
-- 可选在菜单栏图标旁显示数字：端口数、内存占用 % 或启动磁盘占用 %
+- **动态菜单栏仪表图标**：CoreGraphics 原生绘制的环形用量图标，展示白色进度弧与灰色底圈的动态比例，中心配备三色健康/压力状态指示点（正常/预警/严重）
+- **菜单栏数字与容量上限**：可选在菜单栏图标旁显示端口数、项目数、内存占用 % 或启动磁盘占用 %；选择项目数或端口数时，可在设置中自定义「最多项目数」与「最多端口数」容量上限，实时缩放菜单栏图标填充比例
 - 可选全局快捷键打开下拉框（⌥⌘P、⌃⌥P 或 ⌥⌘Space；默认关闭，不需要辅助功能权限）
 - 可选本地通知（默认全部关闭）：内存压力升高、磁盘用量达到 95%、常用项目自己停止。每种情况只提醒一次，恢复后才会再次提醒
 - **备份**：把常用项目、浏览器预设和下拉框布局导出为一个 JSON 文件，在另一台 Mac 上导入（只添加新的条目，已有的跳过）
@@ -365,12 +384,15 @@ Sources/
 │   ├── SMC / Thermals   #   从 SMC 读取风扇和温度
 │   ├── FanPolicy        #   风扇安全规则 + 助手通信协议
 │   ├── FanHelperInstall #   助手路径、launchd 配置、安装脚本
+│   ├── AgentChats       #   AI 助手会话数据库与孤立工作区识别
+│   ├── AgentSQLiteReader#   纯 Swift SQLite 头部与页面解析
 │   └── PopoverLayout    #   下拉框各页签显示哪些组件（可自定义）
 ├── Pharos/              # SwiftUI 应用
 │   ├── ProjectStore     #   轮询、状态、操作
 │   ├── CleanupStore     #   磁盘清理状态
 │   ├── WorkspaceStore   #   常用项目：持久化、收藏、在终端中启动
 │   ├── ChromeStore      #   Chrome 预设、启动 / 退出
+│   ├── AgentChatStore   #   AI 助手数据库状态、备份、删除
 │   ├── Notifier         #   本地通知
 │   ├── MenuBarSettings  #   菜单栏数字、全局快捷键
 │   ├── BackupActions    #   导出 / 导入面板
@@ -399,6 +421,18 @@ make icon                           # 用 Scripts/make-icon.swift 重新生成 A
 ## Changelog / 更新记录
 
 Times are UTC+8. 时间为北京时间（UTC+8）。
+
+### v2.3 — 2026-10-14 20:50
+
+**English**
+- **Dynamic menu bar gauge icon**: native CoreGraphics ring icon reflecting live fill fraction (white progress arc vs. gray track) and pressure status dot (green / yellow / red)
+- **Project count option & capacity limits**: choose between project count (`projects`) and port count (`ports`) in menu bar; customize "Max projects" and "Max ports" in Settings to scale the dynamic gauge ring
+- **AI agent chat databases**: inspect, backup, and clean local session databases and orphaned project records across 23+ AI programming editors (Cursor, Trae, Windsurf, VS Code, Antigravity, OpenCode, Claude Code, MiniMax Code, etc.)
+
+**简体中文**
+- **动态菜单栏仪表图标**：CoreGraphics 原生绘制的环形用量图标，展示白色进度弧与灰色底圈的动态比例，中心配备三色健康/压力状态指示点
+- **新增项目数显示与容量上限设置**：菜单栏数字支持独立选择「项目数」或「端口数」；设置中提供「最多项目数」与「最多端口数」自定义上限，实时缩放菜单栏图标填充比例
+- **AI 编程助手会话管理**：全面扫描与管理 23+ 款本地 AI 编辑器（Cursor、Trae、Windsurf、VS Code、Antigravity、OpenCode、Claude Code、MiniMax 等）的聊天会话与工作区数据库，支持残余孤立数据库检测、安全备份与清理
 
 ### v2.2 — 2026-10-13 14:23
 

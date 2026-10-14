@@ -3,7 +3,7 @@ import Carbon.HIToolbox
 
 /// What the menu bar shows next to the icon.
 enum MenuBarText: String, CaseIterable, Identifiable {
-    case none, ports, memory, disk
+    case none, projects, ports, memory, disk
     var id: String { rawValue }
 }
 
@@ -43,6 +43,12 @@ final class MenuBarSettings: ObservableObject {
     @Published var text: MenuBarText {
         didSet { UserDefaults.standard.set(text.rawValue, forKey: Keys.text) }
     }
+    @Published var maxProjects: Int {
+        didSet { UserDefaults.standard.set(maxProjects, forKey: Keys.maxProjects) }
+    }
+    @Published var maxPorts: Int {
+        didSet { UserDefaults.standard.set(maxPorts, forKey: Keys.maxPorts) }
+    }
     @Published var hotkey: PopoverHotkey {
         didSet {
             UserDefaults.standard.set(hotkey.rawValue, forKey: Keys.hotkey)
@@ -55,6 +61,8 @@ final class MenuBarSettings: ObservableObject {
     private enum Keys {
         static let text = "menuBarText"
         static let hotkey = "popoverHotkey"
+        static let maxProjects = "maxProjectsCapacity"
+        static let maxPorts = "maxPortsCapacity"
     }
 
     private var hotkeyRef: EventHotKeyRef?
@@ -62,6 +70,10 @@ final class MenuBarSettings: ObservableObject {
 
     private init() {
         text = UserDefaults.standard.string(forKey: Keys.text).flatMap(MenuBarText.init) ?? .none
+        let savedProjects = UserDefaults.standard.integer(forKey: Keys.maxProjects)
+        maxProjects = savedProjects > 0 ? savedProjects : 25
+        let savedPorts = UserDefaults.standard.integer(forKey: Keys.maxPorts)
+        maxPorts = savedPorts > 0 ? savedPorts : 30
         hotkey = UserDefaults.standard.string(forKey: Keys.hotkey).flatMap(PopoverHotkey.init) ?? .none
         installHandler()
         registerHotkey()
@@ -71,6 +83,7 @@ final class MenuBarSettings: ObservableObject {
     func label(for store: ProjectStore) -> String? {
         switch text {
         case .none: return nil
+        case .projects: return "\(store.projects.count)"
         case .ports: return "\(store.totalPorts)"
         case .memory: return store.system.map { "\(Int(($0.usedFraction * 100).rounded()))%" }
         case .disk: return store.volumes.first { $0.kind == .startup }.map { "\(Int(($0.usedFraction * 100).rounded()))%" }
