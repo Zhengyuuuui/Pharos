@@ -1450,4 +1450,25 @@ public enum PackageScanner {
         }
         return false
     }
+
+    // MARK: - Dependency Bundle Clean / Delete
+    /// 将项目的主依赖目录移入废纸篓或删除（释放磁盘空间）
+    @discardableResult
+    public static func deleteProjectDependencyBundle(at bundlePath: String, projectRoot: String) throws -> Bool {
+        guard !bundlePath.isEmpty, bundlePath != projectRoot, bundlePath.hasPrefix(projectRoot + "/") else {
+            return false
+        }
+        guard FileManager.default.fileExists(atPath: bundlePath) else {
+            return false
+        }
+        let url = URL(fileURLWithPath: bundlePath)
+        do {
+            try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+            return true
+        } catch {
+            try FileManager.default.removeItem(atPath: bundlePath)
+            return true
+        }
+    }
 }
+

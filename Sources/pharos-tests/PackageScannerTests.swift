@@ -106,7 +106,26 @@ func testPackageModels() {
     )
     expectEq(pySummary.primaryBundleName, ".venv", "primary bundle fallback name for python")
     expectEq(pySummary.primaryBundlePath, "/tmp/py-app/.venv", "primary bundle path for python")
+
+    // Test deleteProjectDependencyBundle
+    let tmpDir = NSTemporaryDirectory() + "pharos-test-proj-" + UUID().uuidString
+    let nodeModDir = tmpDir + "/node_modules"
+    try? FileManager.default.createDirectory(atPath: nodeModDir, withIntermediateDirectories: true)
+    let dummyFile = nodeModDir + "/dummy.js"
+    try? "console.log(1)".write(toFile: dummyFile, atomically: true, encoding: .utf8)
+
+    expect(FileManager.default.fileExists(atPath: nodeModDir), "node_modules created for test")
+    let deleted = (try? PackageScanner.deleteProjectDependencyBundle(at: nodeModDir, projectRoot: tmpDir)) ?? false
+    expect(deleted, "deleteProjectDependencyBundle returned true")
+    expect(!FileManager.default.fileExists(atPath: nodeModDir), "node_modules removed")
+
+    // Safety check: attempt to delete project root itself should be rejected
+    let rejected = (try? PackageScanner.deleteProjectDependencyBundle(at: tmpDir, projectRoot: tmpDir)) ?? false
+    expect(!rejected, "attempt to delete project root itself rejected")
+
+    try? FileManager.default.removeItem(atPath: tmpDir)
 }
+
 
 
 func testGlobalCliScanner() {

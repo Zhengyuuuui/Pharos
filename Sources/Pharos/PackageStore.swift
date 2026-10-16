@@ -129,7 +129,57 @@ final class PackageStore: ObservableObject {
         }
     }
 
+    // MARK: - Bundle Deletion
+    @Published private(set) var isDeletingBundle = false
+    @Published var deleteBundleError: String? = nil
+    @Published var deleteBundleSuccess: String? = nil
+
+    func deleteDependencyBundle(for summary: ProjectDependencySummary) {
+        guard !isDeletingBundle else { return }
+        let bundleName = summary.primaryBundleName
+        let bundlePath = summary.primaryBundlePath
+        let rootPath = summary.rootPath
+
+        guard !bundleName.isEmpty, bundleName != "/", bundleName != "." else { return }
+        guard bundlePath != rootPath, bundlePath.hasPrefix(rootPath + "/") else { return }
+
+        isDeletingBundle = true
+        deleteBundleError = nil
+        deleteBundleSuccess = nil
+
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let failureMsg: String?
+            do {
+                try PackageScanner.deleteProjectDependencyBundle(at: bundlePath, projectRoot: rootPath)
+                failureMsg = nil
+            } catch {
+                failureMsg = error.localizedDescription
+            }
+
+            let refreshed = PackageScanner.scanProjectDependencies(projectPath: rootPath)
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.isDeletingBundle = false
+                if let err = failureMsg {
+                    self.deleteBundleError = err
+                } else {
+                    self.deleteBundleSuccess = bundleName
+                }
+                if let refreshed {
+                    if let idx = self.detectedProjects.firstIndex(where: { $0.rootPath == refreshed.rootPath }) {
+                        self.detectedProjects[idx] = refreshed
+                    } else {
+                        self.detectedProjects.append(refreshed)
+                    }
+                    self.selectedProjectSummary = refreshed
+                }
+                self.recomputeFilteredProject()
+            }
+        }
+    }
+
     // MARK: - Filtering Logic
+
     private func recomputeFilteredCli() {
         var items = globalCliTools
         if onlyFeatured {

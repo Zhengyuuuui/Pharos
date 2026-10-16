@@ -20,6 +20,8 @@ struct PackageView: View {
     @State private var isFeaturedShelfExpanded = true
     @State private var itemToUninstall: LocalPackageItem? = nil
     @State private var showUninstallAlert = false
+    @State private var bundleToDelete: ProjectDependencySummary? = nil
+    @State private var showDeleteBundleAlert = false
     @State private var isDetailedExpanded: Bool? = nil
 
     private var isPackagesBreakdownExpanded: Bool {
@@ -798,10 +800,64 @@ struct PackageView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+
+                if exists {
+                    Button {
+                        bundleToDelete = summary
+                        showDeleteBundleAlert = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            if store.isDeletingBundle {
+                                ProgressView()
+                                    .controlSize(.mini)
+                            } else {
+                                Image(systemName: "trash")
+                            }
+                            Text(l10n.deleteDependencyBundle)
+                        }
+                        .font(.system(size: 11))
+                        .foregroundStyle(.red)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(store.isDeletingBundle)
+                }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
             .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.035)))
+
+            if let successName = store.deleteBundleSuccess {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    Text(l10n.deleteBundleSuccessNotice(successName))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.green)
+                    Spacer()
+                    IconButton(systemImage: "xmark", help: l10n.cancel) {
+                        store.deleteBundleSuccess = nil
+                    }
+                }
+                .padding(8)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Color.green.opacity(0.08)))
+            }
+
+            if let err = store.deleteBundleError {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                    Text(err)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.red)
+                    Spacer()
+                    IconButton(systemImage: "xmark", help: l10n.cancel) {
+                        store.deleteBundleError = nil
+                    }
+                }
+                .padding(8)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Color.red.opacity(0.08)))
+            }
 
             // 4. Missing warning / install tip (if any)
             if summary.missingDependenciesCount > 0 || !exists {
@@ -871,7 +927,23 @@ struct PackageView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(color.opacity(0.2), lineWidth: 1)
         )
+        .alert(isPresented: $showDeleteBundleAlert) {
+            let s = bundleToDelete ?? summary
+            let name = s.primaryBundleName
+            let sizeStr = s.dependenciesSizeBytes > 0 ? ByteFormat.short(s.dependenciesSizeBytes) : ""
+            let installCmd = l10n.missingInstallCommand(for: s.ecosystem)
+
+            return Alert(
+                title: Text(l10n.deleteBundleConfirmTitle(name)),
+                message: Text(l10n.deleteBundleConfirmMessage(name, sizeStr, installCmd)),
+                primaryButton: .destructive(Text(l10n.deleteBundleAction)) {
+                    store.deleteDependencyBundle(for: s)
+                },
+                secondaryButton: .cancel(Text(l10n.cancel))
+            )
+        }
     }
+
 
     private func statPill(label: String, value: String, icon: String, color: Color = .primary) -> some View {
         HStack(spacing: 4) {
@@ -1002,7 +1074,59 @@ struct PackageView: View {
             HStack(spacing: 12) {
                 statCard(l10n.cacheSize, ByteFormat.disk(store.totalCacheSize), icon: "archivebox.fill")
                 statCard(l10n.fileCount, "\(store.totalCacheCount) repos", icon: "folder.fill")
+
+                Spacer()
+
+                Button {
+                    UserDefaults.standard.set(true, forKey: "cleanupGroupExpanded.packages")
+                    CleanupStoreHolder.shared.scan()
+                    WindowRouter.shared.request = .diskCleanup
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "trash.circle.fill")
+                            .font(.system(size: 14))
+                        Text(l10n.cleanLanguageCaches)
+                            .font(.system(size: 12, weight: .semibold))
+                        Image(systemName: "arrow.forward")
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                    .foregroundStyle(Color.accentColor)
+                }
+                .buttonStyle(.plain)
+                .help(l10n.cleanLanguageCachesHelp)
             }
+
+            // Informative Notice Banner linking directly to Disk Cleanup
+            HStack(alignment: .center, spacing: 10) {
+                Image(systemName: "info.circle.fill")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.secondary)
+
+                Text(l10n.cleanLanguageCachesBannerText)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Button {
+                    UserDefaults.standard.set(true, forKey: "cleanupGroupExpanded.packages")
+                    CleanupStoreHolder.shared.scan()
+                    WindowRouter.shared.request = .diskCleanup
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(l10n.goToDiskCleanup)
+                        Image(systemName: "chevron.right")
+                    }
+                    .font(.system(size: 11, weight: .medium))
+                }
+                .buttonStyle(.link)
+            }
+            .padding(10)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.025)))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.06), lineWidth: 1))
 
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 14) {
                 ForEach(store.cacheRepos) { repo in
@@ -1028,10 +1152,17 @@ struct PackageView: View {
                 }
                 Spacer()
 
+                IconButton(systemImage: "trash", help: l10n.cleanLanguageCachesHelp) {
+                    UserDefaults.standard.set(true, forKey: "cleanupGroupExpanded.packages")
+                    CleanupStoreHolder.shared.scan()
+                    WindowRouter.shared.request = .diskCleanup
+                }
+
                 IconButton(systemImage: "folder", help: l10n.revealInFinder) {
                     store.revealInFinder(path: repo.rootPath)
                 }
             }
+
 
             HStack(alignment: .firstTextBaseline) {
                 Text(ByteFormat.disk(repo.fileSizeBytes))

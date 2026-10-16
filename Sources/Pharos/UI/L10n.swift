@@ -908,6 +908,33 @@ final class L10n: ObservableObject {
     var modeConfigNotice: String {
         en ? "Default display mode can be changed in Settings" : "可在「设置」中修改默认展示模式"
     }
+
+    // Deleting Project Dependencies Bundle
+    var deleteDependencyBundle: String { en ? "Delete Bundle" : "删除依赖包" }
+    func deleteBundleConfirmTitle(_ name: String) -> String {
+        en ? "Delete \"\(name)\"?" : "确认删除 \(name)？"
+    }
+    func deleteBundleConfirmMessage(_ name: String, _ size: String, _ cmd: String) -> String {
+        en ? "This will move \"\(name)\"\(size.isEmpty ? "" : " (\(size))") to the Trash to free up disk space.\n\nYou can reinstall dependencies anytime by running:\n\(cmd)"
+           : "即将把 \(name)\(size.isEmpty ? "" : "（\(size)）")移入废纸篓以释放磁盘空间。\n\n删除后可随时在项目目录中运行以下指令重新安装：\n\(cmd)"
+    }
+    var deleteBundleAction: String { en ? "Move to Trash" : "移入废纸篓" }
+    func deleteBundleSuccessNotice(_ name: String) -> String {
+        en ? "\(name) moved to Trash" : "\(name) 已成功移入废纸篓"
+    }
+
+    // Clean Language Caches (Jump to Disk Cleanup)
+    var cleanLanguageCaches: String { en ? "Clean Caches" : "清除缓存" }
+    var cleanLanguageCachesHelp: String {
+        en ? "Jump to Disk Cleanup to inspect and clean package manager caches"
+           : "跳转至「磁盘清理」页面，安全清理包管理器与语言构建缓存"
+    }
+    var cleanLanguageCachesBannerText: String {
+        en ? "Global package & language caches (npm, pnpm, uv, Cargo, Maven, etc.) are safely managed and cleaned by the Disk Cleanup module."
+           : "全局语言与包管理器缓存（npm、pnpm、uv、Cargo、Maven 等）由「磁盘清理」模块统一扫描，并支持按保留期策略安全清理。"
+    }
+    var goToDiskCleanup: String { en ? "Open Disk Cleanup" : "前往磁盘清理" }
 }
+
 
 
