@@ -1,0 +1,203 @@
+import Foundation
+
+/// Safety rules and decision engine for battery charging control.
+/// Kept pure with no IOKit or AppKit imports so it is 100% unit-testable.
+public enum BatteryPolicy {
+    /// No heartbeat from Pharos for this long → hand charging back to macOS.
+    public static let heartbeatTimeout: TimeInterval = 15.0
+
+    /// Default hysteresis margin (percentage points below limit before charging resumes).
+    public static let defaultHysteresisMargin = 5
+
+    /// Maximum safe battery cell temperature (°C) before forcing charging stop.
+    public static let maxSafeTemperatureCelsius = 50.0
+
+    /// Action the privileged daemon should take on hardware SMC registers.
+    public enum Action: Equatable, Sendable {
+        /// Return all control to macOS (charging enabled, adapter normal, default MagSafe).
+        case release
+        /// Inhibit battery charging (BMS in bypass, power Mac from adapter, Amperage = 0).
+        case inhibitCharge
+        /// Allow charging cells towards target.
+        case allowCharge
+        /// Force running on battery power (adapter bypass).
+        case bypassAdapter
+    }
+
+    /// Sleep policy recommendation based on current charging state.
+    public enum SleepDirective: Equatable, Sendable {
+        /// System can sleep normally (either charge limit reached, or on battery).
+        case allowSleep
+        /// System should stay awake until charge target is reached.
+        case preventSleep
+    }
+
+    /// MagSafe LED colors supported on Apple Silicon SMC (`ACLC` key).
+    public enum MagSafeColor: UInt8, Sendable, Codable {
+        case system = 0x00
+        case off = 0x01
+        case green = 0x03
+        case orange = 0x04
+        case orangeSlowBlink = 0x06
+    }
+
+    public struct State: Equatable, Sendable {
+        /// Whether we are currently in the "held at limit" (inhibit) state.
+        public var isHolding: Bool = false
+        /// Whether power adapter is currently bypassed.
+        public var isAdapterBypassed: Bool = false
+
+        public init(isHolding: Bool = false, isAdapterBypassed: Bool = false) {
+            self.isHolding = isHolding
+            self.isAdapterBypassed = isAdapterBypassed
+        }
+    }
+
+    public struct Decision: Equatable, Sendable {
+        public var action: Action
+        public var sleepDirective: SleepDirective
+        public var magSafeColor: MagSafeColor
+        public var progress: ChargingProgress
+
+        public init(
+            action: Action,
+            sleepDirective: SleepDirective,
+            magSafeColor: MagSafeColor,
+            progress: ChargingProgress
+        ) {
+            self.action = action
+            self.sleepDirective = sleepDirective
+            self.magSafeColor = magSafeColor
+            self.progress = progress
+        }
+    }
+
+    /// Evaluates the current inputs against the policy and produces the hardware decision.
+    public static func decide(
+        mode: BatteryMode,
+        currentPercent: Int,
+        isACConnected: Bool,
+        temperatureCelsius: Double = 25.0,
+        syncMagSafe: Bool = true,
+        lastHeartbeat: Date?,
+        now: Date,
+        state: inout State
+    ) -> Decision {
+        // 1. Safety check: Pharos quit or crashed. Never leave charging locked or adapter disabled.
+        if mode != .system {
+            guard let beat = lastHeartbeat, now.timeIntervalSince(beat) <= heartbeatTimeout else {
+                state.isHolding = false
+                state.isAdapterBypassed = false
+                return Decision(
+                    action: .release,
+                    sleepDirective: .allowSleep,
+                    magSafeColor: .system,
+                    progress: isACConnected ? (currentPercent >= 100 ? .fullyCharged : .charging(target: 100)) : .onBattery
+                )
+            }
+        }
+
+        // 2. Not connected to AC power: running on battery.
+        guard isACConnected else {
+            state.isHolding = false
+            state.isAdapterBypassed = false
+            return Decision(
+                action: .release,
+                sleepDirective: .allowSleep,
+                magSafeColor: .system,
+                progress: .onBattery
+            )
+        }
+
+        // 3. Thermal protection: if battery is dangerously hot, inhibit charge immediately.
+        if temperatureCelsius >= maxSafeTemperatureCelsius {
+            state.isHolding = true
+            state.isAdapterBypassed = false
+            return Decision(
+                action: .inhibitCharge,
+                sleepDirective: .allowSleep,
+                magSafeColor: syncMagSafe ? .orangeSlowBlink : .system,
+                progress: .holding(limit: currentPercent)
+            )
+        }
+
+        // 4. Mode evaluation
+        switch mode {
+        case .system:
+            state.isHolding = false
+            state.isAdapterBypassed = false
+            let isFull = currentPercent >= 100
+            return Decision(
+                action: .release,
+                sleepDirective: .allowSleep,
+                magSafeColor: .system,
+                progress: isFull ? .fullyCharged : .charging(target: 100)
+            )
+
+        case .full:
+            state.isAdapterBypassed = false
+            if currentPercent >= 100 {
+                state.isHolding = true
+                return Decision(
+                    action: .inhibitCharge,
+                    sleepDirective: .allowSleep,
+                    magSafeColor: syncMagSafe ? .green : .system,
+                    progress: .fullyCharged
+                )
+            } else {
+                state.isHolding = false
+                return Decision(
+                    action: .allowCharge,
+                    sleepDirective: .preventSleep,
+                    magSafeColor: syncMagSafe ? .orange : .system,
+                    progress: .charging(target: 100)
+                )
+            }
+
+        case .discharge:
+            state.isHolding = false
+            state.isAdapterBypassed = true
+            return Decision(
+                action: .bypassAdapter,
+                sleepDirective: .allowSleep,
+                magSafeColor: syncMagSafe ? .off : .system,
+                progress: .onBattery
+            )
+
+        case .limit(let rawLimit):
+            let limit = clampLimit(rawLimit)
+            let lowerThreshold = Swift.max(20, limit - defaultHysteresisMargin)
+            state.isAdapterBypassed = false
+
+            if currentPercent >= limit {
+                // Reached or exceeded upper limit: inhibit charge.
+                state.isHolding = true
+            } else if currentPercent <= lowerThreshold {
+                // Fallen to or below lower hysteresis threshold: resume charge.
+                state.isHolding = false
+            }
+            // If currentPercent is between lowerThreshold and limit, maintain state.isHolding.
+
+            if state.isHolding {
+                return Decision(
+                    action: .inhibitCharge,
+                    sleepDirective: .allowSleep,
+                    magSafeColor: syncMagSafe ? .green : .system,
+                    progress: .holding(limit: limit)
+                )
+            } else {
+                return Decision(
+                    action: .allowCharge,
+                    sleepDirective: .preventSleep,
+                    magSafeColor: syncMagSafe ? .orange : .system,
+                    progress: .charging(target: limit)
+                )
+            }
+        }
+    }
+
+    /// Clamps user limit between 50% and 100%.
+    public static func clampLimit(_ limit: Int) -> Int {
+        Swift.min(Swift.max(limit, 50), 100)
+    }
+}

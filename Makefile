@@ -21,6 +21,8 @@ app: build
 	cp .build/release/$(APP) $(DIST)/Contents/MacOS/$(APP)
 	# Optional fan-control helper; only installed if the user asks (Thermal page).
 	cp .build/release/pharos-fand $(DIST)/Contents/MacOS/pharos-fand
+	# Optional battery-control helper; only installed if the user asks (Battery page).
+	cp .build/release/pharos-battd $(DIST)/Contents/MacOS/pharos-battd
 	cp Resources/Info.plist $(DIST)/Contents/Info.plist
 	cp Resources/Pharos.icns $(DIST)/Contents/Resources/Pharos.icns
 	codesign --force --sign - $(DIST)

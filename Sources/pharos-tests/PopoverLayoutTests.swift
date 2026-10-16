@@ -3,12 +3,16 @@ import PharosCore
 
 func testPopoverLayout() {
     var l = PopoverLayout.standard
-    expectEq(l.unused, [.favorites], "standard layout leaves favorites in the library")
+    expectEq(l.unused, [.favorites, .battery], "standard layout leaves favorites and battery in the library")
     expectEq(l.visibleTabs, [.overview, .projects], "both tabs visible")
 
     l.insert(.favorites, into: .projects, before: .browsers)
     expectEq(l.projects, [.projects, .favorites, .browsers], "dragged in before a block")
+    expectEq(l.unused, [.battery], "battery still in library")
+    l.insert(.battery, into: .projects)
     expectEq(l.unused, [], "library empty")
+    l.remove(.battery)
+    expectEq(l.unused, [.battery], "battery back in library")
 
     l.insert(.memory, into: .projects)
     expectEq(l.overview, [.disk, .thermals, .devProjects, .topApps], "moved out of overview")
@@ -25,7 +29,7 @@ func testPopoverLayout() {
     expectEq(l.overview.first, .thermals, "can't move past the top")
 
     l.remove(.topApps)
-    expectEq(l.unused, [.topApps], "removed block returns to the library")
+    expectEq(l.unused, [.topApps, .battery], "removed block returns to the library")
 
     for b in l.overview { l.remove(b) }
     expectEq(l.visibleTabs, [.projects], "empty tab is hidden")

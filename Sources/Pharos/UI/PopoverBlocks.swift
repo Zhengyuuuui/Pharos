@@ -17,6 +17,7 @@ struct PopoverBlockView: View {
         case .projects: ProjectListBlock()
         case .browsers: BrowsersBlock()
         case .favorites: FavoritesBlock()
+        case .battery: PopoverBatteryBlock()
         }
     }
 }
@@ -46,6 +47,7 @@ extension PopoverBlock {
         case .projects: return "shippingbox"
         case .browsers: return "globe"
         case .favorites: return "star"
+        case .battery: return "battery.100.bolt"
         }
     }
 }
@@ -253,3 +255,82 @@ private struct FavoritesBlock: View {
         }
     }
 }
+
+/// Battery and charging limit block in popover.
+private struct PopoverBatteryBlock: View {
+    @ObservedObject private var battery = BatteryStore.shared
+    @ObservedObject private var l10n = L10n.shared
+
+    var body: some View {
+        let r = battery.reading
+        let isHolding = battery.isHolding || (!r.isCharging && r.powerSource == .acPower && r.currentPercent < 100)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(l10n.batteryTitle)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button {
+                    AppDelegate.shared?.showMainWindow(selecting: .battery)
+                } label: {
+                    Text(l10n.manage).font(.system(size: 10))
+                }
+                .buttonStyle(.borderless)
+            }
+            .padding(.horizontal, 8)
+
+            HStack(spacing: 8) {
+                if isHolding {
+                    Image(systemName: "powerplug.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.teal)
+                } else if r.isCharging {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.green)
+                } else {
+                    Image(systemName: "battery.75")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                }
+
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 4) {
+                        Text("\(r.currentPercent)%")
+                            .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                        if isHolding {
+                            Text("(\(battery.targetLimit)%)")
+                                .font(.system(size: 10.5))
+                                .foregroundStyle(.teal)
+                        } else if r.isCharging {
+                            Text("→ \(battery.targetLimit)%")
+                                .font(.system(size: 10.5))
+                                .foregroundStyle(.green)
+                        }
+                    }
+                    Text(isHolding ? l10n.batteryHoldingSubtitle : (r.isCharging ? l10n.batteryChargingTo(battery.targetLimit) : l10n.batteryDischarging))
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 4)
+
+                if isHolding {
+                    Button(l10n.batteryChargeToFullNow) {
+                        battery.chargeToFullNow()
+                    }
+                    .controlSize(.mini)
+                } else if case .full = battery.mode {
+                    Button(l10n.batteryResumeLimit) {
+                        battery.resumeLimit()
+                    }
+                    .controlSize(.mini)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+        }
+    }
+}
+

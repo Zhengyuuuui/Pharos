@@ -26,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         _ = MenuBarSettings.shared
         _ = FanStore.shared
+        _ = BatteryStore.shared
         Notifier.shared.start(observing: store)
         showMainWindow()
     }

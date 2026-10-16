@@ -21,6 +21,7 @@ struct MainWindowView: View {
         case systemMemory
         case diskUsage
         case thermals
+        case battery
         case portsOverview
         case diskCleanup
         case chrome
@@ -75,6 +76,24 @@ struct MainWindowView: View {
                         }
                         .tag(SidebarItem.thermals)
                     }
+                    HStack {
+                        Label(l10n.batteryTitle, systemImage: "battery.100.bolt")
+                        Spacer()
+                        let r = BatteryStore.shared.reading
+                        if BatteryStore.shared.isHolding {
+                            Image(systemName: "powerplug.fill")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.teal)
+                        } else if r.isCharging {
+                            Image(systemName: "bolt.fill")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.green)
+                        }
+                        Text("\(r.currentPercent)%")
+                            .font(.system(size: 10).monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                    .tag(SidebarItem.battery)
                     HStack {
                         Label(l10n.portsOverview, systemImage: "point.3.connected.trianglepath.dotted")
                         Spacer()
@@ -207,6 +226,8 @@ struct MainWindowView: View {
                 DiskUsageView()
             case .thermals:
                 ThermalView()
+            case .battery:
+                BatteryControlView()
             case .portsOverview:
                 PortsOverviewView(onSelect: { selection = .project($0.id) },
                                   onSelectFavorite: { selection = .favorite($0.id) })

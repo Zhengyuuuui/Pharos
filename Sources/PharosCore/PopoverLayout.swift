@@ -2,7 +2,7 @@ import Foundation
 
 /// A section that can be placed in the menu-bar popover.
 public enum PopoverBlock: String, Codable, CaseIterable, Sendable {
-    case memory, disk, thermals, devProjects, topApps, projects, browsers, favorites
+    case memory, disk, thermals, devProjects, topApps, projects, browsers, favorites, battery
 }
 
 public enum PopoverTab: String, Codable, CaseIterable, Sendable {
