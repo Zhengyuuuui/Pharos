@@ -1076,28 +1076,6 @@ struct PackageView: View {
                 statCard(l10n.fileCount, "\(store.totalCacheCount) repos", icon: "folder.fill")
 
                 Spacer()
-
-                Button {
-                    WindowRouter.shared.cleanupTargetGroup = .packages
-                    UserDefaults.standard.set(true, forKey: "cleanupGroupExpanded.packages")
-                    CleanupStoreHolder.shared.scan()
-                    WindowRouter.shared.request = .diskCleanup
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "trash.circle.fill")
-                            .font(.system(size: 14))
-                        Text(l10n.cleanLanguageCaches)
-                            .font(.system(size: 12, weight: .semibold))
-                        Image(systemName: "arrow.forward")
-                            .font(.system(size: 10, weight: .bold))
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
-                    .foregroundStyle(Color.accentColor)
-                }
-                .buttonStyle(.plain)
-                .help(l10n.cleanLanguageCachesHelp)
             }
 
             // Informative Notice Banner linking directly to Disk Cleanup
@@ -1153,13 +1131,6 @@ struct PackageView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-
-                IconButton(systemImage: "trash", help: l10n.cleanLanguageCachesHelp) {
-                    WindowRouter.shared.cleanupTargetGroup = .packages
-                    UserDefaults.standard.set(true, forKey: "cleanupGroupExpanded.packages")
-                    CleanupStoreHolder.shared.scan()
-                    WindowRouter.shared.request = .diskCleanup
-                }
 
                 IconButton(systemImage: "folder", help: l10n.revealInFinder) {
                     store.revealInFinder(path: repo.rootPath)
