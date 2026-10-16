@@ -22,11 +22,17 @@ struct CleanupView: View {
                 } else {
                     header
                     if let report = cleanup.report { ReportBanner(report: report) }
-                    PinnedTempSection()
+                    PinnedTempSection(onSelectDetail: { group in
+                        withAnimation(.easeInOut(duration: 0.2)) { selectedGroup = group }
+                    })
                     Text(l10n.otherCaches)
                         .font(.system(size: 13, weight: .semibold))
                         .padding(.top, 4)
-                    ForEach(otherGroups, id: \.self) { CacheGroupSection(group: $0) }
+                    ForEach(otherGroups, id: \.self) { group in
+                        CacheGroupSection(group: group) { selected in
+                            withAnimation(.easeInOut(duration: 0.2)) { selectedGroup = selected }
+                        }
+                    }
                 }
             }
             .padding(20)
@@ -51,9 +57,28 @@ struct CleanupView: View {
 
     private func groupFocusedHeader(_ group: DiskCleaner.Group) -> some View {
         let bytes = cleanup.bytes(in: group)
-        let isPackages = (group == .packages)
-        let title = isPackages ? l10n.languageCachesCleanupTitle : l10n.groupTitle(group)
-        let subtitle = isPackages ? l10n.languageCachesCleanupSubtitle : l10n.cleanupIntro
+        let title: String
+        let subtitle: String
+        let cleanBtnTitle: String
+
+        switch group {
+        case .packages:
+            title = l10n.languageCachesCleanupTitle
+            subtitle = l10n.languageCachesCleanupSubtitle
+            cleanBtnTitle = l10n.cleanLanguageCachesGroup
+        case .appCaches:
+            title = l10n.appCachesCleanupTitle
+            subtitle = l10n.appCachesCleanupSubtitle
+            cleanBtnTitle = l10n.cleanGroup
+        case .apple:
+            title = l10n.appleToolchainCleanupTitle
+            subtitle = l10n.appleToolchainCleanupSubtitle
+            cleanBtnTitle = l10n.cleanGroup
+        case .temp:
+            title = l10n.tempCleanupTitle
+            subtitle = l10n.tempCleanupSubtitle
+            cleanBtnTitle = l10n.cleanTemp
+        }
 
         return VStack(alignment: .leading, spacing: 12) {
             Button {
@@ -92,7 +117,7 @@ struct CleanupView: View {
                 .controlSize(.small)
                 .disabled(cleanup.isBusy)
 
-                ConfirmButton(title: isPackages ? l10n.cleanLanguageCachesGroup : l10n.cleanGroup,
+                ConfirmButton(title: cleanBtnTitle,
                               icon: "trash",
                               prominent: true,
                               busy: cleanup.cleaning == .group(group),
@@ -138,6 +163,23 @@ struct CleanupView: View {
             .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.03)))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.primary.opacity(0.08), lineWidth: 1))
 
+            if group == .temp {
+                HStack(spacing: 10) {
+                    Text(l10n.keepNewerThan).font(.system(size: 11)).foregroundStyle(.secondary)
+                    Picker("", selection: $cleanup.tempRetentionHours) {
+                        ForEach(CleanupStore.tempRetentionChoices, id: \.self) {
+                            Text(l10n.retentionLabel(hours: $0)).tag($0)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: 320)
+                    .disabled(cleanup.isBusy)
+                    Spacer()
+                }
+                .padding(.vertical, 4)
+            }
+
             RowList(rows: rows)
         }
     }
@@ -175,6 +217,11 @@ struct CleanupView: View {
 private struct PinnedTempSection: View {
     @ObservedObject private var cleanup = CleanupStoreHolder.shared
     @ObservedObject private var l10n = L10n.shared
+    let onSelectDetail: ((DiskCleaner.Group) -> Void)?
+
+    init(onSelectDetail: ((DiskCleaner.Group) -> Void)? = nil) {
+        self.onSelectDetail = onSelectDetail
+    }
 
     var body: some View {
         let bytes = cleanup.bytes(in: .temp)
@@ -184,7 +231,23 @@ private struct PinnedTempSection: View {
                     .foregroundStyle(Color.accentColor)
                     .rotationEffect(.degrees(45))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(l10n.groupTitle(.temp)).font(.system(size: 14, weight: .semibold))
+                    if let onSelectDetail {
+                        Button {
+                            onSelectDetail(.temp)
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(l10n.groupTitle(.temp)).font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(Color.primary)
+                                Image(systemName: "arrow.up.right.square")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(Color.secondary.opacity(0.6))
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .help(l10n.viewGroupDetailHelp(l10n.groupTitle(.temp)))
+                    } else {
+                        Text(l10n.groupTitle(.temp)).font(.system(size: 14, weight: .semibold))
+                    }
                     Text(l10n.tempGroupHint)
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
@@ -226,29 +289,45 @@ private struct CacheGroupSection: View {
     @ObservedObject private var cleanup = CleanupStoreHolder.shared
     @ObservedObject private var l10n = L10n.shared
     let group: DiskCleaner.Group
+    let onSelectDetail: (DiskCleaner.Group) -> Void
     @AppStorage private var expanded: Bool
 
-    init(group: DiskCleaner.Group) {
+    init(group: DiskCleaner.Group, onSelectDetail: @escaping (DiskCleaner.Group) -> Void) {
         self.group = group
-        _expanded = AppStorage(wrappedValue: false, "cleanupGroupExpanded.\(group.rawValue)")
+        self.onSelectDetail = onSelectDetail
+        _expanded = AppStorage(wrappedValue: group == .packages, "cleanupGroupExpanded.\(group.rawValue)")
     }
 
     var body: some View {
         let bytes = cleanup.bytes(in: group)
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
+                // Chevron button for inline expand/collapse
                 Button {
                     withAnimation(.easeOut(duration: 0.15)) { expanded.toggle() }
                 } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .rotationEffect(.degrees(expanded ? 90 : 0))
+                        .frame(width: 16, height: 16)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                // Title + Icon: Click to enter dedicated detail page!
+                Button {
+                    onSelectDetail(group)
+                } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .semibold))
-                            .rotationEffect(.degrees(expanded ? 90 : 0))
-                            .frame(width: 12)
                         Image(systemName: l10n.groupIcon(group))
                             .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                        Text(l10n.groupTitle(group)).font(.system(size: 12.5, weight: .semibold))
+                            .foregroundStyle(Color.accentColor)
+                        Text(l10n.groupTitle(group))
+                            .font(.system(size: 12.5, weight: .semibold))
+                            .foregroundStyle(Color.primary)
+                        Image(systemName: "arrow.up.right.square")
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(Color.secondary.opacity(0.6))
                         Text(l10n.locationCount(cleanup.rows(in: group).count))
                             .font(.system(size: 10))
                             .foregroundStyle(.tertiary)
@@ -260,6 +339,8 @@ private struct CacheGroupSection: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .help(l10n.viewGroupDetailHelp(l10n.groupTitle(group)))
+
                 ConfirmButton(title: l10n.cleanGroup, icon: "trash",
                               busy: cleanup.cleaning == .group(group),
                               disabled: cleanup.isBusy || bytes == 0) {
@@ -273,6 +354,7 @@ private struct CacheGroupSection: View {
         .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
     }
 }
+
 
 private struct RowList: View {
     let rows: [CleanupStore.Row]
