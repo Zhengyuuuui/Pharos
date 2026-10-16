@@ -18,6 +18,10 @@ func testAgentEditorKinds() {
     expectEq(AgentEditorKind.wechatDevTools.displayName, "微信开发者工具", "wechat devtools name")
     expectEq(AgentEditorKind.hbuilder.displayName, "HBuilderX", "hbuilder name")
     expectEq(AgentEditorKind.deepseek.displayName, "DeepSeek", "deepseek name")
+    expectEq(AgentEditorKind.autoClaw.displayName, "AutoClaw", "autoclaw name")
+    expectEq(AgentEditorKind.ccSwitch.displayName, "CC Switch", "ccSwitch name")
+    expectEq(AgentEditorKind.yDevSphere.displayName, "YDevSphere", "ydevsphere name")
+    expectEq(AgentEditorKind.devin.displayName, "Devin", "devin name")
 
     for ed in AgentEditorKind.allCases {
         let paths = ed.knownStoragePaths(home: "/Users/test")

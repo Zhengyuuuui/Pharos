@@ -26,6 +26,8 @@ app: build
 	codesign --force --sign - $(DIST)
 
 install: app
+	-pkill -x $(APP)
+	sleep 0.5
 	rm -rf /Applications/$(APP).app
 	cp -R $(DIST) /Applications/
 	open /Applications/$(APP).app

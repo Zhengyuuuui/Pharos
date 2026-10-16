@@ -6,6 +6,7 @@ struct MainWindowView: View {
     @ObservedObject private var cleanup = CleanupStoreHolder.shared
     @ObservedObject private var workspaces = WorkspaceStore.shared
     @ObservedObject private var agentStore = AgentChatStore.shared
+    @ObservedObject private var packageStore = PackageStore.shared
     @ObservedObject private var router = WindowRouter.shared
     @ObservedObject private var l10n = L10n.shared
     @State private var selection: SidebarItem?
@@ -24,6 +25,7 @@ struct MainWindowView: View {
         case diskCleanup
         case chrome
         case agentChats
+        case packages
         case favorite(String)
         case project(String)
         case customize
@@ -112,6 +114,16 @@ struct MainWindowView: View {
                         }
                     }
                     .tag(SidebarItem.agentChats)
+                    HStack {
+                        Label(l10n.packagesTitle, systemImage: "shippingbox.fill")
+                        Spacer()
+                        if packageStore.globalCliCount > 0 {
+                            Text("\(packageStore.globalCliCount)")
+                                .font(.system(size: 10).monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .tag(SidebarItem.packages)
                 }
                 Section {
                     ForEach(workspaces.statuses(store.projects), id: \.favorite.id) { s in
@@ -206,6 +218,8 @@ struct MainWindowView: View {
                 ChromeView()
             case .agentChats:
                 AgentChatView()
+            case .packages:
+                PackageView()
             case .project(let id):
                 if let project = store.project(id: id) {
                     ProjectDetailView(project: project)

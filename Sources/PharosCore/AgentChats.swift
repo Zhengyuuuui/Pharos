@@ -25,6 +25,10 @@ public enum AgentEditorKind: String, Codable, CaseIterable, Identifiable {
     case wechatDevTools = "wechatDevTools"
     case hbuilder = "hbuilder"
     case deepseek = "deepseek"
+    case autoClaw = "autoClaw"
+    case ccSwitch = "ccSwitch"
+    case yDevSphere = "yDevSphere"
+    case devin = "devin"
 
     public var id: String { rawValue }
 
@@ -53,6 +57,10 @@ public enum AgentEditorKind: String, Codable, CaseIterable, Identifiable {
         case .wechatDevTools: return "微信开发者工具"
         case .hbuilder: return "HBuilderX"
         case .deepseek: return "DeepSeek"
+        case .autoClaw: return "AutoClaw"
+        case .ccSwitch: return "CC Switch"
+        case .yDevSphere: return "YDevSphere"
+        case .devin: return "Devin"
         }
     }
 
@@ -81,6 +89,10 @@ public enum AgentEditorKind: String, Codable, CaseIterable, Identifiable {
         case .wechatDevTools: return "chevron.left.forwardslash.chevron.right"
         case .hbuilder: return "hammer.fill"
         case .deepseek: return "fish.fill"
+        case .autoClaw: return "gearshape.2.fill"
+        case .ccSwitch: return "arrow.triangle.swap"
+        case .yDevSphere: return "globe.americas.fill"
+        case .devin: return "sparkles.rectangle.stack"
         }
     }
 
@@ -99,16 +111,20 @@ public enum AgentEditorKind: String, Codable, CaseIterable, Identifiable {
         case .claudeCode: return ["Claude.app", "Claude Code.app"]
         case .zed: return ["Zed.app", "Zed Preview.app"]
         case .workBuddy: return ["WorkBuddy.app", "WorkBuddy AI.app"]
-        case .miniMax: return ["MiniMax Code.app", "MiniMax Code 2.app"]
+        case .miniMax: return ["MiniMax Code.app", "MiniMax Code 2.app", "MiniMax Design.app"]
         case .zCode: return ["ZCode.app"]
         case .continueExt: return ["Visual Studio Code.app", "Code.app"]
         case .aider: return []
-        case .doubao: return ["Doubao.app"]
+        case .doubao: return ["Doubao.app", "豆包浏览器.app"]
         case .chatgpt: return ["ChatGPT.app", "Codex.app"]
         case .marvis: return ["Marvis.app"]
         case .wechatDevTools: return ["wechatwebdevtools.app"]
         case .hbuilder: return ["HBuilderX.app"]
         case .deepseek: return ["DeepSeek Harness.app"]
+        case .autoClaw: return ["AutoClaw.app"]
+        case .ccSwitch: return ["CC Switch.app"]
+        case .yDevSphere: return ["YDevSphere.app"]
+        case .devin: return ["Devin.app"]
         }
     }
 
@@ -127,7 +143,7 @@ public enum AgentEditorKind: String, Codable, CaseIterable, Identifiable {
         case .claudeCode: return ["com.anthropic.claudefordesktop"]
         case .zed: return ["dev.zed.Zed", "dev.zed.Zed-Preview"]
         case .workBuddy: return ["com.tencent.workbuddy.mac", "com.tencent.workbuddy"]
-        case .miniMax: return ["com.minimax.agent", "com.minimax.agent.cn"]
+        case .miniMax: return ["com.minimax.agent", "com.minimax.agent.cn", "com.minimax.hub.global"]
         case .zCode: return ["dev.zcode.app"]
         case .continueExt: return ["com.microsoft.VSCode"]
         case .aider: return []
@@ -136,7 +152,11 @@ public enum AgentEditorKind: String, Codable, CaseIterable, Identifiable {
         case .marvis: return ["com.tencent.mac.marvis"]
         case .wechatDevTools: return ["com.tencent.wechat.devtools"]
         case .hbuilder: return ["com.dcloud.HBuilderX"]
-        case .deepseek: return ["com.deepseek.harness"]
+        case .deepseek: return ["com.deepseek.harness", "com.deepseek.dsh"]
+        case .autoClaw: return ["com.zhipuai.autoclaw"]
+        case .ccSwitch: return ["com.ccswitch.desktop"]
+        case .yDevSphere: return ["com.ydevsphere.app"]
+        case .devin: return ["ai.cognition.devin", "com.cognition.devin"]
         }
     }
 
@@ -187,12 +207,15 @@ public enum AgentEditorKind: String, Codable, CaseIterable, Identifiable {
             ]
         case .antigravity:
             return [
-                AgentKnownPath(label: "智能体对话汇总数据库", fullPath: "\(home)/.gemini/antigravity/conversation_summaries.db", scope: .global),
+                AgentKnownPath(label: "智能体会话汇总数据库", fullPath: "\(home)/.gemini/antigravity/conversation_summaries.db", scope: .global),
+                AgentKnownPath(label: "智能体独立会话数据库目录", fullPath: "\(home)/.gemini/antigravity/conversations", scope: .global, isDirectory: true),
                 AgentKnownPath(label: "Antigravity 数据根目录", fullPath: "\(home)/.gemini/antigravity", scope: .global, isDirectory: true)
             ]
         case .qoder:
             return [
                 AgentKnownPath(label: "Qoder CN 对话本地数据库", fullPath: "\(home)/Library/Application Support/QoderCN/SharedClientCache/cache/db/local.db", scope: .global),
+                AgentKnownPath(label: "Qoder CN 向量索引库目录", fullPath: "\(home)/Library/Application Support/QoderCN/SharedClientCache/index/vector/v5", scope: .vectorCache, isDirectory: true),
+                AgentKnownPath(label: "Qoder CN 元数据索引目录", fullPath: "\(home)/Library/Application Support/QoderCN/SharedClientCache/index/meta/v8", scope: .vectorCache, isDirectory: true),
                 AgentKnownPath(label: "Qoder CN 工作区存储目录", fullPath: "\(home)/Library/Application Support/QoderCN/User/workspaceStorage", scope: .workspace, isDirectory: true),
                 AgentKnownPath(label: "知识库与图谱索引", fullPath: "\(home)/Library/Application Support/QoderCN/SharedClientCache/repowiki/knowledge.db", scope: .vectorCache),
                 AgentKnownPath(label: "Qoder 对话本地数据库", fullPath: "\(home)/Library/Application Support/Qoder/SharedClientCache/cache/db/local.db", scope: .global)
@@ -231,8 +254,11 @@ public enum AgentEditorKind: String, Codable, CaseIterable, Identifiable {
             ]
         case .workBuddy:
             return [
-                AgentKnownPath(label: "WorkBuddy 应用主目录", fullPath: "\(home)/Library/Application Support/com.tencent.workbuddy.mac", scope: .global, isDirectory: true),
-                AgentKnownPath(label: "WorkBuddy AI 存储目录", fullPath: "\(home)/Library/Application Support/WorkBuddy AI", scope: .global, isDirectory: true)
+                AgentKnownPath(label: "WorkBuddy 安全与威胁数据库", fullPath: "\(home)/.workbuddy/security/threat-database", scope: .global, isDirectory: true),
+                AgentKnownPath(label: "WorkBuddy AI 威胁数据库", fullPath: "\(home)/.workbuddy-ai/security/threat-database", scope: .global, isDirectory: true),
+                AgentKnownPath(label: "WorkBuddy 核心数据库", fullPath: "\(home)/.workbuddy/workbuddy.db", scope: .global),
+                AgentKnownPath(label: "WorkBuddy AI 核心数据库", fullPath: "\(home)/.workbuddy-ai/workbuddy.db", scope: .global),
+                AgentKnownPath(label: "WorkBuddy 应用主目录", fullPath: "\(home)/Library/Application Support/com.tencent.workbuddy.mac", scope: .global, isDirectory: true)
             ]
         case .miniMax:
             return [
@@ -242,6 +268,8 @@ public enum AgentEditorKind: String, Codable, CaseIterable, Identifiable {
             ]
         case .zCode:
             return [
+                AgentKnownPath(label: "ZCode CLI 核心数据库", fullPath: "\(home)/.zcode/cli/db/db.sqlite", scope: .global),
+                AgentKnownPath(label: "ZCode 任务索引库", fullPath: "\(home)/.zcode/v2/tasks-index.sqlite", scope: .global),
                 AgentKnownPath(label: "ZCode 会话与数据存储目录", fullPath: "\(home)/Library/Application Support/ZCode/session", scope: .global, isDirectory: true)
             ]
         case .continueExt:
@@ -261,15 +289,20 @@ public enum AgentEditorKind: String, Codable, CaseIterable, Identifiable {
             ]
         case .chatgpt:
             return [
+                AgentKnownPath(label: "Codex 会话与调用日志库", fullPath: "\(home)/.codex/logs_2.sqlite", scope: .global),
+                AgentKnownPath(label: "Codex 线程历史数据库", fullPath: "\(home)/.codex/thread_history_1.sqlite", scope: .global),
+                AgentKnownPath(label: "Codex 运行时状态库", fullPath: "\(home)/.codex/state_5.sqlite", scope: .global),
+                AgentKnownPath(label: "Codex 数据主目录", fullPath: "\(home)/.codex", scope: .global, isDirectory: true),
                 AgentKnownPath(label: "ChatGPT/Codex 服务数据库", fullPath: "\(home)/Library/Group Containers/2DC432GLL2.com.openai.sky.CUAService/Library/Application Support/Software/Analytics.db", scope: .global),
-                AgentKnownPath(label: "OpenAI Codex 支持目录", fullPath: "\(home)/Library/Application Support/com.openai.codex", scope: .global, isDirectory: true),
-                AgentKnownPath(label: "OpenAI 主配置目录", fullPath: "\(home)/Library/Application Support/OpenAI", scope: .global, isDirectory: true)
+                AgentKnownPath(label: "OpenAI Codex 支持目录", fullPath: "\(home)/Library/Application Support/com.openai.codex", scope: .global, isDirectory: true)
             ]
         case .marvis:
             return [
+                AgentKnownPath(label: "Marvis 数据库主目录", fullPath: "\(home)/.marvis/database", scope: .global, isDirectory: true),
+                AgentKnownPath(label: "Marvis 会话核心库", fullPath: "\(home)/.marvis/database/data.db", scope: .global),
+                AgentKnownPath(label: "Marvis 工具向量索引库", fullPath: "\(home)/.marvis/database/tool_index_vector.db", scope: .vectorCache),
                 AgentKnownPath(label: "腾讯云 Marvis 用户会话数据库", fullPath: "\(home)/Library/Application Support/com.tencent.mac.marvis/MarvisData/User", scope: .global, isDirectory: true),
                 AgentKnownPath(label: "腾讯云 Marvis 本地应用数据库", fullPath: "\(home)/Library/Application Support/com.tencent.mac.marvis/db/local_app_info.db", scope: .global),
-                AgentKnownPath(label: "腾讯云 Marvis 状态持久化库", fullPath: "\(home)/Library/Application Support/com.tencent.mac.marvis/db/persist.db", scope: .global),
                 AgentKnownPath(label: "腾讯云 Marvis 主数据目录", fullPath: "\(home)/Library/Application Support/com.tencent.mac.marvis", scope: .global, isDirectory: true)
             ]
         case .wechatDevTools:
@@ -285,6 +318,28 @@ public enum AgentEditorKind: String, Codable, CaseIterable, Identifiable {
             return [
                 AgentKnownPath(label: "DeepSeek 桌面端持久化库", fullPath: "\(home)/Library/Application Support/@deepseek-ai/dsh-desktop/declarative_performance_observer.db", scope: .global),
                 AgentKnownPath(label: "DeepSeek 数据目录", fullPath: "\(home)/Library/Application Support/@deepseek-ai", scope: .global, isDirectory: true)
+            ]
+        case .autoClaw:
+            return [
+                AgentKnownPath(label: "AutoClaw 核心状态数据库", fullPath: "\(home)/.openclaw-autoclaw/state/openclaw.sqlite", scope: .global),
+                AgentKnownPath(label: "AutoClaw 对话历史目录", fullPath: "\(home)/.openclaw-autoclaw/autoclaw/chat-history", scope: .global, isDirectory: true),
+                AgentKnownPath(label: "AutoClaw 应用配置目录", fullPath: "\(home)/Library/Application Support/autoclaw", scope: .global, isDirectory: true)
+            ]
+        case .ccSwitch:
+            return [
+                AgentKnownPath(label: "CC Switch 核心配置数据库", fullPath: "\(home)/.cc-switch/cc-switch.db", scope: .global),
+                AgentKnownPath(label: "CC Switch 自动备份目录", fullPath: "\(home)/.cc-switch/backups", scope: .global, isDirectory: true),
+                AgentKnownPath(label: "CC Switch 桌面端支持目录", fullPath: "\(home)/Library/Application Support/com.ccswitch.desktop", scope: .global, isDirectory: true)
+            ]
+        case .yDevSphere:
+            return [
+                AgentKnownPath(label: "YDevSphere 核心数据库", fullPath: "\(home)/.ydevsphere/database.sqlite", scope: .global),
+                AgentKnownPath(label: "YDevSphere 数据主目录", fullPath: "\(home)/.ydevsphere", scope: .global, isDirectory: true)
+            ]
+        case .devin:
+            return [
+                AgentKnownPath(label: "Devin 全局共享状态数据库", fullPath: "\(home)/.devin-shared/sharedStorage/state.vscdb", scope: .global),
+                AgentKnownPath(label: "Devin 数据与扩展配置目录", fullPath: "\(home)/.devin", scope: .global, isDirectory: true)
             ]
         }
     }
@@ -443,6 +498,10 @@ public enum AgentScanner {
         entries += scanWeChatDevTools(home: homeDirectory)
         entries += scanHBuilder(home: homeDirectory)
         entries += scanDeepSeek(home: homeDirectory)
+        entries += scanAutoClaw(home: homeDirectory)
+        entries += scanCCSwitch(home: homeDirectory)
+        entries += scanYDevSphere(home: homeDirectory)
+        entries += scanDevin(home: homeDirectory)
 
         // Sort by file size descending
         return entries.sorted { $0.fileSizeBytes > $1.fileSizeBytes }
@@ -473,6 +532,28 @@ public enum AgentScanner {
                 isOrphaned: false,
                 conversationCount: conversations.count,
                 conversations: conversations
+            ))
+        }
+
+        // AI code tracking
+        let trackDb = (home as NSString).appendingPathComponent(".cursor/ai-tracking/ai-code-tracking.db")
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: trackDb),
+           let size = attrs[.size] as? UInt64,
+           let mtime = attrs[.modificationDate] as? Date {
+            results.append(AgentDatabaseEntry(
+                id: trackDb,
+                editor: .cursor,
+                scope: .global,
+                filePath: trackDb,
+                fileName: "ai-code-tracking.db",
+                storageDirectory: (trackDb as NSString).deletingLastPathComponent,
+                fileSizeBytes: size,
+                lastModified: mtime,
+                workspacePath: nil,
+                workspaceName: "Cursor AI 代码追踪库",
+                isOrphaned: false,
+                conversationCount: 0,
+                conversations: []
             ))
         }
 
@@ -583,6 +664,39 @@ public enum AgentScanner {
             results += scanWorkspaceStorage(root: wsRoot, editor: .trae)
         }
 
+        // Forensics baseline database if available (~428 MB)
+        let forensicsRoot = (home as NSString).appendingPathComponent("trae-forensics/original-copies")
+        if let subdirs = try? FileManager.default.contentsOfDirectory(atPath: forensicsRoot) {
+            for sub in subdirs {
+                let db = (forensicsRoot as NSString).appendingPathComponent("\(sub)/database.db")
+                if let attrs = try? FileManager.default.attributesOfItem(atPath: db),
+                   let size = attrs[.size] as? UInt64,
+                   let mtime = attrs[.modificationDate] as? Date {
+                    var total = size
+                    let wal = db + "-wal"
+                    if let walAttrs = try? FileManager.default.attributesOfItem(atPath: wal),
+                       let walSize = walAttrs[.size] as? UInt64 {
+                        total += walSize
+                    }
+                    results.append(AgentDatabaseEntry(
+                        id: db,
+                        editor: .trae,
+                        scope: .global,
+                        filePath: db,
+                        fileName: "database.db (Forensics Baseline)",
+                        storageDirectory: (db as NSString).deletingLastPathComponent,
+                        fileSizeBytes: total,
+                        lastModified: mtime,
+                        workspacePath: nil,
+                        workspaceName: "Trae 基准归档数据库 (\(sub))",
+                        isOrphaned: false,
+                        conversationCount: 0,
+                        conversations: []
+                    ))
+                }
+            }
+        }
+
         return results
     }
 
@@ -682,28 +796,64 @@ public enum AgentScanner {
 
     // MARK: - Antigravity
     public static func scanAntigravity(home: String) -> [AgentDatabaseEntry] {
+        var results: [AgentDatabaseEntry] = []
         let dbPath = (home as NSString).appendingPathComponent(".gemini/antigravity/conversation_summaries.db")
-        guard let attrs = try? FileManager.default.attributesOfItem(atPath: dbPath),
-              let size = attrs[.size] as? UInt64,
-              let mtime = attrs[.modificationDate] as? Date else {
-            return []
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: dbPath),
+           let size = attrs[.size] as? UInt64,
+           let mtime = attrs[.modificationDate] as? Date {
+            let convs = AgentSQLiteReader.readAntigravityConversations(dbPath: dbPath)
+            results.append(AgentDatabaseEntry(
+                id: dbPath,
+                editor: .antigravity,
+                scope: .global,
+                filePath: dbPath,
+                fileName: "conversation_summaries.db",
+                storageDirectory: (dbPath as NSString).deletingLastPathComponent,
+                fileSizeBytes: size,
+                lastModified: mtime,
+                workspacePath: nil,
+                workspaceName: "Antigravity 对话汇总数据库",
+                isOrphaned: false,
+                conversationCount: convs.count,
+                conversations: convs
+            ))
         }
-        let convs = AgentSQLiteReader.readAntigravityConversations(dbPath: dbPath)
-        return [AgentDatabaseEntry(
-            id: dbPath,
-            editor: .antigravity,
-            scope: .global,
-            filePath: dbPath,
-            fileName: "conversation_summaries.db",
-            storageDirectory: (dbPath as NSString).deletingLastPathComponent,
-            fileSizeBytes: size,
-            lastModified: mtime,
-            workspacePath: nil,
-            workspaceName: "Antigravity Agent Sessions",
-            isOrphaned: false,
-            conversationCount: convs.count,
-            conversations: convs
-        )]
+
+        // Scan individual conversation databases in ~/.gemini/antigravity/conversations/*.db
+        let convsDir = (home as NSString).appendingPathComponent(".gemini/antigravity/conversations")
+        if let files = try? FileManager.default.contentsOfDirectory(atPath: convsDir) {
+            for file in files where file.hasSuffix(".db") {
+                let fullPath = (convsDir as NSString).appendingPathComponent(file)
+                if let attrs = try? FileManager.default.attributesOfItem(atPath: fullPath),
+                   let size = attrs[.size] as? UInt64,
+                   let mtime = attrs[.modificationDate] as? Date {
+                    var totalSize = size
+                    let wal = fullPath + "-wal"
+                    if let walAttrs = try? FileManager.default.attributesOfItem(atPath: wal),
+                       let walSize = walAttrs[.size] as? UInt64 {
+                        totalSize += walSize
+                    }
+                    let convId = (file as NSString).deletingPathExtension
+                    results.append(AgentDatabaseEntry(
+                        id: fullPath,
+                        editor: .antigravity,
+                        scope: .global,
+                        filePath: fullPath,
+                        fileName: file,
+                        storageDirectory: convsDir,
+                        fileSizeBytes: totalSize,
+                        lastModified: mtime,
+                        workspacePath: nil,
+                        workspaceName: "Antigravity 会话库 (\(convId.prefix(8)))",
+                        isOrphaned: false,
+                        conversationCount: 1,
+                        conversations: []
+                    ))
+                }
+            }
+        }
+
+        return results
     }
 
     // MARK: - Qoder / Qoder CN
@@ -719,6 +869,12 @@ public enum AgentScanner {
             if let attrs = try? FileManager.default.attributesOfItem(atPath: localDb),
                let size = attrs[.size] as? UInt64,
                let mtime = attrs[.modificationDate] as? Date {
+                var total = size
+                let wal = localDb + "-wal"
+                if let walAttrs = try? FileManager.default.attributesOfItem(atPath: wal),
+                   let walSize = walAttrs[.size] as? UInt64 {
+                    total += walSize
+                }
                 let convs = AgentSQLiteReader.readQoderConversations(dbPath: localDb)
                 results.append(AgentDatabaseEntry(
                     id: localDb,
@@ -727,7 +883,7 @@ public enum AgentScanner {
                     filePath: localDb,
                     fileName: "local.db",
                     storageDirectory: (localDb as NSString).deletingLastPathComponent,
-                    fileSizeBytes: size,
+                    fileSizeBytes: total,
                     lastModified: mtime,
                     workspacePath: nil,
                     workspaceName: "\(variant) Chat Sessions",
@@ -735,6 +891,71 @@ public enum AgentScanner {
                     conversationCount: convs.count,
                     conversations: convs
                 ))
+            }
+
+            // Vector index DBs in index/vector/v5
+            let vectorRoot = (base as NSString).appendingPathComponent("SharedClientCache/index/vector/v5")
+            if let enumerator = FileManager.default.enumerator(atPath: vectorRoot) {
+                while let item = enumerator.nextObject() as? String {
+                    if item.hasSuffix(".db") {
+                        let fullPath = (vectorRoot as NSString).appendingPathComponent(item)
+                        if let attrs = try? FileManager.default.attributesOfItem(atPath: fullPath),
+                           let size = attrs[.size] as? UInt64,
+                           let mtime = attrs[.modificationDate] as? Date {
+                            var total = size
+                            let wal = fullPath + "-wal"
+                            if let walAttrs = try? FileManager.default.attributesOfItem(atPath: wal),
+                               let walSize = walAttrs[.size] as? UInt64 {
+                                total += walSize
+                            }
+                            let projName = item.components(separatedBy: "/").first ?? item
+                            results.append(AgentDatabaseEntry(
+                                id: fullPath,
+                                editor: .qoder,
+                                scope: .vectorCache,
+                                filePath: fullPath,
+                                fileName: (item as NSString).lastPathComponent,
+                                storageDirectory: (fullPath as NSString).deletingLastPathComponent,
+                                fileSizeBytes: total,
+                                lastModified: mtime,
+                                workspacePath: nil,
+                                workspaceName: "\(variant) 向量索引 (\(projName.prefix(20)))",
+                                isOrphaned: false,
+                                conversationCount: 0,
+                                conversations: []
+                            ))
+                        }
+                    }
+                }
+            }
+
+            // Meta index DBs in index/meta/v8
+            let metaRoot = (base as NSString).appendingPathComponent("SharedClientCache/index/meta/v8")
+            if let enumerator = FileManager.default.enumerator(atPath: metaRoot) {
+                while let item = enumerator.nextObject() as? String {
+                    if item.hasSuffix(".db") {
+                        let fullPath = (metaRoot as NSString).appendingPathComponent(item)
+                        if let attrs = try? FileManager.default.attributesOfItem(atPath: fullPath),
+                           let size = attrs[.size] as? UInt64,
+                           let mtime = attrs[.modificationDate] as? Date {
+                            results.append(AgentDatabaseEntry(
+                                id: fullPath,
+                                editor: .qoder,
+                                scope: .vectorCache,
+                                filePath: fullPath,
+                                fileName: (item as NSString).lastPathComponent,
+                                storageDirectory: (fullPath as NSString).deletingLastPathComponent,
+                                fileSizeBytes: size,
+                                lastModified: mtime,
+                                workspacePath: nil,
+                                workspaceName: "\(variant) 元数据索引",
+                                isOrphaned: false,
+                                conversationCount: 0,
+                                conversations: []
+                            ))
+                        }
+                    }
+                }
             }
 
             // Knowledge DB
@@ -784,6 +1005,40 @@ public enum AgentScanner {
             // Workspace storage
             let wsRoot = (base as NSString).appendingPathComponent("User/workspaceStorage")
             results += scanWorkspaceStorage(root: wsRoot, editor: .qoder)
+        }
+
+        // Main.sqlite in stable support dirs
+        let appSupportDirs = [
+            "Library/Application Support/com.qoder.app.stable",
+            "Library/Application Support/com.qodercn.app.stable"
+        ]
+        for rel in appSupportDirs {
+            let fullPath = (home as NSString).appendingPathComponent("\(rel)/main.sqlite")
+            if let attrs = try? FileManager.default.attributesOfItem(atPath: fullPath),
+               let size = attrs[.size] as? UInt64,
+               let mtime = attrs[.modificationDate] as? Date {
+                var total = size
+                let wal = fullPath + "-wal"
+                if let walAttrs = try? FileManager.default.attributesOfItem(atPath: wal),
+                   let walSize = walAttrs[.size] as? UInt64 {
+                    total += walSize
+                }
+                results.append(AgentDatabaseEntry(
+                    id: fullPath,
+                    editor: .qoder,
+                    scope: .global,
+                    filePath: fullPath,
+                    fileName: "main.sqlite",
+                    storageDirectory: (fullPath as NSString).deletingLastPathComponent,
+                    fileSizeBytes: total,
+                    lastModified: mtime,
+                    workspacePath: nil,
+                    workspaceName: "\((rel as NSString).lastPathComponent) 主数据库",
+                    isOrphaned: false,
+                    conversationCount: 0,
+                    conversations: []
+                ))
+            }
         }
 
         return results
@@ -1038,6 +1293,79 @@ public enum AgentScanner {
     // MARK: - WorkBuddy
     public static func scanWorkBuddy(home: String) -> [AgentDatabaseEntry] {
         var results: [AgentDatabaseEntry] = []
+
+        // 1. ~/.workbuddy and ~/.workbuddy-ai
+        let homeDirs = [
+            (home as NSString).appendingPathComponent(".workbuddy"),
+            (home as NSString).appendingPathComponent(".workbuddy-ai")
+        ]
+        for dir in homeDirs {
+            let isAI = dir.contains("-ai")
+            let prefix = isAI ? "WorkBuddy AI" : "WorkBuddy"
+
+            // Main workbuddy.db
+            let mainDb = (dir as NSString).appendingPathComponent("workbuddy.db")
+            if let attrs = try? FileManager.default.attributesOfItem(atPath: mainDb),
+               let size = attrs[.size] as? UInt64,
+               let mtime = attrs[.modificationDate] as? Date {
+                var total = size
+                let wal = mainDb + "-wal"
+                if let walAttrs = try? FileManager.default.attributesOfItem(atPath: wal),
+                   let walSize = walAttrs[.size] as? UInt64 {
+                    total += walSize
+                }
+                results.append(AgentDatabaseEntry(
+                    id: mainDb,
+                    editor: .workBuddy,
+                    scope: .global,
+                    filePath: mainDb,
+                    fileName: "workbuddy.db",
+                    storageDirectory: dir,
+                    fileSizeBytes: total,
+                    lastModified: mtime,
+                    workspacePath: nil,
+                    workspaceName: "\(prefix) 核心数据库",
+                    isOrphaned: false,
+                    conversationCount: 0,
+                    conversations: []
+                ))
+            }
+
+            // Threat database
+            let threatDir = (dir as NSString).appendingPathComponent("security/threat-database")
+            if let files = try? FileManager.default.contentsOfDirectory(atPath: threatDir) {
+                for file in files where file.hasSuffix(".db") {
+                    let fullPath = (threatDir as NSString).appendingPathComponent(file)
+                    if let attrs = try? FileManager.default.attributesOfItem(atPath: fullPath),
+                       let size = attrs[.size] as? UInt64,
+                       let mtime = attrs[.modificationDate] as? Date {
+                        var total = size
+                        let wal = fullPath + "-wal"
+                        if let walAttrs = try? FileManager.default.attributesOfItem(atPath: wal),
+                           let walSize = walAttrs[.size] as? UInt64 {
+                            total += walSize
+                        }
+                        results.append(AgentDatabaseEntry(
+                            id: fullPath,
+                            editor: .workBuddy,
+                            scope: .global,
+                            filePath: fullPath,
+                            fileName: file,
+                            storageDirectory: threatDir,
+                            fileSizeBytes: total,
+                            lastModified: mtime,
+                            workspacePath: nil,
+                            workspaceName: "\(prefix) 安全与威胁数据库",
+                            isOrphaned: false,
+                            conversationCount: 0,
+                            conversations: []
+                        ))
+                    }
+                }
+            }
+        }
+
+        // 2. Library/Application Support dirs
         let dirs = [
             "Library/Application Support/com.tencent.workbuddy.mac",
             "Library/Application Support/WorkBuddy AI",
@@ -1106,6 +1434,40 @@ public enum AgentScanner {
             ))
         }
 
+        // 2. ~/.minimax/v2/sqlite/runtime-state.sqlite (+ WAL ~5.5 MB)
+        let minimaxSqliteDir = (home as NSString).appendingPathComponent(".minimax/v2/sqlite")
+        if let files = try? FileManager.default.contentsOfDirectory(atPath: minimaxSqliteDir) {
+            for file in files where file.hasSuffix(".sqlite") || file.hasSuffix(".db") {
+                let fullPath = (minimaxSqliteDir as NSString).appendingPathComponent(file)
+                if let attrs = try? FileManager.default.attributesOfItem(atPath: fullPath),
+                   let size = attrs[.size] as? UInt64,
+                   let mtime = attrs[.modificationDate] as? Date {
+                    var total = size
+                    let wal = fullPath + "-wal"
+                    if let walAttrs = try? FileManager.default.attributesOfItem(atPath: wal),
+                       let walSize = walAttrs[.size] as? UInt64 {
+                        total += walSize
+                    }
+                    results.append(AgentDatabaseEntry(
+                        id: fullPath,
+                        editor: .miniMax,
+                        scope: .global,
+                        filePath: fullPath,
+                        fileName: file,
+                        storageDirectory: minimaxSqliteDir,
+                        fileSizeBytes: total,
+                        lastModified: mtime,
+                        workspacePath: nil,
+                        workspaceName: "MiniMax 运行时状态数据库",
+                        isOrphaned: false,
+                        conversationCount: 0,
+                        conversations: []
+                    ))
+                }
+            }
+        }
+
+        // 3. MiniMax Agent / Support dirs
         let dirs = [
             "Library/Application Support/MiniMax Agent",
             "Library/Application Support/MiniMax"
@@ -1139,6 +1501,58 @@ public enum AgentScanner {
     // MARK: - ZCode
     public static func scanZCode(home: String) -> [AgentDatabaseEntry] {
         var results: [AgentDatabaseEntry] = []
+
+        // 1. ~/.zcode/cli/db/db.sqlite (4.8 MB)
+        let cliDb = (home as NSString).appendingPathComponent(".zcode/cli/db/db.sqlite")
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: cliDb),
+           let size = attrs[.size] as? UInt64,
+           let mtime = attrs[.modificationDate] as? Date {
+            var total = size
+            let wal = cliDb + "-wal"
+            if let walAttrs = try? FileManager.default.attributesOfItem(atPath: wal),
+               let walSize = walAttrs[.size] as? UInt64 {
+                total += walSize
+            }
+            results.append(AgentDatabaseEntry(
+                id: cliDb,
+                editor: .zCode,
+                scope: .global,
+                filePath: cliDb,
+                fileName: "db.sqlite",
+                storageDirectory: (cliDb as NSString).deletingLastPathComponent,
+                fileSizeBytes: total,
+                lastModified: mtime,
+                workspacePath: nil,
+                workspaceName: "ZCode CLI 核心数据库",
+                isOrphaned: false,
+                conversationCount: 0,
+                conversations: []
+            ))
+        }
+
+        // 2. ~/.zcode/v2/tasks-index.sqlite (296 KB)
+        let taskDb = (home as NSString).appendingPathComponent(".zcode/v2/tasks-index.sqlite")
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: taskDb),
+           let size = attrs[.size] as? UInt64,
+           let mtime = attrs[.modificationDate] as? Date {
+            results.append(AgentDatabaseEntry(
+                id: taskDb,
+                editor: .zCode,
+                scope: .global,
+                filePath: taskDb,
+                fileName: "tasks-index.sqlite",
+                storageDirectory: (taskDb as NSString).deletingLastPathComponent,
+                fileSizeBytes: size,
+                lastModified: mtime,
+                workspacePath: nil,
+                workspaceName: "ZCode 任务索引库",
+                isOrphaned: false,
+                conversationCount: 0,
+                conversations: []
+            ))
+        }
+
+        // 3. Library/Application Support/ZCode/session
         let base = (home as NSString).appendingPathComponent("Library/Application Support/ZCode/session")
         if let enumerator = FileManager.default.enumerator(atPath: base) {
             while let file = enumerator.nextObject() as? String {
@@ -1326,15 +1740,64 @@ public enum AgentScanner {
     // MARK: - ChatGPT & Codex
     public static func scanChatGPT(home: String) -> [AgentDatabaseEntry] {
         var results: [AgentDatabaseEntry] = []
+
+        // 1. Scan ~/.codex and ~/.codex/sqlite for large databases
+        let codexDirs = [
+            (home as NSString).appendingPathComponent(".codex"),
+            (home as NSString).appendingPathComponent(".codex/sqlite")
+        ]
+        for dir in codexDirs {
+            if let files = try? FileManager.default.contentsOfDirectory(atPath: dir) {
+                for file in files where file.hasSuffix(".sqlite") || file.hasSuffix(".db") {
+                    let fullPath = (dir as NSString).appendingPathComponent(file)
+                    if let attrs = try? FileManager.default.attributesOfItem(atPath: fullPath),
+                       let size = attrs[.size] as? UInt64,
+                       let mtime = attrs[.modificationDate] as? Date {
+                        var totalSize = size
+                        let wal = fullPath + "-wal"
+                        if let walAttrs = try? FileManager.default.attributesOfItem(atPath: wal),
+                           let walSize = walAttrs[.size] as? UInt64 {
+                            totalSize += walSize
+                        }
+                        let label: String
+                        if file.contains("thread_history") {
+                            label = "Codex 线程历史数据库"
+                        } else if file.contains("logs") {
+                            label = "Codex 会话与调用日志库"
+                        } else if file.contains("state") {
+                            label = "Codex 运行时状态库"
+                        } else {
+                            label = "Codex 数据库 (\(file))"
+                        }
+                        results.append(AgentDatabaseEntry(
+                            id: fullPath,
+                            editor: .chatgpt,
+                            scope: .global,
+                            filePath: fullPath,
+                            fileName: file,
+                            storageDirectory: dir,
+                            fileSizeBytes: totalSize,
+                            lastModified: mtime,
+                            workspacePath: nil,
+                            workspaceName: label,
+                            isOrphaned: false,
+                            conversationCount: 0,
+                            conversations: []
+                        ))
+                    }
+                }
+            }
+        }
+
+        // 2. Fallbacks for Analytics.db and Codex support dirs
         let candidatePaths = [
-            (home as NSString).appendingPathComponent("Library/Group Containers/2DC432GLL2.com.openai.sky.CUAService/Library/Application Support/Software/Analytics.db"),
-            (home as NSString).appendingPathComponent("Library/Application Support/com.openai.codex/production-appcast-bootstrap.json"),
-            (home as NSString).appendingPathComponent("Library/Application Support/OpenAI/Codex/chrome-native-hosts.json")
+            (home as NSString).appendingPathComponent("Library/Group Containers/2DC432GLL2.com.openai.sky.CUAService/Library/Application Support/Software/Analytics.db")
         ]
         for path in candidatePaths {
-            if let attrs = try? FileManager.default.attributesOfItem(atPath: path),
-               let size = attrs[.size] as? UInt64,
-               let mtime = attrs[.modificationDate] as? Date {
+            var st = stat()
+            if path.withCString({ stat($0, &st) }) == 0 {
+                let size = UInt64(st.st_size)
+                let mtime = Date(timeIntervalSince1970: TimeInterval(st.st_mtimespec.tv_sec))
                 results.append(AgentDatabaseEntry(
                     id: path,
                     editor: .chatgpt,
@@ -1345,7 +1808,7 @@ public enum AgentScanner {
                     fileSizeBytes: size,
                     lastModified: mtime,
                     workspacePath: nil,
-                    workspaceName: "ChatGPT/Codex (\((path as NSString).lastPathComponent))",
+                    workspaceName: "ChatGPT/Codex 服务数据库",
                     isOrphaned: false,
                     conversationCount: 0,
                     conversations: []
@@ -1358,6 +1821,42 @@ public enum AgentScanner {
     // MARK: - Tencent Marvis
     public static func scanMarvis(home: String) -> [AgentDatabaseEntry] {
         var results: [AgentDatabaseEntry] = []
+
+        // 1. ~/.marvis/database/*.db
+        let dotMarvis = (home as NSString).appendingPathComponent(".marvis/database")
+        if let files = try? FileManager.default.contentsOfDirectory(atPath: dotMarvis) {
+            for file in files where file.hasSuffix(".db") {
+                let full = (dotMarvis as NSString).appendingPathComponent(file)
+                if let attrs = try? FileManager.default.attributesOfItem(atPath: full),
+                   let size = attrs[.size] as? UInt64,
+                   let mtime = attrs[.modificationDate] as? Date {
+                    var total = size
+                    let wal = full + "-wal"
+                    if let walAttrs = try? FileManager.default.attributesOfItem(atPath: wal),
+                       let walSize = walAttrs[.size] as? UInt64 {
+                        total += walSize
+                    }
+                    let isVector = file.contains("vector")
+                    results.append(AgentDatabaseEntry(
+                        id: full,
+                        editor: .marvis,
+                        scope: isVector ? .vectorCache : .global,
+                        filePath: full,
+                        fileName: file,
+                        storageDirectory: dotMarvis,
+                        fileSizeBytes: total,
+                        lastModified: mtime,
+                        workspacePath: nil,
+                        workspaceName: "Marvis 数据库 (\(file))",
+                        isOrphaned: false,
+                        conversationCount: 0,
+                        conversations: []
+                    ))
+                }
+            }
+        }
+
+        // 2. Library/Application Support/com.tencent.mac.marvis
         let base = (home as NSString).appendingPathComponent("Library/Application Support/com.tencent.mac.marvis")
 
         // 1. User conversation database (data.db) & vector databases
@@ -1565,6 +2064,187 @@ public enum AgentScanner {
                 lastModified: mtime,
                 workspacePath: nil,
                 workspaceName: "DeepSeek 桌面端持久化库",
+                isOrphaned: false,
+                conversationCount: 0,
+                conversations: []
+            ))
+        }
+        return results
+    }
+
+    // MARK: - AutoClaw
+    public static func scanAutoClaw(home: String) -> [AgentDatabaseEntry] {
+        var results: [AgentDatabaseEntry] = []
+
+        // 1. ~/.openclaw-autoclaw/state/openclaw.sqlite (~936 KB)
+        let mainDb = (home as NSString).appendingPathComponent(".openclaw-autoclaw/state/openclaw.sqlite")
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: mainDb),
+           let size = attrs[.size] as? UInt64,
+           let mtime = attrs[.modificationDate] as? Date {
+            var total = size
+            let wal = mainDb + "-wal"
+            if let walAttrs = try? FileManager.default.attributesOfItem(atPath: wal),
+               let walSize = walAttrs[.size] as? UInt64 {
+                total += walSize
+            }
+            results.append(AgentDatabaseEntry(
+                id: mainDb,
+                editor: .autoClaw,
+                scope: .global,
+                filePath: mainDb,
+                fileName: "openclaw.sqlite",
+                storageDirectory: (mainDb as NSString).deletingLastPathComponent,
+                fileSizeBytes: total,
+                lastModified: mtime,
+                workspacePath: nil,
+                workspaceName: "AutoClaw 核心状态数据库",
+                isOrphaned: false,
+                conversationCount: 0,
+                conversations: []
+            ))
+        }
+
+        // 2. Library/Application Support/autoclaw/log_sdk_v2.db
+        let logDb = (home as NSString).appendingPathComponent("Library/Application Support/autoclaw/log_sdk_v2.db")
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: logDb),
+           let size = attrs[.size] as? UInt64,
+           let mtime = attrs[.modificationDate] as? Date {
+            results.append(AgentDatabaseEntry(
+                id: logDb,
+                editor: .autoClaw,
+                scope: .global,
+                filePath: logDb,
+                fileName: "log_sdk_v2.db",
+                storageDirectory: (logDb as NSString).deletingLastPathComponent,
+                fileSizeBytes: size,
+                lastModified: mtime,
+                workspacePath: nil,
+                workspaceName: "AutoClaw SDK 日志库",
+                isOrphaned: false,
+                conversationCount: 0,
+                conversations: []
+            ))
+        }
+        return results
+    }
+
+    // MARK: - CC Switch
+    public static func scanCCSwitch(home: String) -> [AgentDatabaseEntry] {
+        var results: [AgentDatabaseEntry] = []
+
+        // 1. ~/.cc-switch/cc-switch.db (17.75 MB)
+        let mainDb = (home as NSString).appendingPathComponent(".cc-switch/cc-switch.db")
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: mainDb),
+           let size = attrs[.size] as? UInt64,
+           let mtime = attrs[.modificationDate] as? Date {
+            var total = size
+            let wal = mainDb + "-wal"
+            if let walAttrs = try? FileManager.default.attributesOfItem(atPath: wal),
+               let walSize = walAttrs[.size] as? UInt64 {
+                total += walSize
+            }
+            results.append(AgentDatabaseEntry(
+                id: mainDb,
+                editor: .ccSwitch,
+                scope: .global,
+                filePath: mainDb,
+                fileName: "cc-switch.db",
+                storageDirectory: (mainDb as NSString).deletingLastPathComponent,
+                fileSizeBytes: total,
+                lastModified: mtime,
+                workspacePath: nil,
+                workspaceName: "CC Switch 核心配置数据库",
+                isOrphaned: false,
+                conversationCount: 0,
+                conversations: []
+            ))
+        }
+
+        // 2. ~/.cc-switch/backups/*.db (backups ~17.5 MB each)
+        let backupDir = (home as NSString).appendingPathComponent(".cc-switch/backups")
+        if let files = try? FileManager.default.contentsOfDirectory(atPath: backupDir) {
+            for file in files where file.hasSuffix(".db") {
+                let full = (backupDir as NSString).appendingPathComponent(file)
+                if let attrs = try? FileManager.default.attributesOfItem(atPath: full),
+                   let size = attrs[.size] as? UInt64,
+                   let mtime = attrs[.modificationDate] as? Date {
+                    results.append(AgentDatabaseEntry(
+                        id: full,
+                        editor: .ccSwitch,
+                        scope: .global,
+                        filePath: full,
+                        fileName: file,
+                        storageDirectory: backupDir,
+                        fileSizeBytes: size,
+                        lastModified: mtime,
+                        workspacePath: nil,
+                        workspaceName: "CC Switch 历史备份 (\(file))",
+                        isOrphaned: false,
+                        conversationCount: 0,
+                        conversations: []
+                    ))
+                }
+            }
+        }
+        return results
+    }
+
+    // MARK: - YDevSphere
+    public static func scanYDevSphere(home: String) -> [AgentDatabaseEntry] {
+        var results: [AgentDatabaseEntry] = []
+        let mainDb = (home as NSString).appendingPathComponent(".ydevsphere/database.sqlite")
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: mainDb),
+           let size = attrs[.size] as? UInt64,
+           let mtime = attrs[.modificationDate] as? Date {
+            var total = size
+            let wal = mainDb + "-wal"
+            if let walAttrs = try? FileManager.default.attributesOfItem(atPath: wal),
+               let walSize = walAttrs[.size] as? UInt64 {
+                total += walSize
+            }
+            results.append(AgentDatabaseEntry(
+                id: mainDb,
+                editor: .yDevSphere,
+                scope: .global,
+                filePath: mainDb,
+                fileName: "database.sqlite",
+                storageDirectory: (mainDb as NSString).deletingLastPathComponent,
+                fileSizeBytes: total,
+                lastModified: mtime,
+                workspacePath: nil,
+                workspaceName: "YDevSphere 核心数据库",
+                isOrphaned: false,
+                conversationCount: 0,
+                conversations: []
+            ))
+        }
+        return results
+    }
+
+    // MARK: - Devin
+    public static func scanDevin(home: String) -> [AgentDatabaseEntry] {
+        var results: [AgentDatabaseEntry] = []
+        let stateDb = (home as NSString).appendingPathComponent(".devin-shared/sharedStorage/state.vscdb")
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: stateDb),
+           let size = attrs[.size] as? UInt64,
+           let mtime = attrs[.modificationDate] as? Date {
+            var total = size
+            let wal = stateDb + "-wal"
+            if let walAttrs = try? FileManager.default.attributesOfItem(atPath: wal),
+               let walSize = walAttrs[.size] as? UInt64 {
+                total += walSize
+            }
+            results.append(AgentDatabaseEntry(
+                id: stateDb,
+                editor: .devin,
+                scope: .global,
+                filePath: stateDb,
+                fileName: "state.vscdb",
+                storageDirectory: (stateDb as NSString).deletingLastPathComponent,
+                fileSizeBytes: total,
+                lastModified: mtime,
+                workspacePath: nil,
+                workspaceName: "Devin 全局共享状态数据库",
                 isOrphaned: false,
                 conversationCount: 0,
                 conversations: []

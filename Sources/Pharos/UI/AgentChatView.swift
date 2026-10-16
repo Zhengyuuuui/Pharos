@@ -1152,6 +1152,10 @@ extension AgentEditorKind {
         case .wechatDevTools: return Color(red: 0.08, green: 0.75, blue: 0.35)
         case .hbuilder: return Color(red: 0.15, green: 0.7, blue: 0.45)
         case .deepseek: return Color(red: 0.3, green: 0.45, blue: 0.95)
+        case .autoClaw: return Color(red: 0.95, green: 0.45, blue: 0.15)
+        case .ccSwitch: return Color(red: 0.35, green: 0.65, blue: 0.85)
+        case .yDevSphere: return Color(red: 0.45, green: 0.35, blue: 0.85)
+        case .devin: return Color(red: 0.25, green: 0.75, blue: 0.65)
         }
     }
 }

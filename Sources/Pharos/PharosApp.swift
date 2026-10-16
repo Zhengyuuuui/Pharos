@@ -111,6 +111,10 @@ struct PharosApp: App {
                 let ports = p.ports.map { ":\($0.port)\($0.loopbackOnly ? "" : "*")" }.joined(separator: " ")
                 print("\(p.name)\t\(ports)\t\(ByteFormat.short(p.memoryBytes))\t\(p.processCount) proc\t\(p.directory ?? "-")")
             }
+            let clis = PackageScanner.scanGlobalCliTools()
+            let caches = PackageScanner.scanCacheRepositories()
+            let totalCacheBytes = caches.reduce(0) { $0 + $1.fileSizeBytes }
+            print("packages\t\(clis.count) CLI tools\t\(caches.count) caches (\(ByteFormat.disk(totalCacheBytes)))")
             exit(0)
         }
     }

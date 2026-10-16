@@ -63,6 +63,9 @@ struct PopoverView: View {
             menuRow(l10n.diskCleanup, icon: "trash") {
                 AppDelegate.shared?.showMainWindow(selecting: .diskCleanup)
             }
+            menuRow(l10n.packagesTitle, icon: "shippingbox.fill") {
+                AppDelegate.shared?.showMainWindow(selecting: .packages)
+            }
             menuRow(l10n.customizePopover, icon: "square.grid.2x2") {
                 AppDelegate.shared?.showMainWindow(selecting: .customize)
             }

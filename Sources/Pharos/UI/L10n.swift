@@ -770,5 +770,90 @@ final class L10n: ObservableObject {
     var databasesCountLabel: String { en ? "databases" : "个数据库" }
     var inactiveEditors: String { en ? "Inactive / No Data" : "不常用 (无数据)" }
     var uninstalledAppResidual: String { en ? "Uninstalled (Residual)" : "已卸载 (残留)" }
+
+    // MARK: - Package & Dependency Manager
+    var isZh: Bool { !en }
+    var packagesTitle: String { en ? "Packages & Dependencies" : "依赖与软件包" }
+    var packagesSubtitle: String {
+        en ? "Manage global CLI tools, project dependencies, and package caches"
+           : "全局命令行软件、项目依赖与语言缓存统一管理"
+    }
+    var tabGlobalCli: String { en ? "Global CLI Tools" : "全局 CLI 软件" }
+    var tabProjectDeps: String { en ? "Project Dependencies" : "项目依赖洞察" }
+    var tabCacheRepos: String { en ? "Cache Repositories" : "语言缓存仓库" }
+    var declaredVersion: String { en ? "Declared" : "声明版本" }
+    var installedVersion: String { en ? "Installed" : "实际安装" }
+    var statusMissing: String { en ? "Missing" : "未安装" }
+    var statusNormal: String { en ? "Ready" : "已就绪" }
+    var statusWorkspace: String { en ? "Workspace Link" : "本地工作区" }
+    var statusMismatched: String { en ? "Mismatched" : "版本偏离" }
+    var testInTerminal: String { en ? "Test in Terminal" : "在终端测试运行" }
+    var prodDependencies: String { en ? "Production" : "生产依赖" }
+    var devDependencies: String { en ? "Development" : "开发依赖" }
+    var missingDependenciesWarn: String {
+        en ? "Missing dependencies detected, please install packages"
+           : "检测到依赖缺失，请在终端执行依赖安装"
+    }
+    var allEcosystems: String { en ? "All Ecosystems" : "全部生态" }
+    var searchPackages: String { en ? "Search packages or commands…" : "搜索软件包或指令…" }
+    var selectProjectPrompt: String { en ? "Select Project" : "选择项目" }
+    var noPackagesFound: String { en ? "No packages found" : "未找到匹配的软件包" }
+    var cacheSize: String { en ? "Cache Size" : "缓存占用" }
+    var fileCount: String { en ? "Files" : "文件数" }
+    var executableBinary: String { en ? "Executable" : "执行文件" }
+    var packagePath: String { en ? "Package Path" : "包路径" }
+    var license: String { en ? "License" : "开源协议" }
+    var refreshPackages: String { en ? "Refresh" : "刷新列表" }
+    var totalCliToolsCount: String { en ? "CLI Tools" : "命令行工具" }
+    var directDependencies: String { en ? "Direct Dependencies" : "直接依赖" }
+    var copyCliCommand: String { en ? "Copy Command" : "复制指令" }
+    var commandCopied: String { en ? "Copied" : "已复制" }
+    var runCommandTest: String { en ? "Run --help Test" : "执行 --help 测试" }
+    func filterByEcosystemHelp(_ name: String) -> String {
+        en ? "Click to filter \(name) tools" : "点击筛选 \(name) 命令行工具"
+    }
+    var showAllCliTools: String {
+        en ? "Click to show all CLI tools" : "点击查看全部命令行工具"
+    }
+    var featuredToolsTitle: String { en ? "Installed Software & AI Tools" : "已下载的核心软件与 AI 工具" }
+    var featuredToolsSubtitle: String {
+        en ? "Standalone developer software and AI agents installed globally on your Mac"
+           : "已独立安装在当前 Mac 上的核心开发软件与 AI 助手，可直接在终端中运行或定位"
+    }
+    var featuredSoftwareCard: String { en ? "Featured Tools" : "核心软件" }
+    var filterByFeaturedHelp: String { en ? "Click to filter featured developer software and AI tools" : "点击仅查看核心软件与 AI 工具" }
+    var runInTerminal: String { en ? "Run in Terminal" : "终端运行" }
+    var copyPath: String { en ? "Copy Path" : "复制路径" }
+    var coreSoftwareBadge: String { en ? "Featured" : "核心软件" }
+    var collapseSection: String { en ? "Collapse" : "收起" }
+    var expandSection: String { en ? "Expand" : "展开" }
+    func readyToolsCount(_ n: Int) -> String { en ? "\(n) ready" : "\(n) 个已就绪" }
+    var uninstall: String { en ? "Uninstall" : "卸载" }
+    func uninstallConfirmTitle(_ name: String) -> String {
+        en ? "Uninstall \(name)?" : "确认卸载 \(name)？"
+    }
+    func uninstallConfirmMessage(_ name: String, _ cmd: String) -> String {
+        en ? "This will launch your terminal to run the uninstall command:\n\n\(cmd)\n\nYou can review the progress and confirm any prompts in terminal."
+           : "即将打开终端并执行对应的卸载指令：\n\n\(cmd)\n\n你可以在终端窗口中查看进度，并在需要时进行确认。"
+    }
+    var confirmUninstallInTerminal: String {
+        en ? "Uninstall in Terminal" : "在终端中执行卸载"
+    }
+    func uninstallHelp(_ name: String) -> String {
+        en ? "Uninstall \(name)" : "卸载 \(name)"
+    }
+    var cacheDirectory: String { en ? "Cache Folder" : "缓存目录" }
+    var projectCacheSize: String { en ? "Project Cache" : "缓存依赖体积" }
+    var noCacheYet: String { en ? "No cache yet" : "尚未生成缓存" }
+    func missingInstallCommand(for ecosystem: PackageEcosystem) -> String {
+        switch ecosystem {
+        case .node: return "npm install"
+        case .python: return "pip install -r requirements.txt"
+        case .swift: return "swift package resolve"
+        case .rust: return "cargo build"
+        case .java: return "mvn clean install"
+        default: return "install"
+        }
+    }
 }
 

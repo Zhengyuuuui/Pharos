@@ -20,11 +20,11 @@
   <img src="https://img.shields.io/badge/dependencies-none-brightgreen" alt="Dependencies">
   <img src="https://img.shields.io/badge/network-none-lightgrey" alt="No network">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.3-blue" alt="Version 2.3">
-  <img src="https://img.shields.io/badge/updated-2026--10--14-informational" alt="Last updated 2026-10-14">
+  <img src="https://img.shields.io/badge/version-2.4-blue" alt="Version 2.4">
+  <img src="https://img.shields.io/badge/updated-2026--10--16-informational" alt="Last updated 2026-10-16">
 </p>
 
-<p align="center"><sub>Last updated / 最后更新：2026-10-14 20:50 (UTC+8) · v2.3</sub></p>
+<p align="center"><sub>Last updated / 最后更新：2026-10-16 21:15 (UTC+8) · v2.4</sub></p>
 
 <p align="center"><a href="#english">English</a> · <a href="#简体中文">简体中文</a> · <a href="#changelog--更新记录">Changelog / 更新记录</a></p>
 
@@ -50,6 +50,7 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 | **Favorite projects** | Save project folders, start commands detected automatically, open in Terminal with one click |
 | **Browser instances** | Chrome, Chrome Beta / Canary, Chromium, Edge and Brave — every profile folder with its debug port, proxy and memory; save favorites that stay listed with their launch command after quitting; start and quit |
 | **AI agent chat databases** | Inspect, clean and backup local chat / session databases from 23+ AI IDEs and editors (Cursor, Trae, Windsurf, VS Code, Antigravity, OpenCode, Claude Code, MiniMax…); detect orphaned workspaces |
+| **Packages & CLI tools** | Global CLI tools (Node, Homebrew, Rust, Python, Go) with terminal run, reveal and uninstall; multi-ecosystem project dependencies and cache inspection (.venv, node_modules, .build, target); language cache repos overview |
 
 ### Features
 
@@ -124,6 +125,14 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 - Database size, conversation counts, last modified date, and storage breakdown chart (by editor and database type)
 - Detects orphaned databases left behind from deleted projects or uninstalled editors
 - Safe database backup (`.db.bak`) and one-click cleanup with confirmation
+
+**Packages & dependencies**
+- **Global CLI software**: automatically identifies all global binaries installed across Node.js (`npm -g`, Bun, pnpm, yarn), Homebrew, Cargo / Rust, Python (`uv tool`, `pip`), and Go (`~/go/bin`)
+- **Featured tools shelf**: prominent cards for core standalone software and AI agents (`claude`, `grok`, `rea`, `aider`, `codebuddy`, `wrangler`, `docker`, `uv`, `bun`, `pnpm`, `cargo-tauri`, `gh`, `rg`), with category badges, descriptions and version tags
+- **Quick actions on every tool**: run `--help` test in Terminal, reveal in Finder, copy command or path, and **uninstall** (generates ecosystem-specific uninstall command and executes in Terminal after secondary confirmation)
+- **Project dependency insight**: scans projects across **Node.js** (`node_modules`), **Python** (`.venv`/`venv`, `site-packages` metadata, `requirements.txt`, `pyproject.toml`), **SwiftPM** (`.build`, `Package.resolved`), **Rust** (`target`, `Cargo.lock`), and **Java** (`pom.xml`, `target`/`build`)
+- Shows exact cache directory name and disk footprint in the project picker (e.g. `[.venv: 124 MB]`, `[node_modules: 1.8 GB]`, `[.build: 320 MB]`, `[target: 850 MB]`), with status indicators (ready, missing, workspace link, mismatched) and smart install command suggestions
+- **Language cache repositories**: aggregates disk usage and file counts for npm cache, pnpm store, Python uv wheels, Cargo registry, Bun cache, Maven `.m2`, SwiftPM caches, and OpenJDK runtimes
 
 **General**
 - English / 简体中文, switchable live
@@ -244,6 +253,7 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 | **常用项目** | 收藏项目文件夹，自动识别启动命令，一键在终端中启动 |
 | **浏览器实例** | 支持 Chrome、Chrome Beta / Canary、Chromium、Edge、Brave，按配置文件夹列出每个实例，显示调试端口、代理、内存；收藏后关闭也能看到端口和启动命令；启动与退出 |
 | **AI 助手会话管理** | 扫描、分析、备份与清理 23+ 种本地 AI 编程助手与编辑器（Cursor、Trae、Windsurf、VS Code、Antigravity、OpenCode、Claude Code、MiniMax 等）的会话数据库，识别孤立/残留工作区 |
+| **依赖与软件包** | 全局命令行软件与核心工具统一管理（Node、Homebrew、Rust、Python、Go 等），一键终端测试、定位与二次确认卸载；全生态项目依赖与缓存目录识别（.venv、node_modules、.build、target 等）；语言缓存仓库概览 |
 
 ### 功能
 
@@ -318,6 +328,14 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 - 显示各数据库大小、会话条数、修改时间与空间占用可视化图表（按编辑器与按类型构成）
 - 智能检测已被删除或移除工作区的残留孤立数据库（Orphaned）
 - 支持一键安全备份（`.db.bak`）及二次确认清理，释放冗余磁盘空间
+
+**依赖与软件包**
+- **全局 CLI 软件统一管理**：自动扫描 Node.js（`npm -g`、Bun、pnpm、yarn）、Homebrew、Cargo / Rust、Python（`uv tool`、`pip`）及 Go（`~/go/bin`）安装的全部命令行工具
+- **核心软件与 AI 工具展架**：顶部卡片重点收录已安装的核心开发软件与终端 AI 助手（`claude`、`grok`、`rea`、`aider`、`codebuddy`、`wrangler`、`docker`、`uv`、`bun`、`pnpm`、`cargo-tauri`、`gh`、`rg` 等），带有分类标签、简要功能说明与版本号
+- **每张卡片均提供完整快捷操作**：一键在终端执行 `--help` 测试、在 Finder 中定位执行文件、复制路径/指令，以及**安全卸载**（根据包管理生态自动匹配对应卸载命令，在弹出二次确认框后移交终端执行）
+- **多技术栈项目依赖洞察**：支持 **Node.js**（`node_modules`）、**Python**（`.venv` / `venv`、解析 `site-packages` 元数据与 `requirements.txt`）、**SwiftPM**（`.build`、`Package.resolved`）、**Rust**（`target`、`Cargo.lock`）及 **Java**（`pom.xml`、`target`/`build`）等技术栈项目的深度扫描
+- 项目选择栏与指标卡直接展示缓存目录名称与磁盘体积（如 `[.venv: 124 MB]`、`[node_modules: 1.8 GB]`、`[.build: 320 MB]`、`[target: 850 MB]`），直观标识就绪、缺失、工作区软链接与版本偏离状态，缺失依赖时针对各技术栈自动给出对应的安装指令
+- **语言缓存仓库概览**：统计分析 npm 缓存、pnpm 全局硬链接仓库、Python uv Wheel 编译缓存、Cargo 依赖缓存、Bun 运行时缓存、Maven 本地库、SwiftPM 缓存及已安装的 OpenJDK 运行时
 
 **通用**
 - 中文 / English 即时切换
@@ -421,6 +439,20 @@ make icon                           # 用 Scripts/make-icon.swift 重新生成 A
 ## Changelog / 更新记录
 
 Times are UTC+8. 时间为北京时间（UTC+8）。
+
+### v2.4 — 2026-10-16 21:15
+
+**English**
+- **Packages & Dependencies manager**: unified tabbed page in main window covering Global CLI tools, Project Dependencies, and Language Cache Repositories
+- **Global CLI software & featured shelf**: auto-discovers binaries across Node (`npm -g`, Bun, pnpm, yarn), Homebrew, Cargo, Python (`uv`, `pip`), and Go; top shelf with category tags for core tools and AI agents (`claude`, `grok`, `rea`, `aider`, `codebuddy`, `wrangler`, `docker`, `uv`, `bun`, `pnpm`, `cargo-tauri`, `gh`, `rg`); quick `--help` test in Terminal, reveal in Finder, and **one-click uninstall with secondary confirmation in Terminal**
+- **Multi-ecosystem project dependencies & cache insight**: scans and identifies project cache footprints across Node (`node_modules`), Python (`.venv`/`venv`, `site-packages` metadata), SwiftPM (`.build`, `Package.resolved`), Rust (`target`, `Cargo.lock`), and Java (`pom.xml`, `target`/`build`); displays cache directory name and disk size; provides smart language-specific install commands for missing packages
+- **Language cache repositories**: aggregates sizes and locations for npm cache, pnpm store, Python uv wheels, Cargo registry, Bun cache, Maven m2, SwiftPM cache, and OpenJDK runtimes
+
+**简体中文**
+- **依赖与软件包管理**：主窗口新增「依赖与软件包」独立页面，统一管理全局 CLI 软件、项目依赖洞察与语言缓存仓库
+- **全局命令行软件与核心工具展架**：自动扫描 Node（`npm -g`、Bun、pnpm、yarn）、Homebrew、Cargo、Python（`uv`、`pip`）及 Go 安装的全部 CLI；顶部展架高亮核心独立软件与 AI 助手（`claude`、`grok`、`rea`、`aider`、`codebuddy`、`wrangler`、`docker`、`uv`、`bun`、`pnpm`、`cargo-tauri`、`gh`、`rg` 等）；卡片支持在终端测试运行、在 Finder 中定位，以及**二次确认后在终端中执行一键卸载**
+- **多技术栈项目依赖洞察与缓存识别**：全面识别 **Node.js**（`node_modules`）、**Python**（`.venv` / `venv`、`site-packages` 元数据）、**SwiftPM**（`.build`、`Package.resolved`）、**Rust**（`target`、`Cargo.lock`）与 **Java**（`pom.xml`、`target`/`build`）等项目的依赖包与缓存占用；项目选择菜单直观显示缓存目录及体积；缺失依赖时智能推荐对应的安装指令
+- **语言缓存仓库概览**：统计分析 npm 缓存、pnpm 全局硬链接仓库、Python uv Wheel 预编译缓存、Cargo 依赖缓存、Bun 运行时缓存、Maven 本地库、SwiftPM 缓存及已安装的 OpenJDK 运行时
 
 ### v2.3 — 2026-10-14 20:50
 
