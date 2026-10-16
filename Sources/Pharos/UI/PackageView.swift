@@ -1078,6 +1078,7 @@ struct PackageView: View {
                 Spacer()
 
                 Button {
+                    WindowRouter.shared.cleanupTargetGroup = .packages
                     UserDefaults.standard.set(true, forKey: "cleanupGroupExpanded.packages")
                     CleanupStoreHolder.shared.scan()
                     WindowRouter.shared.request = .diskCleanup
@@ -1112,6 +1113,7 @@ struct PackageView: View {
                 Spacer()
 
                 Button {
+                    WindowRouter.shared.cleanupTargetGroup = .packages
                     UserDefaults.standard.set(true, forKey: "cleanupGroupExpanded.packages")
                     CleanupStoreHolder.shared.scan()
                     WindowRouter.shared.request = .diskCleanup
@@ -1153,6 +1155,7 @@ struct PackageView: View {
                 Spacer()
 
                 IconButton(systemImage: "trash", help: l10n.cleanLanguageCachesHelp) {
+                    WindowRouter.shared.cleanupTargetGroup = .packages
                     UserDefaults.standard.set(true, forKey: "cleanupGroupExpanded.packages")
                     CleanupStoreHolder.shared.scan()
                     WindowRouter.shared.request = .diskCleanup

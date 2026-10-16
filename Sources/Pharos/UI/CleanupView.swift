@@ -7,27 +7,143 @@ import PharosCore
 struct CleanupView: View {
     @ObservedObject private var cleanup = CleanupStoreHolder.shared
     @ObservedObject private var l10n = L10n.shared
+    @ObservedObject private var router = WindowRouter.shared
 
+    @State private var selectedGroup: DiskCleaner.Group? = nil
     private let otherGroups: [DiskCleaner.Group] = [.appCaches, .apple, .packages]
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                header
-                if let report = cleanup.report { ReportBanner(report: report) }
-                PinnedTempSection()
-                Text(l10n.otherCaches)
-                    .font(.system(size: 13, weight: .semibold))
-                    .padding(.top, 4)
-                ForEach(otherGroups, id: \.self) { CacheGroupSection(group: $0) }
+                if let targetGroup = selectedGroup {
+                    groupFocusedHeader(targetGroup)
+                    if let report = cleanup.report { ReportBanner(report: report) }
+                    groupFocusedContent(targetGroup)
+                } else {
+                    header
+                    if let report = cleanup.report { ReportBanner(report: report) }
+                    PinnedTempSection()
+                    Text(l10n.otherCaches)
+                        .font(.system(size: 13, weight: .semibold))
+                        .padding(.top, 4)
+                    ForEach(otherGroups, id: \.self) { CacheGroupSection(group: $0) }
+                }
             }
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .onAppear { cleanup.viewAppeared() }
+        .onAppear {
+            cleanup.viewAppeared()
+            if let target = router.cleanupTargetGroup {
+                selectedGroup = target
+                router.cleanupTargetGroup = nil
+            }
+        }
+        .onChange(of: router.cleanupTargetGroup) { _, target in
+            if let target {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selectedGroup = target
+                }
+                router.cleanupTargetGroup = nil
+            }
+        }
+    }
+
+    private func groupFocusedHeader(_ group: DiskCleaner.Group) -> some View {
+        let bytes = cleanup.bytes(in: group)
+        let isPackages = (group == .packages)
+        let title = isPackages ? l10n.languageCachesCleanupTitle : l10n.groupTitle(group)
+        let subtitle = isPackages ? l10n.languageCachesCleanupSubtitle : l10n.cleanupIntro
+
+        return VStack(alignment: .leading, spacing: 12) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selectedGroup = nil
+                }
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text(l10n.allDiskCleanup)
+                        .font(.system(size: 12))
+                }
+                .foregroundStyle(Color.accentColor)
+            }
+            .buttonStyle(.plain)
+
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.system(size: 20, weight: .bold))
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer()
+
+                Button {
+                    cleanup.scan()
+                } label: {
+                    Label(cleanup.isScanning ? l10n.scanning : l10n.cleanupScan,
+                          systemImage: "arrow.clockwise")
+                }
+                .controlSize(.small)
+                .disabled(cleanup.isBusy)
+
+                ConfirmButton(title: isPackages ? l10n.cleanLanguageCachesGroup : l10n.cleanGroup,
+                              icon: "trash",
+                              prominent: true,
+                              busy: cleanup.cleaning == .group(group),
+                              disabled: cleanup.isBusy || bytes == 0) {
+                    cleanup.clean(group: group)
+                }
+            }
+        }
+    }
+
+    private func groupFocusedContent(_ group: DiskCleaner.Group) -> some View {
+        let rows = cleanup.rows(in: group)
+        let bytes = cleanup.bytes(in: group)
+
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 14) {
+                Image(systemName: l10n.groupIcon(group))
+                    .font(.system(size: 22))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 44, height: 44)
+                    .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(l10n.groupTitle(group))
+                        .font(.system(size: 14, weight: .semibold))
+                    Text(l10n.locationCount(rows.count))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(cleanup.rows.isEmpty ? "–" : ByteFormat.short(bytes))
+                        .font(.system(size: 22, weight: .bold, design: .monospaced))
+                        .foregroundStyle(bytes == 0 ? Color.secondary : Color.primary)
+                    Text(l10n.cacheSize)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .padding(14)
+            .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.03)))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.primary.opacity(0.08), lineWidth: 1))
+
+            RowList(rows: rows)
+        }
     }
 
     private var header: some View {
+
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 Text(l10n.diskCleanup).font(.system(size: 20, weight: .bold))

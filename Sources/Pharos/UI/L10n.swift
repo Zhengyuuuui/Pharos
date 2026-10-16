@@ -934,7 +934,15 @@ final class L10n: ObservableObject {
            : "全局语言与包管理器缓存（npm、pnpm、uv、Cargo、Maven 等）由「磁盘清理」模块统一扫描，并支持按保留期策略安全清理。"
     }
     var goToDiskCleanup: String { en ? "Open Disk Cleanup" : "前往磁盘清理" }
+    var allDiskCleanup: String { en ? "All Disk Cleanups" : "全部磁盘清理" }
+    var languageCachesCleanupTitle: String { en ? "Language & Package Caches" : "语言与包管理器缓存清理" }
+    var languageCachesCleanupSubtitle: String {
+        en ? "Clean download & build caches for npm, pnpm, uv, pip, Cargo, Maven, Gradle, Go, and Homebrew"
+           : "清理 npm、pnpm、uv、pip、Cargo、Maven、Gradle、Go、Homebrew 等语言与包管理器的构建与下载缓存"
+    }
+    var cleanLanguageCachesGroup: String { en ? "Clean All Language Caches" : "一键清理全部语言缓存" }
 }
+
 
 
 

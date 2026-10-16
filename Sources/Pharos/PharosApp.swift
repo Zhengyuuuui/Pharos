@@ -74,12 +74,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 }
 
-/// Page-switch requests for an already-open main window (from the popover).
+/// Page-switch requests for an already-open main window (from the popover or internal navigation).
 @MainActor
 final class WindowRouter: ObservableObject {
     static let shared = WindowRouter()
     @Published var request: MainWindowView.SidebarItem?
+    @Published var cleanupTargetGroup: DiskCleaner.Group? = nil
 }
+
 
 @main
 struct PharosApp: App {
