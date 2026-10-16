@@ -522,34 +522,44 @@ struct PackageView: View {
             // Project Selector Bar
             HStack(spacing: 12) {
                 Menu {
-                    ForEach(store.detectedProjects) { p in
-                        Button {
-                            store.selectedProjectSummary = p
-                        } label: {
-                            HStack {
-                                Image(systemName: p.ecosystem.iconName)
-                                Text(p.name)
-                                Spacer()
-                                if let cacheName = p.cacheDirectoryName, p.dependenciesSizeBytes > 0 {
-                                    Text("\(cacheName): \(ByteFormat.short(p.dependenciesSizeBytes))")
-                                } else if p.dependenciesSizeBytes > 0 {
-                                    Text(ByteFormat.short(p.dependenciesSizeBytes))
-                                } else {
-                                    Text("\(p.directDependenciesCount) deps")
+                    ForEach(PackageEcosystem.allCases) { eco in
+                        let ecoProjects = store.detectedProjects.filter { $0.ecosystem == eco }
+                        if !ecoProjects.isEmpty {
+                            Section("\(eco.displayName) (\(ecoProjects.count))") {
+                                ForEach(ecoProjects) { p in
+                                    Button {
+                                        store.selectedProjectSummary = p
+                                    } label: {
+                                        HStack {
+                                            Image(systemName: "folder.fill")
+                                            Text(p.name)
+                                            Spacer()
+                                            if let cacheName = p.cacheDirectoryName, p.dependenciesSizeBytes > 0 {
+                                                Text("[\(cacheName): \(ByteFormat.short(p.dependenciesSizeBytes))]")
+                                            } else {
+                                                Text("\(p.directDependenciesCount) deps")
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 } label: {
                     HStack(spacing: 8) {
-                        Image(systemName: store.selectedProjectSummary?.ecosystem.iconName ?? "shippingbox.fill")
+                        Image(systemName: "folder.fill")
                             .foregroundStyle(store.selectedProjectSummary != nil ? ecosystemColor(store.selectedProjectSummary!.ecosystem) : Color.accentColor)
                         Text(store.selectedProjectSummary?.name ?? l10n.selectProjectPrompt)
                             .font(.system(size: 13, weight: .semibold))
-                        if let cacheName = store.selectedProjectSummary?.cacheDirectoryName, let sz = store.selectedProjectSummary?.dependenciesSizeBytes, sz > 0 {
-                            Text("[\(cacheName): \(ByteFormat.short(sz))]")
-                                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        if let current = store.selectedProjectSummary {
+                            Text("(\(current.ecosystem.displayName))")
+                                .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
+                            if let cacheName = current.cacheDirectoryName, current.dependenciesSizeBytes > 0 {
+                                Text("[\(cacheName): \(ByteFormat.short(current.dependenciesSizeBytes))]")
+                                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                         Image(systemName: "chevron.up.chevron.down")
                             .font(.caption2)

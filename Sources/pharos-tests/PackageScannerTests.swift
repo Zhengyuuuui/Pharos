@@ -11,7 +11,7 @@ func testPackageModels() {
     expectEq(PackageEcosystem.homebrew.displayName, "Homebrew", "homebrew display name")
 
     expectEq(PackageEcosystem.node.iconName, "hexagon.fill", "node icon")
-    expectEq(PackageEcosystem.python.iconName, "snake.fill", "python icon")
+    expectEq(PackageEcosystem.python.iconName, "terminal.fill", "python icon")
     expectEq(PackageEcosystem.swift.iconName, "swift", "swift icon")
 
     let item = LocalPackageItem(

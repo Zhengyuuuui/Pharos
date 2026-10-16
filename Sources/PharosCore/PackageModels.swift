@@ -27,7 +27,7 @@ public enum PackageEcosystem: String, Codable, CaseIterable, Identifiable, Senda
     public var iconName: String {
         switch self {
         case .node: return "hexagon.fill"
-        case .python: return "snake.fill"
+        case .python: return "terminal.fill"
         case .java: return "cup.and.saucer.fill"
         case .rust: return "gearshape.fill"
         case .go: return "arrow.right.circle.fill"
