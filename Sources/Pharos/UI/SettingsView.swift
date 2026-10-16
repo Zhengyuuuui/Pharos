@@ -78,6 +78,7 @@ struct ExtraSettingsForm: View {
     @ObservedObject private var workspaces = WorkspaceStore.shared
     @ObservedObject private var menuBar = MenuBarSettings.shared
     @ObservedObject private var notifier = Notifier.shared
+    @ObservedObject private var packageStore = PackageStore.shared
     @State private var backupMessage: String?
 
     var body: some View {
@@ -133,6 +134,22 @@ struct ExtraSettingsForm: View {
 
             Divider()
 
+            VStack(alignment: .leading, spacing: 6) {
+                Text(l10n.packageSettingsTitle).font(.system(size: 12, weight: .semibold))
+                Picker(l10n.projectDepsDisplayMode, selection: $packageStore.projectDepsDisplayMode) {
+                    ForEach(PackageDepsDisplayMode.allCases) { mode in
+                        Text(l10n.projectDepsDisplayModeOption(mode)).tag(mode)
+                    }
+                }
+                .font(.system(size: 12))
+                Text(l10n.projectDepsDisplayModeHint)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Divider()
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(l10n.notificationsTitle).font(.system(size: 12, weight: .semibold))
                 Toggle(l10n.notifyMemory, isOn: $notifier.memory).font(.system(size: 12))
@@ -163,6 +180,7 @@ struct ExtraSettingsForm: View {
         }
     }
 }
+
 
 /// Shared settings controls, used by both the popover and the main window.
 struct SettingsForm: View {

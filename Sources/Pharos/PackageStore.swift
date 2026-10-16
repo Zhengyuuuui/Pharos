@@ -45,6 +45,14 @@ final class PackageStore: ObservableObject {
     }
     @Published var selectedCliId: String? = nil
 
+    // MARK: - Display Preferences
+    private static let depsModeKey = "Pharos.projectDepsDisplayMode"
+    @Published var projectDepsDisplayMode: PackageDepsDisplayMode {
+        didSet {
+            UserDefaults.standard.set(projectDepsDisplayMode.rawValue, forKey: Self.depsModeKey)
+        }
+    }
+
     // MARK: - Filtered Views
     @Published private(set) var filteredCliTools: [LocalPackageItem] = []
     @Published private(set) var featuredShelfTools: [LocalPackageItem] = []
@@ -62,6 +70,12 @@ final class PackageStore: ObservableObject {
     }
 
     private init() {
+        if let saved = UserDefaults.standard.string(forKey: Self.depsModeKey),
+           let mode = PackageDepsDisplayMode(rawValue: saved) {
+            self.projectDepsDisplayMode = mode
+        } else {
+            self.projectDepsDisplayMode = .bundleOnly
+        }
         scanAll()
     }
 

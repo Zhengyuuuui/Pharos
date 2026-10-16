@@ -20,6 +20,11 @@ struct PackageView: View {
     @State private var isFeaturedShelfExpanded = true
     @State private var itemToUninstall: LocalPackageItem? = nil
     @State private var showUninstallAlert = false
+    @State private var isDetailedExpanded: Bool? = nil
+
+    private var isPackagesBreakdownExpanded: Bool {
+        isDetailedExpanded ?? (store.projectDepsDisplayMode == .detailedList)
+    }
 
     var body: some View {
         ScrollView {
@@ -41,6 +46,9 @@ struct PackageView: View {
         }
         .onChange(of: store.selectedEcosystem) { _, _ in
             displayLimit = 60
+        }
+        .onChange(of: store.selectedProjectSummary?.id) { _, _ in
+            isDetailedExpanded = nil
         }
         .alert(isPresented: $showUninstallAlert) {
             let item = itemToUninstall
@@ -587,91 +595,299 @@ struct PackageView: View {
             }
 
             if let summary = store.selectedProjectSummary {
-                // Dependency Health Metrics
-                HStack(spacing: 12) {
-                    statCard(l10n.directDependencies, "\(summary.directDependenciesCount)", icon: "shippingbox")
-                    statCard(l10n.prodDependencies, "\(summary.packages.filter { !$0.isDevDependency }.count)", icon: "gearshape")
-                    statCard(l10n.devDependencies, "\(summary.packages.filter(\.isDevDependency).count)", icon: "hammer")
-                    if summary.missingDependenciesCount > 0 {
-                        statCard(l10n.statusMissing, "\(summary.missingDependenciesCount)", icon: "exclamationmark.triangle.fill", color: .red)
-                    }
-                    let cacheLabel = summary.cacheDirectoryName != nil ? "\(summary.cacheDirectoryName!) \(l10n.cacheSize)" : l10n.cacheSize
-                    statCard(cacheLabel, ByteFormat.short(summary.dependenciesSizeBytes), icon: "internaldrive")
-                }
+                // Primary Big Dependency Bundle Hero Card
+                primaryBundleHeroCard(summary)
 
-                // Missing Warning Banner
-                if summary.missingDependenciesCount > 0 {
-                    let installCmd = l10n.missingInstallCommand(for: summary.ecosystem)
-                    HStack(spacing: 10) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.red)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(l10n.missingDependenciesWarn)
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(.red)
-                            Text(installCmd)
-                                .font(.system(size: 10, design: .monospaced))
+                // Detailed Package Breakdown (only when expanded)
+                if isPackagesBreakdownExpanded {
+                    VStack(alignment: .leading, spacing: 12) {
+                        // Filter & Search
+                        HStack(spacing: 10) {
+                            HStack {
+                                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                                TextField(l10n.searchPackages, text: $store.projectSearchQuery)
+                                    .textFieldStyle(.plain)
+                                if !store.projectSearchQuery.isEmpty {
+                                    IconButton(systemImage: "xmark.circle.fill", help: l10n.cancel) {
+                                        store.projectSearchQuery = ""
+                                    }
+                                }
+                            }
+                            .padding(6)
+                            .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.04)))
+                            .frame(maxWidth: 280)
+
+                            Picker("", selection: $store.projectFilter) {
+                                Text(l10n.showAll).tag(ProjectDepFilter.all)
+                                Text(l10n.prodDependencies).tag(ProjectDepFilter.prod)
+                                Text(l10n.devDependencies).tag(ProjectDepFilter.dev)
+                                if summary.missingDependenciesCount > 0 {
+                                    Text("\(l10n.statusMissing) (\(summary.missingDependenciesCount))").tag(ProjectDepFilter.missing)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .controlSize(.small)
+
+                            Spacer()
+                            Text(l10n.showingCount(shown: store.filteredProjectPackages.count, total: summary.packages.count))
+                                .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
-                        Spacer()
-                        Button {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(installCmd, forType: .string)
-                        } label: {
-                            Text(l10n.copyCliCommand)
-                        }
-                        .controlSize(.small)
-                    }
-                    .padding(10)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.red.opacity(0.08)))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.red.opacity(0.3), lineWidth: 1))
-                }
 
-                // Filter & Search
-                HStack(spacing: 10) {
-                    HStack {
-                        Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                        TextField(l10n.searchPackages, text: $store.projectSearchQuery)
-                            .textFieldStyle(.plain)
-                        if !store.projectSearchQuery.isEmpty {
-                            IconButton(systemImage: "xmark.circle.fill", help: l10n.cancel) {
-                                store.projectSearchQuery = ""
+                        // Packages List
+                        if store.filteredProjectPackages.isEmpty {
+                            ContentUnavailableView(l10n.noPackagesFound, systemImage: "shippingbox")
+                                .frame(maxWidth: .infinity, minHeight: 120)
+                        } else {
+                            LazyVStack(alignment: .leading, spacing: 8) {
+                                ForEach(store.filteredProjectPackages) { pkg in
+                                    projectPackageRow(pkg)
+                                }
                             }
                         }
                     }
-                    .padding(6)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.04)))
-                    .frame(maxWidth: 280)
-
-                    Picker("", selection: $store.projectFilter) {
-                        Text(l10n.showAll).tag(ProjectDepFilter.all)
-                        Text(l10n.prodDependencies).tag(ProjectDepFilter.prod)
-                        Text(l10n.devDependencies).tag(ProjectDepFilter.dev)
-                        if summary.missingDependenciesCount > 0 {
-                            Text("\(l10n.statusMissing) (\(summary.missingDependenciesCount))").tag(ProjectDepFilter.missing)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .controlSize(.small)
-
-                    Spacer()
-                    Text(l10n.showingCount(shown: store.filteredProjectPackages.count, total: summary.packages.count))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                // Packages List
-                LazyVStack(alignment: .leading, spacing: 8) {
-                    ForEach(store.filteredProjectPackages) { pkg in
-                        projectPackageRow(pkg)
-                    }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             } else {
                 ContentUnavailableView(l10n.noProjects, systemImage: "folder.badge.questionmark", description: Text(l10n.selectProjectPrompt))
                     .frame(maxWidth: .infinity, minHeight: 180)
             }
         }
+    }
+
+    // MARK: - Primary Bundle Hero Card
+    private func primaryBundleHeroCard(_ summary: ProjectDependencySummary) -> some View {
+        let bundleName = summary.primaryBundleName
+        let bundlePath = summary.primaryBundlePath
+        let exists = summary.isBundleInstalled
+        let color = ecosystemColor(summary.ecosystem)
+        let isExpanded = isPackagesBreakdownExpanded
+
+        return VStack(alignment: .leading, spacing: 14) {
+            // 1. Top row: Bundle Icon, Name, Ecosystem, Subtitle & Ready status
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "shippingbox.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(color)
+                    .frame(width: 42, height: 42)
+                    .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(bundleName)
+                            .font(.system(size: 16, weight: .bold, design: .monospaced))
+                            .foregroundStyle(.primary)
+
+                        Text(summary.ecosystem.displayName)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(color)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(color.opacity(0.12)))
+
+                        Spacer()
+
+                        // Status Badge
+                        if exists && summary.missingDependenciesCount == 0 {
+                            HStack(spacing: 4) {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text(l10n.bundleInstalledReady)
+                            }
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.green)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(Color.green.opacity(0.12)))
+                        } else if summary.missingDependenciesCount > 0 {
+                            HStack(spacing: 4) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                Text("\(summary.missingDependenciesCount) \(l10n.statusMissing)")
+                            }
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.red)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(Color.red.opacity(0.12)))
+                        } else {
+                            HStack(spacing: 4) {
+                                Image(systemName: "info.circle.fill")
+                                Text(l10n.bundleNotInstalled)
+                            }
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.orange)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(Color.orange.opacity(0.12)))
+                        }
+                    }
+
+                    Text(l10n.bundleSubtitle(for: summary.ecosystem, bundleName: bundleName))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            // 2. Middle Row: Prominent Disk Size & Stats Pills
+            HStack(alignment: .firstTextBaseline, spacing: 16) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(l10n.bundleTotalSize)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Text(summary.dependenciesSizeBytes > 0 ? ByteFormat.short(summary.dependenciesSizeBytes) : (exists ? "0 B" : l10n.noCacheYet))
+                        .font(.system(size: 22, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.primary)
+                }
+
+                Spacer()
+
+                // Stat Pills
+                HStack(spacing: 8) {
+                    statPill(label: l10n.totalPackagesCountLabel, value: "\(summary.packages.count)", icon: "shippingbox")
+                    statPill(label: l10n.declaredCountLabel, value: "\(summary.directDependenciesCount)", icon: "checkmark.seal")
+                    statPill(label: l10n.devDepsCountLabel, value: "\(summary.packages.filter(\.isDevDependency).count)", icon: "hammer")
+                    if summary.missingDependenciesCount > 0 {
+                        statPill(label: l10n.missingDepsCountLabel, value: "\(summary.missingDependenciesCount)", icon: "exclamationmark.triangle.fill", color: .red)
+                    }
+                }
+            }
+
+            // 3. Bundle Path & Quick Actions
+            HStack(spacing: 8) {
+                Image(systemName: "folder")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+
+                Text(bundlePath.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
+                Spacer()
+
+                if exists {
+                    Button {
+                        store.revealInFinder(path: bundlePath)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.forward.circle")
+                            Text(l10n.revealInFinder)
+                        }
+                        .font(.system(size: 11))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(bundlePath, forType: .string)
+                    copiedFeedbackId = bundlePath
+                    Task {
+                        try? await Task.sleep(nanoseconds: 1_500_000_000)
+                        await MainActor.run {
+                            if copiedFeedbackId == bundlePath { copiedFeedbackId = nil }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: copiedFeedbackId == bundlePath ? "checkmark" : "doc.on.doc")
+                        Text(copiedFeedbackId == bundlePath ? l10n.commandCopied : l10n.copyPath)
+                    }
+                    .font(.system(size: 11))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.035)))
+
+            // 4. Missing warning / install tip (if any)
+            if summary.missingDependenciesCount > 0 || !exists {
+                let installCmd = l10n.missingInstallCommand(for: summary.ecosystem)
+                HStack(spacing: 10) {
+                    Image(systemName: "terminal")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.accentColor)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(l10n.missingDependenciesWarn)
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(installCmd)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Button {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(installCmd, forType: .string)
+                    } label: {
+                        Text(l10n.copyCliCommand)
+                    }
+                    .controlSize(.small)
+                }
+                .padding(9)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.06)))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.accentColor.opacity(0.2), lineWidth: 1))
+            }
+
+            Divider()
+
+            // 5. Expand / Collapse Trigger Bar
+            Button {
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    isDetailedExpanded = !isExpanded
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: isExpanded ? "chevron.up.circle.fill" : "chevron.down.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color.accentColor)
+
+                    Text(isExpanded ? l10n.collapseDetailedDependencies : l10n.expandDetailedDependencies(summary.packages.count))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.primary)
+
+                    Spacer()
+
+                    Text(l10n.modeConfigNotice)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
+                .contentShape(Rectangle())
+                .padding(.vertical, 2)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.primary.opacity(0.025))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(color.opacity(0.2), lineWidth: 1)
+        )
+    }
+
+    private func statPill(label: String, value: String, icon: String, color: Color = .primary) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 10))
+                .foregroundStyle(color == .primary ? Color.secondary : color)
+            Text(label + ":")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundStyle(color)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.04)))
     }
 
     private func projectPackageRow(_ pkg: LocalPackageItem) -> some View {

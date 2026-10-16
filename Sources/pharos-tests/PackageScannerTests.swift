@@ -73,7 +73,41 @@ func testPackageModels() {
 
     let pipItem = LocalPackageItem(id: "5", name: "flake8", installedVersion: "7.0", ecosystem: .python, scope: .globalCli, installPath: "/path/flake8", executablePath: "/Library/Python/3.13/bin/flake8")
     expectEq(pipItem.uninstallCommand, "pip uninstall -y flake8", "pip uninstall command")
+
+    // Test PackageDepsDisplayMode
+    expectEq(PackageDepsDisplayMode.bundleOnly.rawValue, "bundleOnly", "bundleOnly raw value")
+    expectEq(PackageDepsDisplayMode.detailedList.rawValue, "detailedList", "detailedList raw value")
+    expectEq(PackageDepsDisplayMode.allCases.count, 2, "all cases count")
+
+    // Test ProjectDependencySummary primary bundle helpers
+    let nodeSummary = ProjectDependencySummary(
+        id: "/tmp/node-app",
+        name: "node-app",
+        rootPath: "/tmp/node-app",
+        ecosystem: .node,
+        dependenciesSizeBytes: 1048576,
+        directDependenciesCount: 5,
+        missingDependenciesCount: 0,
+        packages: [],
+        cacheDirectoryName: "node_modules"
+    )
+    expectEq(nodeSummary.primaryBundleName, "node_modules", "primary bundle name for node")
+    expectEq(nodeSummary.primaryBundlePath, "/tmp/node-app/node_modules", "primary bundle path for node")
+
+    let pySummary = ProjectDependencySummary(
+        id: "/tmp/py-app",
+        name: "py-app",
+        rootPath: "/tmp/py-app",
+        ecosystem: .python,
+        dependenciesSizeBytes: 524288,
+        directDependenciesCount: 3,
+        missingDependenciesCount: 1,
+        packages: []
+    )
+    expectEq(pySummary.primaryBundleName, ".venv", "primary bundle fallback name for python")
+    expectEq(pySummary.primaryBundlePath, "/tmp/py-app/.venv", "primary bundle path for python")
 }
+
 
 func testGlobalCliScanner() {
     // 1. Live scan test

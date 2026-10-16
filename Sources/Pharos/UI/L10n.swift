@@ -855,5 +855,59 @@ final class L10n: ObservableObject {
         default: return "install"
         }
     }
+
+    // MARK: - Project Dependencies Display Mode & Bundle Hero Card
+    var packageSettingsTitle: String { en ? "Packages & Dependencies" : "依赖与软件包" }
+    var projectDepsDisplayMode: String { en ? "Project dependencies display" : "项目依赖展示方式" }
+    func projectDepsDisplayModeOption(_ mode: PackageDepsDisplayMode) -> String {
+        switch mode {
+        case .bundleOnly:
+            return en ? "Primary Bundle (node_modules / .venv, collapsed breakdown)"
+                      : "主依赖大包（如 node_modules，默认折叠具体清单）"
+        case .detailedList:
+            return en ? "Full Breakdown (Expand all packages by default)"
+                      : "完整依赖清单（默认展开所有具体包）"
+        }
+    }
+    var projectDepsDisplayModeHint: String {
+        en ? "Choose whether Project Dependencies aggregates into a primary bundle folder card by default, or always expands the full dependency list."
+           : "设置项目依赖洞察默认以核心大包（如 node_modules / .venv）聚合呈现，还是直接展开完整的依赖清单。"
+    }
+
+    var primaryDependencyBundle: String { en ? "Primary Dependency Bundle" : "核心主依赖包" }
+    var bundleTotalSize: String { en ? "Bundle Size" : "主包磁盘占用" }
+    var bundlePathLabel: String { en ? "Bundle Path" : "主包物理路径" }
+    var bundleInstalledReady: String { en ? "Dependency bundle ready" : "主依赖包已安装就绪" }
+    var bundleNotInstalled: String { en ? "Bundle not generated (Not installed)" : "主包尚未生成（未安装依赖）" }
+    func bundleSubtitle(for ecosystem: PackageEcosystem, bundleName: String) -> String {
+        switch ecosystem {
+        case .node:
+            return en ? "Node.js npm dependency bundle (\(bundleName))" : "Node.js 核心依赖包 (\(bundleName))"
+        case .python:
+            return en ? "Python virtual environment & packages (\(bundleName))" : "Python 虚拟环境与依赖集合 (\(bundleName))"
+        case .swift:
+            return en ? "SwiftPM build cache & package checkouts (\(bundleName))" : "SwiftPM 构建缓存与依赖检出 (\(bundleName))"
+        case .rust:
+            return en ? "Cargo build targets & crates cache (\(bundleName))" : "Cargo 构建产物与依赖缓存 (\(bundleName))"
+        case .java:
+            return en ? "Maven/Gradle build outputs & dependencies (\(bundleName))" : "Maven/Gradle 构建产物与依赖缓存 (\(bundleName))"
+        default:
+            return en ? "Project dependencies bundle (\(bundleName))" : "项目主依赖包 (\(bundleName))"
+        }
+    }
+    func expandDetailedDependencies(_ count: Int) -> String {
+        en ? "Expand Detailed Packages (\(count) packages)" : "展开具体依赖包清单（共 \(count) 个包）"
+    }
+    var collapseDetailedDependencies: String {
+        en ? "Collapse Detailed Packages" : "收起具体依赖包清单"
+    }
+    var totalPackagesCountLabel: String { en ? "Total Packages" : "依赖包总计" }
+    var declaredCountLabel: String { en ? "Declared Direct" : "直接声明" }
+    var devDepsCountLabel: String { en ? "Dev Dependencies" : "开发依赖" }
+    var missingDepsCountLabel: String { en ? "Missing" : "未安装" }
+    var modeConfigNotice: String {
+        en ? "Default display mode can be changed in Settings" : "可在「设置」中修改默认展示模式"
+    }
 }
+
 

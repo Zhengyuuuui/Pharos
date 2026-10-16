@@ -198,3 +198,41 @@ public struct ProjectDependencySummary: Identifiable, Codable, Equatable, Sendab
         self.cacheDirectoryName = cacheDirectoryName
     }
 }
+
+extension ProjectDependencySummary {
+    /// 核心主依赖包/文件夹名称（如 node_modules, .venv, .build, target）
+    public var primaryBundleName: String {
+        if let cache = cacheDirectoryName, !cache.isEmpty {
+            return cache
+        }
+        switch ecosystem {
+        case .node: return "node_modules"
+        case .python: return ".venv"
+        case .swift: return ".build"
+        case .rust: return "target"
+        case .java: return "target"
+        default: return "dependencies"
+        }
+    }
+
+    /// 核心主依赖包物理绝对路径
+    public var primaryBundlePath: String {
+        (rootPath as NSString).appendingPathComponent(primaryBundleName)
+    }
+
+    /// 核心主依赖包是否已在本地硬盘上生成/安装
+    public var isBundleInstalled: Bool {
+        FileManager.default.fileExists(atPath: primaryBundlePath)
+    }
+}
+
+/// 项目依赖展示方式：大包模式 vs 详细清单展开模式
+public enum PackageDepsDisplayMode: String, CaseIterable, Identifiable, Codable, Sendable {
+    /// 核心主依赖包模式：默认仅展示项目核心大包（如 node_modules / .venv），具体依赖列表折叠
+    case bundleOnly
+    /// 完整清单展开模式：默认直接展开所有具体依赖项列表
+    case detailedList
+
+    public var id: String { rawValue }
+}
+
