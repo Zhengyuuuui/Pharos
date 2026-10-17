@@ -2370,70 +2370,76 @@ public enum AgentScanner {
 }
 
 public enum AgentDatabaseManager {
-    /// Safely deletes a database entry.
-    /// If it is an orphaned workspace, removes the entire workspaceStorage directory.
-    public static func deleteEntry(_ entry: AgentDatabaseEntry) throws {
+    public enum DeleteError: Error, Equatable {
+        case refused(AgentDeletePolicy.Verdict)
+    }
+
+    /// Deletes a database only when `AgentDeletePolicy` allows it; the policy is re-evaluated here
+    /// so no caller can bypass it. Removes SQLite `-wal`/`-shm`/`-journal` siblings too.
+    @discardableResult
+    public static func deleteEntry(
+        _ entry: AgentDatabaseEntry,
+        knownPaths: [AgentKnownPath]? = nil,
+        appRunning: Bool
+    ) throws -> UInt64 {
+        let verdict = AgentDeletePolicy.evaluate(entry, knownPaths: knownPaths ?? entry.editor.knownStoragePaths(), appRunning: appRunning)
+        guard case .allowed(let target, let isDirectory) = verdict else { throw DeleteError.refused(verdict) }
         let fm = FileManager.default
-        if entry.isOrphaned && entry.scope == .workspace {
-            if fm.fileExists(atPath: entry.storageDirectory) {
-                try fm.removeItem(atPath: entry.storageDirectory)
-                return
+        if isDirectory {
+            if fm.fileExists(atPath: target) { try fm.removeItem(atPath: target) }
+            return entry.fileSizeBytes
+        }
+        if fm.fileExists(atPath: target) { try fm.removeItem(atPath: target) }
+        for suffix in ["-wal", "-shm", "-journal"] where fm.fileExists(atPath: target + suffix) {
+            try? fm.removeItem(atPath: target + suffix)
+        }
+        return entry.fileSizeBytes
+    }
+
+    public struct OrphanCleanResult: Equatable {
+        public var deletedIds: [String] = []
+        public var bytesFreed: UInt64 = 0
+        public var skipped = 0
+        public var failed = 0
+    }
+
+    /// Cleans orphaned workspaces one by one; refused or failing entries are counted, never fatal.
+    public static func cleanOrphanedEntries(
+        _ entries: [AgentDatabaseEntry],
+        knownPaths: (AgentEditorKind) -> [AgentKnownPath] = { $0.knownStoragePaths() }
+    ) -> OrphanCleanResult {
+        var result = OrphanCleanResult()
+        for entry in entries where entry.isOrphaned {
+            do {
+                result.bytesFreed += try deleteEntry(entry, knownPaths: knownPaths(entry.editor), appRunning: false)
+                result.deletedIds.append(entry.id)
+            } catch DeleteError.refused {
+                result.skipped += 1
+            } catch {
+                result.failed += 1
             }
         }
-
-        // Delete primary file
-        if fm.fileExists(atPath: entry.filePath) {
-            try fm.removeItem(atPath: entry.filePath)
-        }
-
-        // Delete associated SQLite WAL/SHM/journal files if they exist
-        let wal = entry.filePath + "-wal"
-        let shm = entry.filePath + "-shm"
-        let journal = entry.filePath + "-journal"
-        if fm.fileExists(atPath: wal) { try? fm.removeItem(atPath: wal) }
-        if fm.fileExists(atPath: shm) { try? fm.removeItem(atPath: shm) }
-        if fm.fileExists(atPath: journal) { try? fm.removeItem(atPath: journal) }
+        return result
     }
 
-    /// Cleans all orphaned workspace entries, returning the number of cleaned items and total bytes freed.
-    public static func cleanOrphanedEntries(_ entries: [AgentDatabaseEntry]) throws -> (count: Int, bytesFreed: UInt64) {
-        var count = 0
-        var freed: UInt64 = 0
-
-        for entry in entries where entry.isOrphaned {
-            let size = entry.fileSizeBytes
-            try deleteEntry(entry)
-            count += 1
-            freed += size
-        }
-
-        return (count, freed)
-    }
-
-    /// Creates a timestamped backup of the database in the target directory.
-    public static func backupEntry(_ entry: AgentDatabaseEntry, toDirectory destDir: URL) throws -> URL {
+    /// Copies the database (and its `-wal`, so un-checkpointed sessions are kept) to the
+    /// file the user picked in the save panel. Never overwrites an existing file.
+    public static func backupEntry(_ entry: AgentDatabaseEntry, to targetURL: URL) throws {
         let fm = FileManager.default
-        if !fm.fileExists(atPath: destDir.path) {
-            try fm.createDirectory(at: destDir, withIntermediateDirectories: true)
-        }
-
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyyMMdd_HHmmss"
-        let stamp = formatter.string(from: Date())
-        let safeName = entry.workspaceName.replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: " ", with: "_")
-        let ext = (entry.fileName as NSString).pathExtension.isEmpty ? "db" : (entry.fileName as NSString).pathExtension
-        let backupFileName = "\(entry.editor.rawValue)_\(safeName)_\(stamp).\(ext)"
-        let targetURL = destDir.appendingPathComponent(backupFileName)
-
         try fm.copyItem(at: URL(fileURLWithPath: entry.filePath), to: targetURL)
-
-        // Also copy wal / shm if they exist
         let walPath = entry.filePath + "-wal"
         if fm.fileExists(atPath: walPath) {
-            let walDest = destDir.appendingPathComponent(backupFileName + "-wal")
-            try? fm.copyItem(at: URL(fileURLWithPath: walPath), to: walDest)
+            try? fm.copyItem(at: URL(fileURLWithPath: walPath), to: URL(fileURLWithPath: targetURL.path + "-wal"))
         }
+    }
 
-        return targetURL
+    /// Suggested file name for the save panel: `<editor>_<name>_<yyyyMMdd_HHmmss>.<ext>`.
+    public static func suggestedBackupName(for entry: AgentDatabaseEntry, now: Date = Date()) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyyMMdd_HHmmss"
+        let safeName = entry.workspaceName.map { "/: ".contains($0) ? "_" : $0 }
+        let ext = (entry.fileName as NSString).pathExtension.isEmpty ? "db" : (entry.fileName as NSString).pathExtension
+        return "\(entry.editor.rawValue)_\(String(safeName))_\(formatter.string(from: now)).\(ext)"
     }
 }

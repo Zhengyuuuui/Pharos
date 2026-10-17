@@ -79,6 +79,7 @@ struct ExtraSettingsForm: View {
     @ObservedObject private var menuBar = MenuBarSettings.shared
     @ObservedObject private var notifier = Notifier.shared
     @ObservedObject private var packageStore = PackageStore.shared
+    @ObservedObject private var agentStore = AgentChatStore.shared
     @State private var backupMessage: String?
 
     var body: some View {
@@ -130,6 +131,16 @@ struct ExtraSettingsForm: View {
                 if let error = menuBar.hotkeyError {
                     Text(error).font(.system(size: 10)).foregroundStyle(.orange)
                 }
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Picker(l10n.agentEditorLayoutTitle, selection: $agentStore.editorLayout) {
+                    ForEach(AgentEditorLayout.allCases) { Text(l10n.agentEditorLayoutOption($0)).tag($0) }
+                }
+                .font(.system(size: 12))
+                Text(l10n.agentEditorLayoutHint)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
             }
 
             Divider()

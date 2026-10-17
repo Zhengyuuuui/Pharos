@@ -744,8 +744,68 @@ final class L10n: ObservableObject {
     func agentDbBackupSuccess(_ path: String) -> String {
         en ? "Backup saved to: \(path)" : "已备份至：\(path)"
     }
-    func agentOrphanedCleanSuccess(count: Int, size: String) -> String {
-        en ? "Cleaned \(count) orphaned database(s), freed \(size)." : "已清理 \(count) 个残留工作区，释放 \(size) 空间。"
+    func agentOrphanedCleanResult(count: Int, size: String, skipped: Int, failed: Int) -> String {
+        var text = en ? "Cleaned \(count) orphaned database(s), freed \(size)." : "已清理 \(count) 个残留工作区，释放 \(size) 空间。"
+        if skipped > 0 { text += en ? " Skipped \(skipped) outside known storage paths." : " 跳过 \(skipped) 个不在已知存储路径内的条目。" }
+        if failed > 0 { text += en ? " \(failed) failed." : " \(failed) 个删除失败。" }
+        return text
+    }
+    func agentBackupFailed(_ reason: String) -> String { en ? "Backup failed: \(reason)" : "备份失败：\(reason)" }
+    func agentDeleteFailed(_ reason: String) -> String { en ? "Delete failed: \(reason)" : "删除失败：\(reason)" }
+    func agentDeleteRefused(_ verdict: AgentDeletePolicy.Verdict) -> String {
+        switch verdict {
+        case .allowed: return ""
+        case .globalDatabase:
+            return en ? "Global databases hold the editor's settings and every session — back them up instead of deleting."
+                      : "全局数据库包含编辑器设置与全部会话，不提供删除，可使用备份。"
+        case .outsideKnownPaths:
+            return en ? "This file is outside the editor's known storage folders, so Pharos leaves it alone."
+                      : "该文件不在此编辑器的已知存储目录内，Pharos 不会删除。"
+        case .appRunning:
+            return en ? "Quit the editor first — it may be writing to this database."
+                      : "请先退出该编辑器，它可能正在写入此数据库。"
+        }
+    }
+    func agentDeleteDisabledHelp(_ verdict: AgentDeletePolicy.Verdict) -> String { agentDeleteRefused(verdict) }
+    var agentScopeShortGlobal: String { en ? "Global" : "全局" }
+    var agentScopeShortWorkspace: String { en ? "Workspace" : "工作区" }
+    var agentScopeShortCache: String { en ? "Cache" : "缓存" }
+    func agentMessages(_ n: Int) -> String { en ? "\(n) msg" : "\(n) 条消息" }
+    func agentDbCount(_ n: Int) -> String { en ? "\(n) DBs" : "\(n) 个库" }
+    var agentChartCollapse: String { en ? "Collapse chart" : "收起图表" }
+    var agentChartExpand: String { en ? "Expand chart" : "展开图表" }
+    var agentEditorsHeader: String { en ? "AI Editors" : "AI 编辑器" }
+    func agentInactiveEditorsHeader(_ n: Int) -> String { en ? "Editors without data (\(n))" : "无数据的编辑器（\(n)）" }
+    var agentBackToAll: String { en ? "All Editors" : "全部编辑器" }
+    var agentTabDatabases: String { en ? "Databases" : "数据库" }
+    var agentTabConversations: String { en ? "Conversations" : "对话" }
+    var agentSearchConversations: String { en ? "Search titles or snippets…" : "搜索对话标题或摘要…" }
+    var agentSearchResults: String { en ? "Search Results" : "搜索结果" }
+    func agentPathsNotCreated(_ n: Int) -> String { en ? "\(n) known path(s) not created yet" : "\(n) 个已知路径尚未生成" }
+    var agentTruncatedNote: String {
+        en ? "Only the latest 100 sessions per database are read."
+           : "每个数据库只读取最近 100 条会话。"
+    }
+    var agentConvTitle: String { en ? "Title" : "标题" }
+    var agentConvMode: String { en ? "Mode" : "模式" }
+    var agentConvMessages: String { en ? "Messages" : "消息数" }
+    var agentConvCreated: String { en ? "Created" : "创建时间" }
+    var agentConvUpdated: String { en ? "Updated" : "更新时间" }
+    var agentConvDatabase: String { en ? "Database" : "所属库" }
+    var agentConvSnippet: String { en ? "Snippet" : "摘要" }
+    var agentConvId: String { en ? "Session ID" : "会话 ID" }
+    var agentConvNoMatch: String { en ? "No conversations match." : "没有匹配的对话。" }
+    var agentLastActive: String { en ? "Last active" : "最近活动" }
+    var agentEditorLayoutTitle: String { en ? "AI chats: editor list style" : "AI 对话管理：编辑器入口样式" }
+    func agentEditorLayoutOption(_ l: AgentEditorLayout) -> String {
+        switch l {
+        case .grid: return en ? "Cards (grid)" : "卡片网格"
+        case .strip: return en ? "Icon strip" : "横向图标条"
+        }
+    }
+    var agentEditorLayoutHint: String {
+        en ? "How editors are listed on the AI Agent Conversations overview."
+           : "AI 对话管理总览页中编辑器入口的显示方式。"
     }
     var showAll: String { en ? "Show All" : "显示全部" }
     var loadMore: String { en ? "Load More (+60)" : "加载更多 (+60)" }
@@ -754,8 +814,8 @@ final class L10n: ObservableObject {
     }
     var editorStorageChart: String { en ? "Database Storage by AI Editor" : "各 AI 编辑器数据库占用" }
     var editorStorageDesc: String {
-        en ? "Compare database and cache usage across local AI editors. Click any bar to filter the list."
-           : "对比本地各 AI 编程助手的数据库与缓存占用。点击任一柱条可快速筛选下方列表。"
+        en ? "Compare database and cache usage across local AI editors. Pick an editor below to open its details."
+           : "对比本地各 AI 编程助手的数据库与缓存占用。在下方选择编辑器查看详情。"
     }
     var chartModeTotal: String { en ? "Total" : "总占用" }
     var chartModeBreakdown: String { en ? "By Type" : "分类构成" }

@@ -20,11 +20,11 @@
   <img src="https://img.shields.io/badge/dependencies-none-brightgreen" alt="Dependencies">
   <img src="https://img.shields.io/badge/network-none-lightgrey" alt="No network">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.5-blue" alt="Version 2.5">
+  <img src="https://img.shields.io/badge/version-2.6-blue" alt="Version 2.6">
   <img src="https://img.shields.io/badge/updated-2026--10--17-informational" alt="Last updated 2026-10-17">
 </p>
 
-<p align="center"><sub>Last updated / 最后更新：2026-10-17 12:52 (UTC+8) · v2.5 · Author / 作者：zys · Model / 模型：OpenCode (claude-opus-5.5)</sub></p>
+<p align="center"><sub>Last updated / 最后更新：2026-10-17 15:06 (UTC+8) · v2.6 · Author / 作者：zys · Model / 模型：OpenCode (claude-opus-5.5)</sub></p>
 
 <p align="center"><a href="#english">English</a> · <a href="#简体中文">简体中文</a> · <a href="#changelog--更新记录">Changelog / 更新记录</a></p>
 
@@ -125,7 +125,8 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 - Scans local SQLite and state databases across 23+ AI IDEs and assistants (Cursor, Trae, Windsurf, VS Code, Antigravity, Qoder, Cherry Studio, CodeBuddy, Kiro, OpenCode, Claude Code, Zed, MiniMax Code, Doubao, etc.)
 - Database size, conversation counts, last modified date, and storage breakdown chart (by editor and database type)
 - Detects orphaned databases left behind from deleted projects or uninstalled editors
-- Safe database backup (`.db.bak`) and one-click cleanup with confirmation
+- Overview with a collapsible storage chart and an editor grid or icon strip (Settings); each editor opens its own detail page with **Databases** and **Conversations** tabs; conversations show metadata only (title, mode, messages, dates, database)
+- Backup to a file you pick (with `-wal`); deletion only inside each editor's known storage folders, never global databases, never while the editor is running — with confirmation
 
 **Packages & dependencies**
 - **Global CLI software**: automatically identifies all global binaries installed across Node.js (`npm -g`, Bun, pnpm, yarn), Homebrew, Cargo / Rust, Python (`uv tool`, `pip`), and Go (`~/go/bin`)
@@ -329,7 +330,8 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 - 自动发现 23+ 款主流 AI 编程助手（Cursor、Trae、Windsurf、VS Code、Antigravity、Qoder、Cherry Studio、CodeBuddy、Kiro、OpenCode、Claude Code、Zed、MiniMax Code、豆包 等）的本地会话 SQLite 数据库
 - 显示各数据库大小、会话条数、修改时间与空间占用可视化图表（按编辑器与按类型构成）
 - 智能检测已被删除或移除工作区的残留孤立数据库（Orphaned）
-- 支持一键安全备份（`.db.bak`）及二次确认清理，释放冗余磁盘空间
+- 总览页存储图表可收起，编辑器入口可在设置中选择「卡片网格」或「横向图标条」；点击编辑器进入独立详情页，分「数据库 / 对话」两个标签，对话只显示元数据（标题、模式、消息数、时间、所属库）
+- 备份到你在保存面板中选择的文件（连同 `-wal`）；删除只限各编辑器的已知存储目录，全局库不删、编辑器运行时不删，并需二次确认
 
 **依赖与软件包**
 - **全局 CLI 软件统一管理**：自动扫描 Node.js（`npm -g`、Bun、pnpm、yarn）、Homebrew、Cargo / Rust、Python（`uv tool`、`pip`）及 Go（`~/go/bin`）安装的全部命令行工具
@@ -441,6 +443,30 @@ make icon                           # 用 Scripts/make-icon.swift 重新生成 A
 ## Changelog / 更新记录
 
 Times are UTC+8. 时间为北京时间（UTC+8）。
+
+### v2.6 — 2026-10-17 15:06
+
+> Author / 作者：zys · Model / 模型：OpenCode (claude-opus-5.5)
+
+**English**
+- **AI chats: overview and detail are separate pages** — opening an editor replaces the whole page (no more other editors' cards below it); back via "‹ All Editors", ⌘[ or Esc
+- **Editor detail**: summary card plus **Databases / Conversations** tabs; each database card expands to its own sessions; known paths not created yet are folded at the bottom; conversations from every database merged newest-first, each labelled with its database, searchable
+- **Single conversation**: click to expand metadata only (title, mode, messages, created / updated, database and path, snippet, session ID); a note appears when a database hit the 100-session reader cap
+- **Collapsible storage chart**: collapse keeps just the composition strip; state is remembered
+- **Editor entry style in Settings**: cards (grid) or icon strip; editors without data are folded
+- **Safer writes** (`AgentDeletePolicy`, pure + unit-tested, re-checked inside `AgentDatabaseManager.deleteEntry`): global databases never deleted; targets must be inside the editor's known storage paths (copies elsewhere untouched); orphaned workspaces remove only a direct child of a known workspace root; live databases refused while the editor runs; locked rows show why. Orphan cleanup goes entry by entry and reports skipped / failed counts
+- **Backup** now writes only to the file chosen in a save panel (plus `-wal`)
+- Per-editor summaries cached once per scan (`AgentChatCatalog`); all page strings localised; AGENTS.md documents the AI chats read/write rules
+
+**简体中文**
+- **AI 对话管理：总览与详情分离** —— 进入某个编辑器后整页替换，下方不再残留全部编辑器与其他 app 卡片；通过「‹ 全部编辑器」、⌘[ 或 Esc 返回
+- **编辑器详情页**：概要卡片 +「数据库 / 对话」分段标签；每个数据库卡片展开显示该库自己的会话；尚未生成的已知路径折叠在底部；对话标签合并全部库的会话，按时间倒序、标注所属库、可搜索
+- **单条对话**：点击展开元数据（标题、模式、消息数、创建/更新时间、所属库与路径、摘要、会话 ID）；某库读满 100 条时给出提示
+- **存储图表可收起**：收起后仅保留比例色条，状态持久化
+- **设置中可选编辑器入口样式**：卡片网格或横向图标条；无数据的编辑器折叠显示
+- **写操作收紧**（`AgentDeletePolicy` 纯函数单测，并在 `AgentDatabaseManager.deleteEntry` 内二次判定）：全局库不删；目标必须在该编辑器已知存储路径内（其他位置的副本不动）；失效工作区只删已知根目录的直接子目录；编辑器运行时拒绝删除在用库；不可删的条目显示锁形图标与原因。批量清理残留逐条判定，跳过/失败计数显示在横幅
+- **备份**改为只写入保存面板中选择的文件（连同 `-wal`）
+- 按编辑器的统计每次扫描只算一次（`AgentChatCatalog`）；页面文案全部双语；AGENTS.md 补充 AI 对话管理读写约定
 
 ### v2.5 — 2026-10-17 12:52
 

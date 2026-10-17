@@ -204,47 +204,157 @@ func testSQLiteMagicHeader() {
     expectEq(AgentSQLiteReader.isSQLiteFile(atPath: tmp.path), true, "real sqlite file recognized")
 }
 
+private func makeEntry(
+    id: String? = nil, editor: AgentEditorKind = .cursor, scope: AgentDatabaseScope, file: String, dir: String,
+    size: UInt64 = 10, mtime: Date = Date(timeIntervalSince1970: 1_000), orphaned: Bool = false,
+    name: String = "db", convs: [AgentConversationSummary] = []
+) -> AgentDatabaseEntry {
+    AgentDatabaseEntry(
+        id: id ?? file, editor: editor, scope: scope, filePath: file, fileName: (file as NSString).lastPathComponent,
+        storageDirectory: dir, fileSizeBytes: size, lastModified: mtime, workspacePath: orphaned ? "/nonexistent" : nil,
+        workspaceName: name, isOrphaned: orphaned, conversationCount: convs.count, conversations: convs
+    )
+}
+
 func testAgentDatabaseBackupAndDelete() {
     let tmp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("pharos-db-mgmt-\(UUID().uuidString)")
-    let backupDir = tmp.appendingPathComponent("backups")
-    let wsDir = tmp.appendingPathComponent("workspace_storage_123")
+    let wsRoot = tmp.appendingPathComponent("workspaceStorage")
+    let wsDir = wsRoot.appendingPathComponent("abc123")
     try? FileManager.default.createDirectory(at: wsDir, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: tmp) }
+    let known = [AgentKnownPath(label: "ws", fullPath: wsRoot.path, scope: .workspace, isDirectory: true)]
 
     let dbFile = wsDir.appendingPathComponent("state.vscdb")
     try? "dummy db content".write(to: dbFile, atomically: true, encoding: .utf8)
+    try? "wal".write(toFile: dbFile.path + "-wal", atomically: true, encoding: .utf8)
+    let entry = makeEntry(scope: .workspace, file: dbFile.path, dir: wsDir.path, size: 16, orphaned: true, name: "Dead/Project")
 
-    let entry = AgentDatabaseEntry(
-        id: dbFile.path,
-        editor: .cursor,
-        scope: .workspace,
-        filePath: dbFile.path,
-        fileName: "state.vscdb",
-        storageDirectory: wsDir.path,
-        fileSizeBytes: 16,
-        lastModified: Date(),
-        workspacePath: "/nonexistent/dead",
-        workspaceName: "TestDeadProject",
-        isOrphaned: true,
-        conversationCount: 0,
-        conversations: []
-    )
-
-    // Test Backup
+    let backup = tmp.appendingPathComponent(AgentDatabaseManager.suggestedBackupName(for: entry, now: Date(timeIntervalSince1970: 0)))
     do {
-        let backedUpURL = try AgentDatabaseManager.backupEntry(entry, toDirectory: backupDir)
-        expect(FileManager.default.fileExists(atPath: backedUpURL.path), "backup file created")
+        try AgentDatabaseManager.backupEntry(entry, to: backup)
+        expect(FileManager.default.fileExists(atPath: backup.path), "backup file created at chosen URL")
+        expect(FileManager.default.fileExists(atPath: backup.path + "-wal"), "backup keeps -wal")
+        expect(!backup.lastPathComponent.contains("/"), "backup name has no slash")
+        expect(backup.lastPathComponent.hasPrefix("cursor_Dead_Project_"), "backup name sanitised")
     } catch {
         expect(false, "backupEntry failed: \(error)")
     }
-
-    // Test Delete Orphaned Workspace Directory
     do {
-        try AgentDatabaseManager.deleteEntry(entry)
-        expect(!FileManager.default.fileExists(atPath: wsDir.path), "orphaned storage directory was removed")
+        try AgentDatabaseManager.backupEntry(entry, to: backup)
+        expect(false, "backup must not overwrite an existing file")
+    } catch {}
+
+    // Refused deletes leave the file in place.
+    let outside = makeEntry(scope: .workspace, file: backup.path, dir: tmp.path)
+    do {
+        try AgentDatabaseManager.deleteEntry(outside, knownPaths: known, appRunning: false)
+        expect(false, "delete outside known paths must throw")
+    } catch {
+        expect(FileManager.default.fileExists(atPath: backup.path), "refused delete keeps file")
+    }
+
+    do {
+        let freed = try AgentDatabaseManager.deleteEntry(entry, knownPaths: known, appRunning: true)
+        expectEq(freed, 16, "freed bytes reported")
+        expect(!FileManager.default.fileExists(atPath: wsDir.path), "orphaned workspace folder removed")
+        expect(FileManager.default.fileExists(atPath: wsRoot.path), "workspace root itself kept")
     } catch {
         expect(false, "deleteEntry failed: \(error)")
     }
+}
+
+func testAgentDeletePolicy() {
+    let root = "/Users/t/Library/Application Support/Cursor/User"
+    let known = [
+        AgentKnownPath(label: "g", fullPath: "\(root)/globalStorage/state.vscdb", scope: .global),
+        AgentKnownPath(label: "w", fullPath: "\(root)/workspaceStorage", scope: .workspace, isDirectory: true),
+        AgentKnownPath(label: "c", fullPath: "/Users/t/.cache/idx", scope: .vectorCache, isDirectory: true),
+    ]
+    let ws = "\(root)/workspaceStorage/abc"
+
+    let global = makeEntry(scope: .global, file: "\(root)/globalStorage/state.vscdb", dir: "\(root)/globalStorage")
+    expectEq(AgentDeletePolicy.evaluate(global, knownPaths: known, appRunning: false), .globalDatabase, "global DB never deleted")
+
+    let liveWs = makeEntry(scope: .workspace, file: "\(ws)/state.vscdb", dir: ws)
+    expectEq(AgentDeletePolicy.evaluate(liveWs, knownPaths: known, appRunning: false), .allowed(target: "\(ws)/state.vscdb", isDirectory: false), "workspace DB deletable when app closed")
+    expectEq(AgentDeletePolicy.evaluate(liveWs, knownPaths: known, appRunning: true), .appRunning, "workspace DB refused while app runs")
+
+    let orphan = makeEntry(scope: .workspace, file: "\(ws)/state.vscdb", dir: ws, orphaned: true)
+    expectEq(AgentDeletePolicy.evaluate(orphan, knownPaths: known, appRunning: true), .allowed(target: ws, isDirectory: true), "orphaned workspace folder deletable even while app runs")
+
+    let deepOrphan = makeEntry(scope: .workspace, file: "\(ws)/x/state.vscdb", dir: "\(ws)/x", orphaned: true)
+    expectEq(AgentDeletePolicy.evaluate(deepOrphan, knownPaths: known, appRunning: false), .outsideKnownPaths, "orphan folder must be a direct child of the root")
+
+    let rootAsDir = makeEntry(scope: .workspace, file: "\(root)/workspaceStorage/state.vscdb", dir: "\(root)/workspaceStorage", orphaned: true)
+    expectEq(AgentDeletePolicy.evaluate(rootAsDir, knownPaths: known, appRunning: false), .outsideKnownPaths, "workspace root itself never removed")
+
+    let traversal = makeEntry(scope: .workspace, file: "\(root)/workspaceStorage/../../../../.ssh/id_rsa", dir: ws)
+    expectEq(AgentDeletePolicy.evaluate(traversal, knownPaths: known, appRunning: false), .outsideKnownPaths, "path traversal rejected")
+
+    let forensic = makeEntry(scope: .workspace, file: "/Users/t/forensics/database.db", dir: "/Users/t/forensics")
+    expectEq(AgentDeletePolicy.evaluate(forensic, knownPaths: known, appRunning: false), .outsideKnownPaths, "copies outside known paths untouched")
+
+    let cache = makeEntry(scope: .vectorCache, file: "/Users/t/.cache/idx/k.db", dir: "/Users/t/.cache/idx")
+    expectEq(AgentDeletePolicy.evaluate(cache, knownPaths: known, appRunning: false), .allowed(target: "/Users/t/.cache/idx/k.db", isDirectory: false), "cache DB deletable")
+
+    let tmp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("pharos-orphans-\(UUID().uuidString)")
+    let wsRoot = tmp.appendingPathComponent("workspaceStorage")
+    let good = wsRoot.appendingPathComponent("good")
+    try? FileManager.default.createDirectory(at: good, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tmp) }
+    try? "x".write(to: good.appendingPathComponent("state.vscdb"), atomically: true, encoding: .utf8)
+    let tmpKnown = [AgentKnownPath(label: "w", fullPath: wsRoot.path, scope: .workspace, isDirectory: true)]
+    let orphans = [
+        makeEntry(scope: .workspace, file: good.appendingPathComponent("state.vscdb").path, dir: good.path, size: 5, orphaned: true),
+        makeEntry(scope: .workspace, file: "/elsewhere/state.vscdb", dir: "/elsewhere", size: 7, orphaned: true),
+    ]
+    let result = AgentDatabaseManager.cleanOrphanedEntries(orphans, knownPaths: { _ in tmpKnown })
+    expectEq(result.deletedIds.count, 1, "one orphan cleaned")
+    expectEq(result.skipped, 1, "orphan outside known paths skipped")
+    expectEq(result.bytesFreed, 5, "only cleaned bytes counted")
+}
+
+func testAgentChatCatalog() {
+    let c1 = AgentConversationSummary(id: "a", title: "Fix navbar", updatedAt: Date(timeIntervalSince1970: 300))
+    let c2 = AgentConversationSummary(id: "b", title: "Refactor store", createdAt: Date(timeIntervalSince1970: 500), snippet: "PharosCore")
+    let c3 = AgentConversationSummary(id: "c", title: "Undated")
+    let entries = [
+        makeEntry(id: "e1", editor: .cursor, scope: .workspace, file: "/a/1.db", dir: "/a", size: 100, mtime: Date(timeIntervalSince1970: 10), name: "Beta", convs: [c1, c3]),
+        makeEntry(id: "e2", editor: .cursor, scope: .global, file: "/a/2.db", dir: "/a", size: 50, mtime: Date(timeIntervalSince1970: 30), name: "alpha", convs: [c2]),
+        makeEntry(id: "e3", editor: .trae, scope: .vectorCache, file: "/b/3.db", dir: "/b", size: 300, mtime: Date(timeIntervalSince1970: 20), orphaned: true, name: "Gamma"),
+    ]
+
+    let sums = AgentChatCatalog.summarize(entries)
+    expectEq(sums.map(\.editor), [.trae, .cursor], "summaries sorted by size")
+    let cursor = sums.first { $0.editor == .cursor }
+    expectEq(cursor?.totalBytes, 150, "cursor total")
+    expectEq(cursor?.workspaceBytes, 100, "cursor workspace bytes")
+    expectEq(cursor?.globalBytes, 50, "cursor global bytes")
+    expectEq(cursor?.databaseCount, 2, "cursor db count")
+    expectEq(cursor?.conversationCount, 3, "cursor conversation count")
+    expectEq(cursor?.lastModified, Date(timeIntervalSince1970: 30), "cursor latest mtime")
+    expectEq(sums.first?.orphanedCount, 1, "trae orphan count")
+
+    expectEq(AgentChatCatalog.sorted(entries, by: .sizeDesc).map(\.id), ["e3", "e1", "e2"], "sort by size")
+    expectEq(AgentChatCatalog.sorted(entries, by: .mtimeDesc).map(\.id), ["e2", "e3", "e1"], "sort by mtime")
+    expectEq(AgentChatCatalog.sorted(entries, by: .nameAsc).map(\.id), ["e2", "e1", "e3"], "sort by name, case-insensitive")
+
+    expect(AgentChatCatalog.matches(entries[0], query: "  NAVBAR "), "matches conversation title, trimmed and case-insensitive")
+    expect(AgentChatCatalog.matches(entries[1], query: "pharoscore"), "matches conversation snippet")
+    expect(AgentChatCatalog.matches(entries[2], query: "/b/"), "matches file path")
+    expect(!AgentChatCatalog.matches(entries[2], query: "navbar"), "no false match")
+    expect(AgentChatCatalog.matches(entries[2], query: ""), "empty query matches all")
+
+    let refs = AgentChatCatalog.conversations(for: .cursor, in: entries)
+    expectEq(refs.map(\.conversation.id), ["b", "a", "c"], "merged conversations newest first, undated last")
+    expectEq(refs.first?.databaseName, "alpha", "conversation knows its database")
+    expectEq(refs.first?.scope, .global, "conversation knows its scope")
+    expectEq(AgentChatCatalog.conversations(for: .cursor, in: entries, query: "fix").map(\.conversation.id), ["a"], "conversation search")
+    expectEq(Set(refs.map(\.id)).count, refs.count, "conversation ref ids unique")
+
+    expect(!AgentChatCatalog.isTruncated(entries), "small DBs not truncated")
+    let many = (0..<100).map { AgentConversationSummary(id: "\($0)", title: "t") }
+    expect(AgentChatCatalog.isTruncated([makeEntry(scope: .global, file: "/x", dir: "/", convs: many)]), "DB at reader cap is truncated")
 }
 
 func testLiveAgentScanner() {
