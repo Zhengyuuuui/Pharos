@@ -118,11 +118,27 @@ func testBatteryPolicyModes() {
     expectEq(fullDone.action, .inhibitCharge, "full mode at 100 inhibits")
     expectEq(fullDone.sleepDirective, .allowSleep, "full mode at 100 allows sleep")
 
-    // .discharge mode (adapter bypass)
+    // .discharge mode (safe fallback: never cut adapter, inhibit on AC)
     let dis = BatteryPolicy.decide(mode: .discharge, currentPercent: 90, isACConnected: true, lastHeartbeat: now, now: now, state: &state)
-    expectEq(dis.action, .bypassAdapter, "discharge mode cuts adapter")
-    expectEq(dis.progress, .onBattery, "discharge mode progress is onBattery")
-    expectEq(state.isAdapterBypassed, true, "adapter marked bypassed")
+    expectEq(dis.action, .inhibitCharge, "discharge mode safely inhibits charge on AC")
+    expectEq(dis.progress, .holding(limit: 80), "discharge mode progress is holding at limit")
+    expectEq(state.isAdapterBypassed, false, "adapter is never cut off")
+
+    // .limit(80) when currentPercent is 100% (already above limit):
+    // immediately inhibits charge, allows sleep, never cuts adapter!
+    var stateAbove = BatteryPolicy.State()
+    let dAbove = BatteryPolicy.decide(
+        mode: .limit(maxPercent: 80),
+        currentPercent: 100,
+        isACConnected: true,
+        lastHeartbeat: now,
+        now: now,
+        state: &stateAbove
+    )
+    expectEq(dAbove.action, .inhibitCharge, "100% with limit 80 immediately inhibits charge")
+    expectEq(dAbove.progress, .holding(limit: 80), "progress holding at 80")
+    expectEq(stateAbove.isHolding, true, "holding state is true")
+    expectEq(stateAbove.isAdapterBypassed, false, "adapter is never cut off")
 
     // Thermal limit override
     let hot = BatteryPolicy.decide(

@@ -119,11 +119,7 @@ final class BatteryStore: ObservableObject {
     }
 
     func toggleDischarge() {
-        if case .discharge = mode {
-            resumeLimit()
-        } else {
-            apply(.discharge)
-        }
+        resumeLimit()
     }
 
     // MARK: - Heartbeat & State Sync

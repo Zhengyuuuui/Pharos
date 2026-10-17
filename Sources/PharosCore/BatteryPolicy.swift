@@ -155,13 +155,15 @@ public enum BatteryPolicy {
             }
 
         case .discharge:
-            state.isHolding = false
-            state.isAdapterBypassed = true
+            // Safe fallback: never cut the AC adapter to prevent screen flickering or battery damage.
+            // Safely inhibit charge at 80% with continuous direct adapter power.
+            state.isHolding = true
+            state.isAdapterBypassed = false
             return Decision(
-                action: .bypassAdapter,
+                action: .inhibitCharge,
                 sleepDirective: .allowSleep,
-                magSafeColor: syncMagSafe ? .off : .system,
-                progress: .onBattery
+                magSafeColor: syncMagSafe ? .green : .system,
+                progress: .holding(limit: 80)
             )
 
         case .limit(let rawLimit):

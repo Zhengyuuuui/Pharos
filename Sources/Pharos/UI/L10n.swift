@@ -388,10 +388,10 @@ final class L10n: ObservableObject {
 
     // MARK: - Thermals & Battery
 
-    var batteryAndThermalsTitle: String { en ? "Battery, Fans & Thermals" : "电池、风扇与温度" }
+    var batteryAndThermalsTitle: String { en ? "Power & Thermals" : "电源与散热" }
     var batteryAndThermalsDesc: String {
         en ? "Hardware power management, Tahoe-style charge limits (80%), fan speeds and sensor temperatures"
-           : "硬件电源管理、Tahoe 原生风格充电上限 (80%)、风扇转速与传感器温度"
+           : "硬件电源管理、Tahoe 原生风格充电上限 (80%)、风扇转速与芯片温度"
     }
     var thermalTitle: String { en ? "Fans & Temperature" : "风扇与温度" }
     var fansTitle: String { en ? "Fans" : "风扇" }
@@ -979,8 +979,19 @@ final class L10n: ObservableObject {
     func batteryHoldingAtLimit(_ limit: Int) -> String {
         en ? "Charging On Hold (\(limit)%)" : "暂停充电（\(limit)%）"
     }
+    func batteryHoldingAboveLimit(_ current: Int, limit: Int) -> String {
+        en ? "Charging On Hold (\(limit)% Limit · Current \(current)%)" : "暂停充电（设定 \(limit)% · 当前 \(current)%）"
+    }
     var batteryHoldingSubtitle: String {
         en ? "Power Adapter connected · Battery is not charging" : "已连接电源适配器 · 电池未在充电"
+    }
+    var batteryAboveLimitNote: String {
+        en ? "Battery level is above target limit. Hardware charging is inhibited and Mac runs on adapter power. Battery will cap at limit once naturally drained."
+           : "当前电量高于设定上限，硬件限充已生效，电脑由外接电源供电。电量自然回落至上限后将自动保持，无需切断电源强行放电以保护电池电芯。"
+    }
+    var batterySafeLimitTip: String {
+        en ? "Safe by Design: Pharos uses Apple's native approach, inhibiting charging via hardware SMC registers while keeping the Mac on continuous adapter power (0 mA cell current). It never forcibly cuts adapter power, preventing screen flickering and preserving battery health."
+           : "安全设计：Pharos 采用与 Apple 官方 Tahoe 相同的原生硬件逻辑，仅切断电芯充电回路（直通外接电源供电，零电池损耗），绝不切断外接电源去强行放电，彻底避免屏幕闪烁与电池循环损伤。"
     }
     func batteryChargingTo(_ target: Int) -> String {
         en ? "Charging to \(target)%" : "正在充电至 \(target)%"
@@ -993,8 +1004,8 @@ final class L10n: ObservableObject {
     var batteryForceDischargeActive: String { en ? "Discharging on Battery" : "纯电池放电中" }
     var batterySyncMagSafe: String { en ? "Sync MagSafe LED" : "同步 MagSafe 指示灯" }
     var batterySyncMagSafeDesc: String {
-        en ? "MagSafe LED turns green when holding at limit or fully charged, orange while charging, and off in discharge mode."
-           : "达到限充或充满电时指示灯呈绿色，充电时呈橙色，纯电池放电时熄灭。"
+        en ? "MagSafe LED turns green when holding at limit or fully charged, and orange while charging."
+           : "达到限充或充满电时指示灯呈绿色，正在充电时呈橙色。"
     }
     var batteryHealth: String { en ? "Battery Health" : "电池健康度" }
     var batteryCycleCount: String { en ? "Cycle Count" : "循环次数" }

@@ -100,9 +100,15 @@ struct BatteryControlView: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
                     if isHolding {
-                        Label(l10n.batteryHoldingAtLimit(battery.targetLimit), systemImage: "powerplug.fill")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.teal)
+                        if r.currentPercent > battery.targetLimit {
+                            Label(l10n.batteryHoldingAboveLimit(r.currentPercent, limit: battery.targetLimit), systemImage: "powerplug.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.teal)
+                        } else {
+                            Label(l10n.batteryHoldingAtLimit(battery.targetLimit), systemImage: "powerplug.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.teal)
+                        }
                     } else if r.isCharging {
                         Label(l10n.batteryChargingTo(battery.targetLimit), systemImage: "bolt.fill")
                             .font(.system(size: 16, weight: .semibold))
@@ -111,10 +117,6 @@ struct BatteryControlView: View {
                         Label(l10n.batteryFullyCharged, systemImage: "checkmark.circle.fill")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(.green)
-                    } else if battery.isAdapterBypassed {
-                        Label(l10n.batteryForceDischargeActive, systemImage: "arrow.down.forward")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.orange)
                     } else {
                         Label(l10n.batteryDischarging, systemImage: "battery.75")
                             .font(.system(size: 16, weight: .semibold))
@@ -134,9 +136,12 @@ struct BatteryControlView: View {
                     }
                 }
 
-                Text(isHolding ? l10n.batteryHoldingSubtitle : (r.adapterName ?? l10n.batteryAdapter))
+                Text(isHolding
+                     ? (r.currentPercent > battery.targetLimit ? l10n.batteryAboveLimitNote : l10n.batteryHoldingSubtitle)
+                     : (r.adapterName ?? l10n.batteryAdapter))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 HStack(spacing: 16) {
                     if let watts = r.adapterWatts, watts > 0 {
@@ -222,21 +227,23 @@ struct BatteryControlView: View {
                 .controlSize(.small)
                 .disabled(battery.helper != .ready || battery.busy || (battery.mode == .limit(maxPercent: battery.targetLimit) && battery.isHolding))
 
-                if battery.capabilities.supportsAdapterBypass {
-                    Button {
-                        battery.toggleDischarge()
-                    } label: {
-                        Label(
-                            battery.isAdapterBypassed ? l10n.batteryResumeLimit : l10n.batteryForceDischarge,
-                            systemImage: battery.isAdapterBypassed ? "powerplug" : "arrow.down.to.line"
-                        )
-                    }
-                    .controlSize(.small)
-                    .disabled(battery.helper != .ready || battery.busy)
-                }
-
                 Spacer()
             }
+
+            // Safe design explanation
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "checkmark.shield.fill")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.green)
+                    .padding(.top, 1)
+                Text(l10n.batterySafeLimitTip)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(10)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color.green.opacity(0.06)))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.green.opacity(0.12)))
 
             // MagSafe LED toggle
             if battery.capabilities.hasACLC {

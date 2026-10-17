@@ -151,12 +151,17 @@ final class BatteryDaemon: @unchecked Sendable {
             }
 
         case .bypassAdapter:
-            if hasCHIE {
-                smc.write("CHIE", [0x08])
-            } else if hasCH0J {
-                smc.write("CH0J", [0x20])
+            // Safe fallback: never cut the AC adapter. Inhibit charging with continuous adapter power.
+            if hasCHTE {
+                smc.write("CHTE", [1, 0, 0, 0])
+            } else if hasCH0C {
+                smc.write("CH0C", [1])
             }
-            if hasACLC { smc.write("ACLC", [BatteryPolicy.MagSafeColor.off.rawValue]) }
+            if hasCHIE { smc.write("CHIE", [0]) }
+            if hasCH0J { smc.write("CH0J", [0]) }
+            if syncMagSafe && hasACLC {
+                smc.write("ACLC", [BatteryPolicy.MagSafeColor.green.rawValue])
+            }
         }
 
         // Apply sleep directive
