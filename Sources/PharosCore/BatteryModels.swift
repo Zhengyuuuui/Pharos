@@ -140,6 +140,9 @@ public struct BatteryReading: Equatable, Sendable, Codable {
         self.healthPercent = healthPercent
         self.optimizedChargingEngaged = optimizedChargingEngaged
     }
+
+    /// Whether an internal battery is installed on this Mac (e.g. MacBook Pro / Air).
+    public var hasBattery: Bool { designCapacity > 0 || maxCapacity > 0 }
 }
 
 /// User's requested charging mode.

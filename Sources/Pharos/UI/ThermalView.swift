@@ -43,7 +43,8 @@ struct PopoverThermalSection: View {
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(ThermalStyle.stateColor(store.thermalState))
                     Button {
-                        AppDelegate.shared?.showMainWindow(selecting: .thermals)
+                        WindowRouter.shared.batteryThermalTab = .thermals
+                        AppDelegate.shared?.showMainWindow(selecting: .batteryAndThermals)
                     } label: {
                         Text(l10n.manage).font(.system(size: 10))
                     }
@@ -78,6 +79,7 @@ struct PopoverThermalSection: View {
 
 /// Main window page: fans, temperatures, and fan control (when installed).
 struct ThermalView: View {
+    var showsTitle: Bool = true
     @EnvironmentObject var store: ProjectStore
     @ObservedObject private var l10n = L10n.shared
 
@@ -85,7 +87,13 @@ struct ThermalView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(l10n.thermalTitle).font(.system(size: 20, weight: .bold))
+                    if showsTitle {
+                        Text(l10n.thermalTitle).font(.system(size: 20, weight: .bold))
+                    } else {
+                        Text(l10n.blockDescription(.thermals))
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
                     Spacer()
                     Label(l10n.thermalStateName(store.thermalState), systemImage: "thermometer.medium")
                         .font(.system(size: 11, weight: .medium))

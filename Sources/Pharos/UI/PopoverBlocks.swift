@@ -271,7 +271,8 @@ private struct PopoverBatteryBlock: View {
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button {
-                    AppDelegate.shared?.showMainWindow(selecting: .battery)
+                    WindowRouter.shared.batteryThermalTab = .battery
+                    AppDelegate.shared?.showMainWindow(selecting: .batteryAndThermals)
                 } label: {
                     Text(l10n.manage).font(.system(size: 10))
                 }

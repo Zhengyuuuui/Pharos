@@ -81,6 +81,7 @@ final class WindowRouter: ObservableObject {
     static let shared = WindowRouter()
     @Published var request: MainWindowView.SidebarItem?
     @Published var cleanupTargetGroup: DiskCleaner.Group? = nil
+    @Published var batteryThermalTab: BatteryAndThermalTab? = nil
 }
 
 

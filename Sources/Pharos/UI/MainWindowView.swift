@@ -20,8 +20,7 @@ struct MainWindowView: View {
     enum SidebarItem: Hashable {
         case systemMemory
         case diskUsage
-        case thermals
-        case battery
+        case batteryAndThermals
         case portsOverview
         case diskCleanup
         case chrome
@@ -64,36 +63,8 @@ struct MainWindowView: View {
                         }
                     }
                     .tag(SidebarItem.diskUsage)
-                    if store.thermals != nil {
-                        HStack {
-                            Label(l10n.thermalTitle, systemImage: "fanblades")
-                            Spacer()
-                            if let c = store.thermals?.peakChipTemperature {
-                                Text(ThermalStyle.temp(c))
-                                    .font(.system(size: 10).monospacedDigit())
-                                    .foregroundStyle(c >= 85 ? ThermalStyle.color(c) : .secondary)
-                            }
-                        }
-                        .tag(SidebarItem.thermals)
-                    }
-                    HStack {
-                        Label(l10n.batteryTitle, systemImage: "battery.100.bolt")
-                        Spacer()
-                        let r = BatteryStore.shared.reading
-                        if BatteryStore.shared.isHolding {
-                            Image(systemName: "powerplug.fill")
-                                .font(.system(size: 9))
-                                .foregroundStyle(.teal)
-                        } else if r.isCharging {
-                            Image(systemName: "bolt.fill")
-                                .font(.system(size: 9))
-                                .foregroundStyle(.green)
-                        }
-                        Text("\(r.currentPercent)%")
-                            .font(.system(size: 10).monospacedDigit())
-                            .foregroundStyle(.secondary)
-                    }
-                    .tag(SidebarItem.battery)
+                    BatteryAndThermalSidebarRow()
+                        .tag(SidebarItem.batteryAndThermals)
                     HStack {
                         Label(l10n.portsOverview, systemImage: "point.3.connected.trianglepath.dotted")
                         Spacer()
@@ -224,10 +195,8 @@ struct MainWindowView: View {
                 SystemMemoryView()
             case .diskUsage:
                 DiskUsageView()
-            case .thermals:
-                ThermalView()
-            case .battery:
-                BatteryControlView()
+            case .batteryAndThermals:
+                BatteryAndThermalView()
             case .portsOverview:
                 PortsOverviewView(onSelect: { selection = .project($0.id) },
                                   onSelectFavorite: { selection = .favorite($0.id) })
@@ -443,3 +412,43 @@ struct MainSettingsView: View {
         }
     }
 }
+
+private struct BatteryAndThermalSidebarRow: View {
+    @ObservedObject private var battery = BatteryStore.shared
+    @EnvironmentObject var store: ProjectStore
+    @ObservedObject private var l10n = L10n.shared
+
+    var body: some View {
+        let r = battery.reading
+        let thermals = store.thermals
+        HStack {
+            Label(r.hasBattery ? l10n.batteryAndThermalsTitle : l10n.thermalTitle,
+                  systemImage: r.hasBattery ? "battery.100.bolt" : "fanblades")
+            Spacer()
+            if r.hasBattery {
+                if battery.isHolding {
+                    Image(systemName: "powerplug.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.teal)
+                } else if r.isCharging {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.green)
+                }
+                Text("\(r.currentPercent)%")
+                    .font(.system(size: 10).monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+            if let c = thermals?.peakChipTemperature {
+                if r.hasBattery {
+                    Text("·")
+                        .foregroundStyle(.tertiary)
+                }
+                Text(ThermalStyle.temp(c))
+                    .font(.system(size: 10).monospacedDigit())
+                    .foregroundStyle(c >= 85 ? ThermalStyle.color(c) : .secondary)
+            }
+        }
+    }
+}
+

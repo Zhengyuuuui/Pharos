@@ -386,8 +386,13 @@ final class L10n: ObservableObject {
            : "支持 Chrome、Chrome Beta / Canary、Chromium、Edge 和 Brave。实例按配置文件夹区分（每个文件夹只能开一个浏览器）。启动即执行 `open -na \"<浏览器>\" --args …`；退出发送 SIGTERM（浏览器正常关闭，下次可恢复标签页），仍未退出才提供强制结束。Pharos 不会连接调试端口。"
     }
 
-    // MARK: - Thermals / fans
+    // MARK: - Thermals & Battery
 
+    var batteryAndThermalsTitle: String { en ? "Battery, Fans & Thermals" : "电池、风扇与温度" }
+    var batteryAndThermalsDesc: String {
+        en ? "Hardware power management, Tahoe-style charge limits (80%), fan speeds and sensor temperatures"
+           : "硬件电源管理、Tahoe 原生风格充电上限 (80%)、风扇转速与传感器温度"
+    }
     var thermalTitle: String { en ? "Fans & Temperature" : "风扇与温度" }
     var fansTitle: String { en ? "Fans" : "风扇" }
     var temperaturesTitle: String { en ? "Temperatures" : "温度" }

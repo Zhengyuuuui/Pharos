@@ -4,6 +4,7 @@ import PharosCore
 /// Dedicated page for Battery & Charging Control, providing Tahoe-style charge limits (e.g. 80%)
 /// and replicating the native macOS 15 "Plug" (Not Charging) state.
 struct BatteryControlView: View {
+    var showsTitle: Bool = true
     @ObservedObject private var battery = BatteryStore.shared
     @ObservedObject private var l10n = L10n.shared
     @State private var armedUninstall = false
@@ -29,9 +30,15 @@ struct BatteryControlView: View {
 
     private var headerView: some View {
         HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(l10n.batteryTitle)
-                    .font(.system(size: 20, weight: .bold))
+            if showsTitle {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(l10n.batteryTitle)
+                        .font(.system(size: 20, weight: .bold))
+                    Text(l10n.batteryChargeLimitDesc)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            } else {
                 Text(l10n.batteryChargeLimitDesc)
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
