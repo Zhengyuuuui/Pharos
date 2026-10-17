@@ -51,6 +51,9 @@ struct AgentChatView: View {
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .onAppear {
+            store.scanIfNeeded()
+        }
     }
 
     // MARK: - Header
@@ -1169,6 +1172,38 @@ final class AgentEditorIconProvider {
 
     private init() {}
 
+    private static func downsample(_ source: NSImage, targetSize: NSSize = NSSize(width: 20, height: 20)) -> NSImage {
+        let pixelWidth = 40
+        let pixelHeight = 40
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else { return source }
+        guard let context = CGContext(
+            data: nil,
+            width: pixelWidth,
+            height: pixelHeight,
+            bitsPerComponent: 8,
+            bytesPerRow: pixelWidth * 4,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return source
+        }
+
+        var proposedRect = NSRect(origin: .zero, size: targetSize)
+        guard let cgImage = source.cgImage(forProposedRect: &proposedRect, context: nil, hints: nil) else {
+            return source
+        }
+
+        context.interpolationQuality = .high
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: pixelWidth, height: pixelHeight))
+
+        guard let downscaledCG = context.makeImage() else { return source }
+        let rep = NSBitmapImageRep(cgImage: downscaledCG)
+        rep.size = targetSize
+        let downsampled = NSImage(size: targetSize)
+        downsampled.addRepresentation(rep)
+        return downsampled
+    }
+
     func icon(for editor: AgentEditorKind) -> NSImage? {
         if let img = cache[editor] {
             return img
@@ -1180,7 +1215,7 @@ final class AgentEditorIconProvider {
 
         // 1. Direct path lookup from installedAppPath
         if let path = editor.installedAppPath {
-            let img = NSWorkspace.shared.icon(forFile: path)
+            let img = Self.downsample(NSWorkspace.shared.icon(forFile: path))
             cache[editor] = img
             return img
         }
@@ -1188,7 +1223,7 @@ final class AgentEditorIconProvider {
         // 2. LaunchServices bundle identifier query
         for bid in editor.bundleIdentifiers {
             if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bid) {
-                let img = NSWorkspace.shared.icon(forFile: url.path)
+                let img = Self.downsample(NSWorkspace.shared.icon(forFile: url.path))
                 cache[editor] = img
                 return img
             }
@@ -1197,9 +1232,9 @@ final class AgentEditorIconProvider {
         // 3. Fallback for uninstalled app: macOS system package icon
         let pkgIcon: NSImage
         if #available(macOS 12.0, *) {
-            pkgIcon = NSWorkspace.shared.icon(for: UTType.package)
+            pkgIcon = Self.downsample(NSWorkspace.shared.icon(for: UTType.package))
         } else {
-            pkgIcon = NSWorkspace.shared.icon(forFileType: "pkg")
+            pkgIcon = Self.downsample(NSWorkspace.shared.icon(forFileType: "pkg"))
         }
         cache[editor] = pkgIcon
         return pkgIcon

@@ -69,6 +69,9 @@ final class PackageStore: ObservableObject {
         globalCliTools.filter { $0.ecosystem == eco }.count
     }
 
+    private var hasScanned = false
+    private var isHeavyCacheReleased = false
+
     private init() {
         if let saved = UserDefaults.standard.string(forKey: Self.depsModeKey),
            let mode = PackageDepsDisplayMode(rawValue: saved) {
@@ -76,28 +79,38 @@ final class PackageStore: ObservableObject {
         } else {
             self.projectDepsDisplayMode = .bundleOnly
         }
-        scanAll()
+        // Lazy initialization: do not scan in init(). Scanned on-demand when PackageView appears.
+    }
+
+    func scanIfNeeded() {
+        if !hasScanned || isHeavyCacheReleased {
+            isHeavyCacheReleased = false
+            scanAll()
+        }
     }
 
     // MARK: - Scanning
     func scanAll() {
         guard !isScanning else { return }
         isScanning = true
+        hasScanned = true
 
         Task.detached(priority: .userInitiated) { [weak self] in
-            let clis = PackageScanner.scanGlobalCliTools()
-            let caches = PackageScanner.scanCacheRepositories()
+            let (clis, caches, finalSummaries) = autoreleasepool {
+                let clis = PackageScanner.scanGlobalCliTools()
+                let caches = PackageScanner.scanCacheRepositories()
 
-            // 探索已知活跃项目与 ~/Documents
-            let docRoots = PackageScanner.discoverProjectPaths(maxDepth: 3)
-            var summaries: [ProjectDependencySummary] = []
-            for path in docRoots {
-                if let summary = PackageScanner.scanProjectDependencies(projectPath: path) {
-                    summaries.append(summary)
+                // 探索已知活跃项目与 ~/Documents
+                let docRoots = PackageScanner.discoverProjectPaths(maxDepth: 3)
+                var summaries: [ProjectDependencySummary] = []
+                for path in docRoots {
+                    if let summary = PackageScanner.scanProjectDependencies(projectPath: path) {
+                        summaries.append(summary)
+                    }
                 }
+                return (clis, caches, summaries)
             }
 
-            let finalSummaries = summaries
             await MainActor.run { [weak self] in
                 guard let self else { return }
                 self.globalCliTools = clis
@@ -112,6 +125,28 @@ final class PackageStore: ObservableObject {
                 self.recomputeFilteredProject()
             }
         }
+    }
+
+    /// Releases heavy dependency package lists while keeping project summary metadata
+    /// (name, rootPath, counts, sizes) to prevent UI flicker when reopened.
+    func releaseHeavyCache() {
+        guard !detectedProjects.isEmpty else { return }
+        isHeavyCacheReleased = true
+        detectedProjects = detectedProjects.map { p in
+            guard !p.packages.isEmpty else { return p }
+            return ProjectDependencySummary(
+                id: p.id,
+                name: p.name,
+                rootPath: p.rootPath,
+                ecosystem: p.ecosystem,
+                dependenciesSizeBytes: p.dependenciesSizeBytes,
+                directDependenciesCount: p.directDependenciesCount,
+                missingDependenciesCount: p.missingDependenciesCount,
+                packages: [], // Free detailed package items
+                cacheDirectoryName: p.cacheDirectoryName
+            )
+        }
+        recomputeFilteredProject()
     }
 
     func scanProject(at path: String) {

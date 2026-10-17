@@ -38,8 +38,11 @@ final class AgentChatStore: ObservableObject {
         var id: String { rawValue }
     }
 
+    private var hasScanned = false
+    private var isHeavyCacheReleased = false
+
     private init() {
-        scan()
+        // Lazy initialization: do not scan in init(). Scanned on-demand when AgentChatView appears.
     }
 
     var totalDatabases: Int { entries.count }
@@ -156,11 +159,21 @@ final class AgentChatStore: ObservableObject {
         return filteredEntries.first
     }
 
+    func scanIfNeeded() {
+        if !hasScanned || isHeavyCacheReleased {
+            isHeavyCacheReleased = false
+            scan()
+        }
+    }
+
     func scan() {
         guard !isScanning else { return }
         isScanning = true
+        hasScanned = true
         Task.detached(priority: .userInitiated) { [weak self] in
-            let results = AgentScanner.scan()
+            let results = autoreleasepool {
+                AgentScanner.scan()
+            }
             await MainActor.run { [weak self] in
                 guard let self else { return }
                 self.entries = results
@@ -169,6 +182,31 @@ final class AgentChatStore: ObservableObject {
                     self.selectedEntryId = results.first?.id
                 }
             }
+        }
+    }
+
+    /// Releases heavy conversation arrays and text excerpts while retaining
+    /// database summaries (name, path, size, counts) to prevent UI flicker when reopened.
+    func releaseHeavyCache() {
+        guard !entries.isEmpty else { return }
+        isHeavyCacheReleased = true
+        entries = entries.map { e in
+            guard !e.conversations.isEmpty else { return e }
+            return AgentDatabaseEntry(
+                id: e.id,
+                editor: e.editor,
+                scope: e.scope,
+                filePath: e.filePath,
+                fileName: e.fileName,
+                storageDirectory: e.storageDirectory,
+                fileSizeBytes: e.fileSizeBytes,
+                lastModified: e.lastModified,
+                workspacePath: e.workspacePath,
+                workspaceName: e.workspaceName,
+                isOrphaned: e.isOrphaned,
+                conversationCount: e.conversationCount,
+                conversations: []
+            )
         }
     }
 

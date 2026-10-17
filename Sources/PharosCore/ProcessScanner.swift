@@ -11,24 +11,26 @@ public enum ProcessScanner {
         let uid = getuid()
         var result: [ProcessSnapshot] = []
         for pid in allPIDs() where pid > 0 {
-            guard let info = bsdInfo(pid), info.pbi_uid == uid else { continue }
-            let ports = listeningPorts(pid)
-            let listening = !ports.isEmpty
-            // Needed for every process: per-app memory rolls up by .app bundle.
-            let path = executablePath(pid)
-            // Chrome browser processes need their flags (profile dir, debug
-            // port) even when not listening; helpers are skipped by name.
-            let isChrome = ChromeInstances.isChromeExecutable(path: path, argv0: nil)
-            result.append(ProcessSnapshot(
-                pid: pid,
-                ppid: Int32(info.pbi_ppid),
-                name: name(of: info),
-                executablePath: path,
-                cwd: listening ? currentDirectory(pid) : nil,
-                arguments: listening || isChrome ? arguments(pid) : [],
-                memoryBytes: footprint(pid),
-                ports: ports
-            ))
+            autoreleasepool {
+                guard let info = bsdInfo(pid), info.pbi_uid == uid else { return }
+                let ports = listeningPorts(pid)
+                let listening = !ports.isEmpty
+                // Needed for every process: per-app memory rolls up by .app bundle.
+                let path = executablePath(pid)
+                // Chrome browser processes need their flags (profile dir, debug
+                // port) even when not listening; helpers are skipped by name.
+                let isChrome = ChromeInstances.isChromeExecutable(path: path, argv0: nil)
+                result.append(ProcessSnapshot(
+                    pid: pid,
+                    ppid: Int32(info.pbi_ppid),
+                    name: name(of: info),
+                    executablePath: path,
+                    cwd: listening ? currentDirectory(pid) : nil,
+                    arguments: listening || isChrome ? arguments(pid) : [],
+                    memoryBytes: footprint(pid),
+                    ports: ports
+                ))
+            }
         }
         return result
     }
@@ -73,12 +75,12 @@ public enum ProcessScanner {
     }
 
     static func executablePath(_ pid: Int32) -> String? {
-        var buf = [UInt8](repeating: 0, count: 4 * Int(MAXPATHLEN))
-        let n = buf.withUnsafeMutableBytes {
-            proc_pidpath(pid, $0.baseAddress, UInt32($0.count))
+        withUnsafeTemporaryAllocation(of: CChar.self, capacity: 4 * Int(MAXPATHLEN)) { buffer in
+            guard let baseAddress = buffer.baseAddress else { return nil }
+            let ret = proc_pidpath(pid, baseAddress, UInt32(buffer.count))
+            guard ret > 0 else { return nil }
+            return String(cString: baseAddress)
         }
-        guard n > 0 else { return nil }
-        return String(decoding: buf.prefix(Int(n)), as: UTF8.self)
     }
 
     static func currentDirectory(_ pid: Int32) -> String? {
@@ -138,12 +140,13 @@ public enum ProcessScanner {
         var mib: [Int32] = [CTL_KERN, KERN_PROCARGS2, pid]
         var size = 0
         guard sysctl(&mib, 3, nil, &size, nil, 0) == 0, size > 4 else { return [] }
-        var buf = [UInt8](repeating: 0, count: size)
-        let ok = buf.withUnsafeMutableBytes {
-            sysctl(&mib, 3, $0.baseAddress, &size, nil, 0) == 0
+        return withUnsafeTemporaryAllocation(of: UInt8.self, capacity: size) { buf in
+            guard let baseAddress = buf.baseAddress else { return [] }
+            var actualSize = size
+            let ok = sysctl(&mib, 3, baseAddress, &actualSize, nil, 0) == 0
+            guard ok else { return [] }
+            return parseProcArgs(Array(buf.prefix(actualSize)))
         }
-        guard ok else { return [] }
-        return parseProcArgs(Array(buf.prefix(size)))
     }
 
     public static func parseProcArgs(_ buf: [UInt8]) -> [String] {

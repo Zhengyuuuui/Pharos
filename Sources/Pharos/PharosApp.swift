@@ -68,6 +68,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NSApp.setActivationPolicy(.accessory)
         guard let closing = notification.object as? NSWindow, closing === window else { return }
         closing.delegate = nil
+        AgentChatStore.shared.releaseHeavyCache()
+        PackageStore.shared.releaseHeavyCache()
         DispatchQueue.main.async { [weak self] in
             closing.contentViewController = nil
             self?.window = nil
@@ -134,9 +136,22 @@ struct PharosApp: App {
     }
 }
 
-/// Dynamic gauge icon in the menu bar, reflecting active resource usage and pressure.
 private enum DynamicMenuBarIcon {
+    private struct CacheKey: Hashable {
+        let percent: Int
+        let pressure: MemoryPressure
+    }
+
+    @MainActor private static var cache: [CacheKey: NSImage] = [:]
+
+    @MainActor
     static func image(fraction: Double, pressure: MemoryPressure) -> NSImage {
+        let percent = min(100, max(0, Int((fraction * 100).rounded())))
+        let key = CacheKey(percent: percent, pressure: pressure)
+        if let cached = cache[key] {
+            return cached
+        }
+
         let size = NSSize(width: 18, height: 18)
         let image = NSImage(size: size, flipped: false) { rect in
             guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
@@ -152,9 +167,9 @@ private enum DynamicMenuBarIcon {
             ctx.strokePath()
 
             // Active progress arc (white area representing the percentage)
-            if fraction > 0 {
+            if percent > 0 {
                 let startAngle: CGFloat = .pi / 2
-                let clamped = min(1.0, max(0.02, CGFloat(fraction)))
+                let clamped = min(1.0, max(0.02, CGFloat(percent) / 100.0))
                 let endAngle: CGFloat = startAngle - (clamped * 2 * .pi)
 
                 let ringColor: NSColor
@@ -164,8 +179,8 @@ private enum DynamicMenuBarIcon {
                 case .warning:
                     ringColor = .systemOrange
                 case .normal:
-                    if fraction >= 0.95 { ringColor = .systemRed }
-                    else if fraction >= 0.85 { ringColor = .systemOrange }
+                    if percent >= 95 { ringColor = .systemRed }
+                    else if percent >= 85 { ringColor = .systemOrange }
                     else { ringColor = .labelColor }
                 }
 
@@ -191,6 +206,7 @@ private enum DynamicMenuBarIcon {
             return true
         }
         image.isTemplate = false
+        cache[key] = image
         return image
     }
 }

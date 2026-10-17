@@ -46,6 +46,9 @@ struct PackageView: View {
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .onAppear {
+            store.scanIfNeeded()
+        }
         .onChange(of: store.selectedEcosystem) { _, _ in
             displayLimit = 60
         }

@@ -88,7 +88,7 @@ private struct MemoryBlock: View {
                         .font(.system(size: 10).monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
-                if store.history.samples.count >= 2 {
+                if store.hasViewers, store.history.samples.count >= 2 {
                     SystemTrendChart(samples: store.history.samples, total: s.total, compact: true)
                         .frame(height: 70)
                 }
@@ -111,7 +111,7 @@ private struct DevProjectsBlock: View {
                 Text("\(store.totalPorts) \(l10n.ports) · \(ByteFormat.short(store.totalMemory))")
                     .font(.system(size: 11, weight: .medium).monospacedDigit())
             }
-            if store.history.samples.count >= 2 && !store.projects.isEmpty {
+            if store.hasViewers, store.history.samples.count >= 2 && !store.projects.isEmpty {
                 DevTrendChart(history: store.history, limit: 5, compact: true)
                     .frame(height: 80)
             }

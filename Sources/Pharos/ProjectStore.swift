@@ -33,9 +33,11 @@ final class ProjectStore: ObservableObject {
     var volumes: [DiskVolume] { state.volumes }
     var thermals: ThermalSnapshot? { state.thermals }
     var thermalState: ProcessInfo.ThermalState { state.thermalState }
-    var history: MemoryHistory { state.history }
+    private var internalHistory = MemoryHistory(window: 3600, minInterval: 10)
+    var history: MemoryHistory { internalHistory }
     var lastScan: Date? { state.lastScan }
     var isScanning: Bool { activity.isScanning }
+    var hasViewers: Bool { viewers > 0 }
     /// Projects that survived SIGTERM; UI offers a force kill for these.
     @Published private(set) var stubborn: Set<String> = []
 
@@ -124,29 +126,45 @@ final class ProjectStore: ObservableObject {
         Task { await refreshThermals() }
         let include = showSystem
         let (projects, chrome, ports, apps, system) = await Task.detached(priority: .utility) {
-            let all = ProcessScanner.scan()
-            let chrome = ChromeInstances.find(in: all)
-            // Chrome instances get their own page; keep debug-port browsers out
-            // of the project list even when "show background apps" is on.
-            let chromePIDs = Set(chrome.flatMap(\.allPIDs))
-            return (ProjectGrouper.group(all.filter { !chromePIDs.contains($0.pid) }, includeSystem: include),
-                    chrome,
-                    Set(all.flatMap { $0.ports.map(\.port) }),
-                    AppGrouper.group(all),
-                    SystemMemory.read())
+            autoreleasepool {
+                let all = ProcessScanner.scan()
+                let chrome = ChromeInstances.find(in: all)
+                // Chrome instances get their own page; keep debug-port browsers out
+                // of the project list even when "show background apps" is on.
+                let chromePIDs = Set(chrome.flatMap(\.allPIDs))
+                return (ProjectGrouper.group(all.filter { !chromePIDs.contains($0.pid) }, includeSystem: include),
+                        chrome,
+                        Set(all.flatMap { $0.ports.map(\.port) }),
+                        AppGrouper.group(all),
+                        SystemMemory.read())
+            }
         }.value
         let now = Date()
+        internalHistory.append(MemorySample(
+            date: now,
+            systemUsed: system?.used ?? 0,
+            projects: projects.map { ProjectSample(id: $0.id, name: $0.name, bytes: $0.memoryBytes) }
+        ))
+
+        let oldFraction = state.system?.usedFraction ?? 0
+        let newFraction = system?.usedFraction ?? oldFraction
+        let fractionDiff = abs(newFraction - oldFraction)
+        let memoryUnchanged = fractionDiff < 0.01
+
+        let projectsUnchanged = (projects == state.projects)
+        let portsUnchanged = (ports == state.listeningPorts)
+
+        if viewers == 0 && projectsUnchanged && portsUnchanged && memoryUnchanged {
+            return
+        }
+
         var next = state
         next.projects = projects
         next.chrome = chrome
         next.listeningPorts = ports
         next.apps = apps
         if let system { next.system = system }
-        next.history.append(MemorySample(
-            date: now,
-            systemUsed: system?.used ?? 0,
-            projects: projects.map { ProjectSample(id: $0.id, name: $0.name, bytes: $0.memoryBytes) }
-        ))
+        next.history = internalHistory
         next.lastScan = now
         state = next
         let alive = stubborn.intersection(projects.map(\.id))
