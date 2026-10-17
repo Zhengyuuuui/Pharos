@@ -1016,6 +1016,7 @@ final class L10n: ObservableObject {
     var batteryAdapter: String { en ? "Power Adapter" : "电源适配器" }
     var batteryInstallHelper: String { en ? "Install Battery Control" : "安装电池控制" }
     var batteryUninstallHelper: String { en ? "Uninstall Battery Control" : "卸载电池控制" }
+    var reinstallHelper: String { en ? "Update Helper" : "更新特权组件" }
     var batteryHelperInstalled: String { en ? "Battery Control Active" : "硬件控制运行中" }
     var batteryHelperDesc: String {
         en ? "Pharos uses a lightweight background service (local.pharos.battd) to safely manage Apple Silicon SMC registers."

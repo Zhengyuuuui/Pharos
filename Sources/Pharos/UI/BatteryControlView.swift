@@ -372,11 +372,19 @@ struct BatteryControlView: View {
                             .controlSize(.small)
                         }
                     } else {
-                        Button(l10n.batteryUninstallHelper) {
-                            armedUninstall = true
+                        HStack(spacing: 8) {
+                            Button(l10n.batteryUninstallHelper) {
+                                armedUninstall = true
+                            }
+                            .controlSize(.small)
+                            .disabled(battery.busy)
+
+                            Button(l10n.reinstallHelper) {
+                                battery.install()
+                            }
+                            .controlSize(.small)
+                            .disabled(battery.busy)
                         }
-                        .controlSize(.small)
-                        .disabled(battery.busy)
                     }
                 }
                 Spacer()
