@@ -20,8 +20,6 @@ public enum BatteryPolicy {
         case inhibitCharge
         /// Allow charging cells towards target.
         case allowCharge
-        /// Force running on battery power (adapter bypass).
-        case bypassAdapter
     }
 
     /// Sleep policy recommendation based on current charging state.
@@ -32,10 +30,11 @@ public enum BatteryPolicy {
         case preventSleep
     }
 
-    /// MagSafe LED colors supported on Apple Silicon SMC (`ACLC` key).
-    public enum MagSafeColor: UInt8, Sendable, Codable {
+    /// MagSafe LED colors Pharos may write to `ACLC`.
+    /// 0x01 (LED off) is deliberately absent: macOS 15 keeps the LED amber while
+    /// "Not Charging", and a dark connector reads as a lost adapter.
+    public enum MagSafeColor: UInt8, Sendable, Codable, CaseIterable {
         case system = 0x00
-        case off = 0x01
         case green = 0x03
         case orange = 0x04
         case orangeSlowBlink = 0x06
@@ -162,7 +161,7 @@ public enum BatteryPolicy {
             return Decision(
                 action: .inhibitCharge,
                 sleepDirective: .allowSleep,
-                magSafeColor: syncMagSafe ? .green : .system,
+                magSafeColor: syncMagSafe ? .orange : .system,
                 progress: .holding(limit: 80)
             )
 
@@ -181,10 +180,11 @@ public enum BatteryPolicy {
             // If currentPercent is between lowerThreshold and limit, maintain state.isHolding.
 
             if state.isHolding {
+                // Matches macOS 15's own "Not Charging" plug state: amber LED, adapter stays on.
                 return Decision(
                     action: .inhibitCharge,
                     sleepDirective: .allowSleep,
-                    magSafeColor: syncMagSafe ? .green : .system,
+                    magSafeColor: syncMagSafe ? .orange : .system,
                     progress: .holding(limit: limit)
                 )
             } else {
@@ -195,6 +195,22 @@ public enum BatteryPolicy {
                     progress: .charging(target: limit)
                 )
             }
+        }
+    }
+
+    /// Final gate before any SMC write in `pharos-battd`. Only the charge-inhibit keys
+    /// may be toggled; the adapter-bypass keys may only ever be written back to 0
+    /// (writing CHIE=0x08 cuts the adapter → screen flicker and battery cycling),
+    /// and ACLC may never be switched off.
+    public static func isSafeWrite(key: String, bytes: [UInt8]) -> Bool {
+        switch key {
+        case "CHTE": return bytes == [0, 0, 0, 0] || bytes == [1, 0, 0, 0]
+        case "CH0C": return bytes == [0] || bytes == [1]
+        case "CHIE", "CH0J": return bytes == [0]
+        case "ACLC":
+            guard bytes.count == 1 else { return false }
+            return MagSafeColor(rawValue: bytes[0]) != nil
+        default: return false
         }
     }
 

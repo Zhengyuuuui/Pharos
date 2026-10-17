@@ -1004,8 +1004,8 @@ final class L10n: ObservableObject {
     var batteryForceDischargeActive: String { en ? "Discharging on Battery" : "纯电池放电中" }
     var batterySyncMagSafe: String { en ? "Sync MagSafe LED" : "同步 MagSafe 指示灯" }
     var batterySyncMagSafeDesc: String {
-        en ? "MagSafe LED turns green when holding at limit or fully charged, and orange while charging."
-           : "达到限充或充满电时指示灯呈绿色，正在充电时呈橙色。"
+        en ? "Like macOS 15 \"Not Charging\": the MagSafe LED stays amber while holding at the limit and is never switched off. Turn off to let the firmware drive the LED."
+           : "与 macOS 15 原生「未在充电」一致：限充保持时 MagSafe 指示灯保持黄色/橙色常亮，绝不熄灭。关闭后完全由系统固件控制指示灯。"
     }
     var batteryHealth: String { en ? "Battery Health" : "电池健康度" }
     var batteryCycleCount: String { en ? "Cycle Count" : "循环次数" }
@@ -1047,6 +1047,25 @@ final class L10n: ObservableObject {
     }
     var batteryCurrentAmperage: String { en ? "Current" : "瞬时电流" }
     var batteryVoltage: String { en ? "Voltage" : "电池电压" }
+    var batterySystemManaged: String { en ? "System Managed" : "交由系统管理" }
+    var batteryPharosActive: String { en ? "Pharos hardware charge limit active" : "Pharos 硬件限充生效中" }
+    var batteryMacOSManaged: String { en ? "Managed natively by macOS" : "macOS 原生托管中" }
+    var batteryHelperOffline: String { en ? "Battery control helper not connected" : "电池控制服务未连接" }
+    func batteryActiveLimitBadge(_ limit: Int) -> String { en ? "Limit \(limit)%" : "上限 \(limit)%" }
+    var batteryFullOverrideBadge: String { en ? "Charging to 100% once" : "临时充满至 100%" }
+    func batteryCellCurrent(_ mA: Int) -> String { en ? "Battery cell current: \(mA) mA" : "电池电芯电流: \(mA) mA" }
+    var batteryFlowPassthrough: String { en ? "Adapter powering the Mac directly" : "外接电源直通主板供电" }
+    var batteryFlowCharging: String { en ? "Adapter charging the battery" : "外接电源正在为电池充电" }
+    var batteryFlowSupplementing: String { en ? "Battery assisting the adapter (high load)" : "负载较高，电池正在辅助供电" }
+    var batteryFlowOnBattery: String { en ? "Running on battery" : "正在使用电池供电" }
+    var batteryPresetRecommended: String { en ? "80% (Recommended)" : "80%（推荐）" }
+    func batteryDesignCapacityCaption(_ mAh: Int) -> String { en ? "\(mAh) mAh design" : "\(mAh) mAh 原厂" }
+    func batteryRemainingCaption(_ mAh: Int) -> String { en ? "\(mAh) mAh remaining" : "\(mAh) mAh 剩余" }
+    func batteryCurrentCaption(_ mA: Int) -> String { en ? "\(mA) mA current" : "\(mA) mA 电流" }
+    var batteryBMSSensor: String { en ? "BMS sensor" : "BMS 传感器" }
+    var batteryStatusNotInstalled: String { en ? "Not Installed" : "未安装" }
+    var batteryStatusNotResponding: String { en ? "Not Responding" : "未响应" }
+    var batteryStatusRunning: String { en ? "Running" : "运行正常" }
 }
 
 

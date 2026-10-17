@@ -159,6 +159,54 @@ func testBatteryPolicyModes() {
     expectEq(unplugged.progress, .onBattery, "unplugged progress is onBattery")
 }
 
+func testBatteryMagSafeAndSafeWrites() {
+    let now = Date()
+    var state = BatteryPolicy.State()
+    let held = BatteryPolicy.decide(mode: .limit(maxPercent: 80), currentPercent: 100, isACConnected: true, lastHeartbeat: now, now: now, state: &state)
+    expectEq(held.action, .inhibitCharge, "100% with 80% limit inhibits immediately")
+    expectEq(held.magSafeColor, .orange, "holding uses macOS 15 amber LED")
+    var noSync = BatteryPolicy.State()
+    let heldNoSync = BatteryPolicy.decide(mode: .limit(maxPercent: 80), currentPercent: 90, isACConnected: true, syncMagSafe: false, lastHeartbeat: now, now: now, state: &noSync)
+    expectEq(heldNoSync.magSafeColor, .system, "without sync the firmware drives the LED")
+
+    // Exhaustive: no decision ever turns the LED off or bypasses the adapter.
+    let modes: [BatteryMode] = [.system, .full, .discharge, .limit(maxPercent: 50), .limit(maxPercent: 80), .limit(maxPercent: 100)]
+    for mode in modes {
+        for pct in stride(from: 0, through: 100, by: 5) {
+            for ac in [true, false] {
+                for temp in [25.0, 55.0] {
+                    for sync in [true, false] {
+                        var st = BatteryPolicy.State()
+                        let d = BatteryPolicy.decide(mode: mode, currentPercent: pct, isACConnected: ac, temperatureCelsius: temp, syncMagSafe: sync, lastHeartbeat: now, now: now, state: &st)
+                        if d.magSafeColor.rawValue == 0x01 || st.isAdapterBypassed {
+                            expect(false, "unsafe decision for \(mode) \(pct)% ac=\(ac)")
+                        }
+                    }
+                }
+            }
+        }
+    }
+    expect(!BatteryPolicy.MagSafeColor.allCases.contains { $0.rawValue == 0x01 }, "LED-off color does not exist")
+
+    expect(BatteryPolicy.isSafeWrite(key: "CHTE", bytes: [1, 0, 0, 0]), "CHTE inhibit allowed")
+    expect(BatteryPolicy.isSafeWrite(key: "CHTE", bytes: [0, 0, 0, 0]), "CHTE release allowed")
+    expect(BatteryPolicy.isSafeWrite(key: "CHIE", bytes: [0]), "CHIE reset to 0 allowed")
+    expect(!BatteryPolicy.isSafeWrite(key: "CHIE", bytes: [0x08]), "CHIE adapter cut rejected")
+    expect(!BatteryPolicy.isSafeWrite(key: "CH0J", bytes: [0x01]), "CH0J adapter cut rejected")
+    expect(!BatteryPolicy.isSafeWrite(key: "ACLC", bytes: [0x01]), "ACLC LED off rejected")
+    expect(BatteryPolicy.isSafeWrite(key: "ACLC", bytes: [0x04]), "ACLC amber allowed")
+    expect(!BatteryPolicy.isSafeWrite(key: "BCLM", bytes: [80]), "unknown keys rejected")
+    expect(!BatteryPolicy.isSafeWrite(key: "CHTE", bytes: [2, 0, 0, 0]), "odd CHTE value rejected")
+}
+
+func testBatteryPowerFlow() {
+    expectEq(BatteryPowerFlow.classify(BatteryReading(amperage: 0, powerSource: .acPower)), .passthrough, "0 mA on AC is passthrough")
+    expectEq(BatteryPowerFlow.classify(BatteryReading(amperage: -8, powerSource: .acPower)), .passthrough, "sensor noise is passthrough")
+    expectEq(BatteryPowerFlow.classify(BatteryReading(amperage: 2500, powerSource: .acPower)), .charging, "positive current is charging")
+    expectEq(BatteryPowerFlow.classify(BatteryReading(amperage: -900, powerSource: .acPower)), .supplementing, "negative current on AC supplements")
+    expectEq(BatteryPowerFlow.classify(BatteryReading(amperage: 0, powerSource: .battery)), .onBattery, "battery source")
+}
+
 func testBatteryProtocolEncodeDecode() {
     let commands: [(BatteryProtocol.Command, String)] = [
         (.status, "status"),

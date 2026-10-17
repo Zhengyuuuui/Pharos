@@ -13,7 +13,10 @@ struct BatteryControlView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 headerView
-                heroStatusCard
+                VStack(alignment: .leading, spacing: 8) {
+                    managementBadge
+                    heroStatusCard
+                }
                 chargeLimitCard
                 hardwareAndHealthGrid
                 helperManagementCard
@@ -57,6 +60,47 @@ struct BatteryControlView: View {
         }
     }
 
+    // MARK: - Takeover Badge
+
+    /// Driven solely by the daemon's reply, so "active" means the helper confirmed it.
+    private var managementBadge: some View {
+        let managing = battery.isPharosManaging
+        let color: Color = managing ? .green : .secondary
+        let title: String
+        if managing {
+            title = l10n.batteryPharosActive
+        } else if battery.helper == .ready {
+            title = l10n.batteryMacOSManaged
+        } else {
+            title = "\(l10n.batteryMacOSManaged) · \(l10n.batteryHelperOffline)"
+        }
+        return HStack(spacing: 6) {
+            Image(systemName: managing ? "circle.fill" : "circle")
+                .font(.system(size: 8, weight: .bold))
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+            if let limit = battery.activeLimit {
+                Text(l10n.batteryActiveLimitBadge(limit))
+                    .font(.system(size: 10, weight: .medium).monospacedDigit())
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 1)
+                    .background(Capsule().fill(color.opacity(0.15)))
+            } else if battery.helper == .ready, battery.mode == .full {
+                Text(l10n.batteryFullOverrideBadge)
+                    .font(.system(size: 10, weight: .medium))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 1)
+                    .background(Capsule().fill(color.opacity(0.15)))
+            }
+        }
+        .foregroundStyle(color)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(Capsule().fill(color.opacity(0.10)))
+        .overlay(Capsule().stroke(color.opacity(0.25)))
+        .animation(.easeInOut(duration: 0.2), value: managing)
+    }
+
     // MARK: - Hero Status Card (Native "小插头" State)
 
     private var heroStatusCard: some View {
@@ -64,6 +108,7 @@ struct BatteryControlView: View {
         let isHolding = battery.isHolding || (!r.isCharging && r.powerSource == .acPower && r.currentPercent < 100)
         let isFull = r.isCharged || r.currentPercent >= 100
         let isPlugged = (r.powerSource == .acPower)
+        let limit = battery.activeLimit ?? battery.targetLimit
 
         return HStack(spacing: 20) {
             // Visual Battery Indicator
@@ -100,17 +145,17 @@ struct BatteryControlView: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
                     if isHolding {
-                        if r.currentPercent > battery.targetLimit {
-                            Label(l10n.batteryHoldingAboveLimit(r.currentPercent, limit: battery.targetLimit), systemImage: "powerplug.fill")
+                        if r.currentPercent > limit {
+                            Label(l10n.batteryHoldingAboveLimit(r.currentPercent, limit: limit), systemImage: "powerplug.fill")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(.teal)
                         } else {
-                            Label(l10n.batteryHoldingAtLimit(battery.targetLimit), systemImage: "powerplug.fill")
+                            Label(l10n.batteryHoldingAtLimit(limit), systemImage: "powerplug.fill")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(.teal)
                         }
                     } else if r.isCharging {
-                        Label(l10n.batteryChargingTo(battery.targetLimit), systemImage: "bolt.fill")
+                        Label(l10n.batteryChargingTo(battery.activeLimit ?? 100), systemImage: "bolt.fill")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(.green)
                     } else if isFull && isPlugged {
@@ -137,11 +182,13 @@ struct BatteryControlView: View {
                 }
 
                 Text(isHolding
-                     ? (r.currentPercent > battery.targetLimit ? l10n.batteryAboveLimitNote : l10n.batteryHoldingSubtitle)
+                     ? (r.currentPercent > limit ? l10n.batteryAboveLimitNote : l10n.batteryHoldingSubtitle)
                      : (r.adapterName ?? l10n.batteryAdapter))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+
+                powerFlowEvidence(r)
 
                 HStack(spacing: 16) {
                     if let watts = r.adapterWatts, watts > 0 {
@@ -163,6 +210,33 @@ struct BatteryControlView: View {
         .padding(16)
         .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.04)))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.08)))
+    }
+
+    /// Measured AppleSmartBattery `Amperage` plus IOPS source — the proof that charging
+    /// really stopped, rather than inferring it from the percentage.
+    private func powerFlowEvidence(_ r: BatteryReading) -> some View {
+        let flow = battery.powerFlow
+        let (text, icon, color): (String, String, Color) = {
+            switch flow {
+            case .passthrough: return (l10n.batteryFlowPassthrough, "powerplug.fill", .teal)
+            case .charging: return (l10n.batteryFlowCharging, "bolt.fill", .green)
+            case .supplementing: return (l10n.batteryFlowSupplementing, "exclamationmark.triangle.fill", .orange)
+            case .onBattery: return (l10n.batteryFlowOnBattery, "battery.75", .secondary)
+            }
+        }()
+        return HStack(spacing: 6) {
+            Image(systemName: "waveform.path.ecg")
+            Text(l10n.batteryCellCurrent(r.amperage))
+                .monospacedDigit()
+            Text("·")
+            Image(systemName: icon)
+            Text(text)
+        }
+        .font(.system(size: 11, weight: .medium))
+        .foregroundStyle(color)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(RoundedRectangle(cornerRadius: 6).fill(color.opacity(0.08)))
     }
 
     // MARK: - Charge Limit Control Card
@@ -200,10 +274,11 @@ struct BatteryControlView: View {
             }
 
             // Quick preset pills
-            HStack(spacing: 10) {
-                presetButton(80, label: "80% (推荐)")
+            HStack(spacing: 8) {
+                presetButton(80, label: l10n.batteryPresetRecommended)
                 presetButton(85, label: "85%")
                 presetButton(90, label: "90%")
+                presetButton(95, label: "95%")
                 presetButton(100, label: "100%")
             }
 
@@ -225,7 +300,15 @@ struct BatteryControlView: View {
                     Label(l10n.batteryResumeLimit, systemImage: "arrow.counterclockwise")
                 }
                 .controlSize(.small)
-                .disabled(battery.helper != .ready || battery.busy || (battery.mode == .limit(maxPercent: battery.targetLimit) && battery.isHolding))
+                .disabled(battery.helper != .ready || battery.busy || battery.mode == .limit(maxPercent: battery.targetLimit))
+
+                Button {
+                    battery.setSystemMode()
+                } label: {
+                    Label(l10n.batterySystemManaged, systemImage: "apple.logo")
+                }
+                .controlSize(.small)
+                .disabled(battery.helper != .ready || battery.busy || battery.mode == .system)
 
                 Spacer()
             }
@@ -263,17 +346,23 @@ struct BatteryControlView: View {
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.08)))
     }
 
+    /// Highlight follows the limit the daemon is actually enforcing, not the slider value.
+    @ViewBuilder
     private func presetButton(_ percent: Int, label: String) -> some View {
-        Button {
-            battery.targetLimit = percent
-            battery.resumeLimit()
+        let active = battery.activeLimit == percent
+        let button = Button {
+            battery.selectLimit(percent)
         } label: {
             Text(label)
-                .font(.system(size: 11, weight: battery.targetLimit == percent ? .bold : .regular))
+                .font(.system(size: 11, weight: active ? .bold : .regular))
         }
-        .buttonStyle(.bordered)
         .controlSize(.small)
-        .tint(battery.targetLimit == percent ? Color.accentColor : nil)
+        .disabled(battery.helper != .ready || battery.busy)
+        if active {
+            button.buttonStyle(.borderedProminent)
+        } else {
+            button.buttonStyle(.bordered)
+        }
     }
 
     // MARK: - Hardware Telemetry & Health Grid
@@ -286,10 +375,10 @@ struct BatteryControlView: View {
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                 metricCell(title: l10n.batteryHealth, value: "\(r.healthPercent)%", caption: r.health.rawValue.capitalized)
-                metricCell(title: l10n.batteryCycleCount, value: "\(r.cycleCount)", caption: "\(r.designCapacity) mAh 原厂")
-                metricCell(title: l10n.batteryMaxCapacity, value: "\(r.maxCapacity) mAh", caption: "\(r.remainingCapacity) mAh 剩余")
-                metricCell(title: l10n.batteryVoltage, value: String(format: "%.2f V", r.voltage), caption: "\(r.amperage) mA 电流")
-                metricCell(title: l10n.batteryTemperature, value: String(format: "%.1f °C", r.temperatureCelsius), caption: "BMS 传感器")
+                metricCell(title: l10n.batteryCycleCount, value: "\(r.cycleCount)", caption: l10n.batteryDesignCapacityCaption(r.designCapacity))
+                metricCell(title: l10n.batteryMaxCapacity, value: "\(r.maxCapacity) mAh", caption: l10n.batteryRemainingCaption(r.remainingCapacity))
+                metricCell(title: l10n.batteryVoltage, value: String(format: "%.2f V", r.voltage), caption: l10n.batteryCurrentCaption(r.amperage))
+                metricCell(title: l10n.batteryTemperature, value: String(format: "%.1f °C", r.temperatureCelsius), caption: l10n.batteryBMSSensor)
                 metricCell(
                     title: l10n.batteryAdapter,
                     value: r.adapterWatts != nil ? "\(r.adapterWatts!)W" : (r.powerSource == .acPower ? "AC" : "DC"),
@@ -399,21 +488,21 @@ struct BatteryControlView: View {
     private var statusBadge: some View {
         switch battery.helper {
         case .notInstalled:
-            Text("未安装")
+            Text(l10n.batteryStatusNotInstalled)
                 .font(.system(size: 10, weight: .medium))
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
                 .background(Capsule().fill(Color.secondary.opacity(0.15)))
                 .foregroundStyle(.secondary)
         case .notResponding:
-            Text("未响应")
+            Text(l10n.batteryStatusNotResponding)
                 .font(.system(size: 10, weight: .medium))
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
                 .background(Capsule().fill(Color.orange.opacity(0.15)))
                 .foregroundStyle(.orange)
         case .ready:
-            Text("运行正常")
+            Text(l10n.batteryStatusRunning)
                 .font(.system(size: 10, weight: .medium))
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)

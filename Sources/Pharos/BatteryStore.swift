@@ -27,12 +27,20 @@ final class BatteryStore: ObservableObject {
     /// User's chosen charge limit (e.g. 80%), persisted in UserDefaults.
     @Published var targetLimit: Int = UserDefaults.standard.object(forKey: "batteryTargetLimit") as? Int ?? 80 {
         didSet {
+            guard targetLimit != oldValue else { return }
             UserDefaults.standard.set(targetLimit, forKey: "batteryTargetLimit")
             if case .limit = mode {
                 apply(.limit(maxPercent: targetLimit))
             }
         }
     }
+
+    /// Whether the user wants Pharos to enforce the limit; restored after relaunch,
+    /// because the daemon itself falls back to `.system` whenever Pharos goes away.
+    private var limitEnabled: Bool = UserDefaults.standard.bool(forKey: "batteryLimitEnabled") {
+        didSet { UserDefaults.standard.set(limitEnabled, forKey: "batteryLimitEnabled") }
+    }
+    private var restoredAfterLaunch = false
 
     /// Whether to synchronize MagSafe LED state with charging limit.
     @Published var syncMagSafe: Bool = UserDefaults.standard.object(forKey: "batterySyncMagSafe") as? Bool ?? true {
@@ -68,8 +76,8 @@ final class BatteryStore: ObservableObject {
             object: nil,
             queue: .main
         ) { _ in
-            // Best effort restore to system charging on app exit
-            _ = BatteryStore.send(.setMode(.system))
+            // Best effort restore to system charging on app exit; single attempt so quitting never stalls.
+            _ = BatteryStore.send(.setMode(.system), attempts: 1)
         }
     }
 
@@ -111,16 +119,38 @@ final class BatteryStore: ObservableObject {
     }
 
     func resumeLimit() {
+        limitEnabled = true
         apply(.limit(maxPercent: targetLimit))
     }
 
+    /// Preset pills: one command to the daemon, not one from `targetLimit.didSet` plus another here.
+    func selectLimit(_ percent: Int) {
+        let alreadyLimited: Bool
+        if case .limit = mode { alreadyLimited = true } else { alreadyLimited = false }
+        limitEnabled = true
+        // In limit mode `targetLimit.didSet` already sends the new limit.
+        targetLimit = percent
+        if !alreadyLimited { resumeLimit() }
+    }
+
+    /// "System Managed": daemon runs `releaseHardwareLocked()` and drops its sleep assertion.
     func setSystemMode() {
+        limitEnabled = false
         apply(.system)
     }
 
-    func toggleDischarge() {
-        resumeLimit()
+    /// True only when the daemon confirms it is enforcing a limit — the UI never guesses.
+    var isPharosManaging: Bool {
+        guard helper == .ready, !unsupported else { return false }
+        return mode != .system
     }
+
+    var activeLimit: Int? {
+        guard helper == .ready, case .limit(let p) = mode else { return nil }
+        return p
+    }
+
+    var powerFlow: BatteryPowerFlow { BatteryPowerFlow.classify(reading) }
 
     // MARK: - Heartbeat & State Sync
 
@@ -157,6 +187,14 @@ final class BatteryStore: ObservableObject {
         unsupported = reply.unsupported
         if !reply.ok, let failure {
             errorMessage = reply.error ?? failure
+        } else if reply.ok, failure != nil, errorMessage == L10n.shared.batteryCommandFailed {
+            errorMessage = nil
+        }
+        if !restoredAfterLaunch {
+            restoredAfterLaunch = true
+            if limitEnabled, reply.mode == .system, !reply.unsupported {
+                apply(.limit(maxPercent: targetLimit))
+            }
         }
     }
 
@@ -175,6 +213,9 @@ final class BatteryStore: ObservableObject {
             errorMessage = error.localizedDescription
             return
         }
+        // An update restarts the daemon in `.system`; put back whatever the user had.
+        let restore: BatteryMode = (helper == .ready && mode != .system) ? mode : .limit(maxPercent: targetLimit)
+        let restoreLimit = helper != .ready || limitEnabled || mode != .system
         let script = BatteryHelperInstall.installScript(helperSource: helperURL.path, plistSource: plistURL.path)
         runAsAdmin(script, prompt: l10n.batteryInstallPrompt) { [weak self] error in
             try? FileManager.default.removeItem(at: plistURL)
@@ -182,15 +223,26 @@ final class BatteryStore: ObservableObject {
                 self?.errorMessage = error
                 return
             }
-            Task { @MainActor in
-                for _ in 0..<20 {
-                    try? await Task.sleep(nanoseconds: 100_000_000)
-                    self?.refreshHelperState()
-                    if self?.helper == .ready {
-                        self?.resumeLimit()
-                        break
+            Task { @MainActor [weak self] in
+                // launchd bootout → bootstrap needs ~200–400 ms before the socket exists again.
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                for _ in 0..<10 {
+                    guard let self else { return }
+                    let reply = await Task.detached { BatteryStore.send(.status) }.value
+                    if reply != nil {
+                        self.handle(reply, failure: nil)
+                        self.errorMessage = nil
+                        if restoreLimit {
+                            if case .limit = restore { self.limitEnabled = true }
+                            self.apply(restore)
+                        }
+                        self.refreshHelperState()
+                        self.beat()
+                        return
                     }
+                    try? await Task.sleep(nanoseconds: 200_000_000)
                 }
+                self?.refreshHelperState()
             }
         }
     }
@@ -228,9 +280,33 @@ final class BatteryStore: ObservableObject {
 
     // MARK: - Socket Client
 
-    nonisolated static func send(_ command: BatteryProtocol.Command) -> BatteryProtocol.Reply? {
+    /// Retries only when the socket is missing or refusing connections (daemon being restarted
+    /// by launchd), never after a request was delivered, so a slow daemon is not hammered.
+    nonisolated static func send(
+        _ command: BatteryProtocol.Command,
+        attempts: Int = 3,
+        retryDelay: useconds_t = 150_000
+    ) -> BatteryProtocol.Reply? {
+        for attempt in 1...max(1, attempts) {
+            switch sendOnce(command) {
+            case .reply(let r): return r
+            case .failed: return nil
+            case .unreachable:
+                if attempt < attempts { usleep(retryDelay) }
+            }
+        }
+        return nil
+    }
+
+    private enum SendOutcome {
+        case reply(BatteryProtocol.Reply)
+        case unreachable
+        case failed
+    }
+
+    private nonisolated static func sendOnce(_ command: BatteryProtocol.Command) -> SendOutcome {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
-        guard fd >= 0 else { return nil }
+        guard fd >= 0 else { return .failed }
         defer { close(fd) }
 
         var tv = timeval(tv_sec: 2, tv_usec: 0)
@@ -251,15 +327,18 @@ final class BatteryStore: ObservableObject {
                 connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
             }
         }
-        guard connected == 0 else { return nil }
+        guard connected == 0 else { return .unreachable }
 
         let line = Array((BatteryProtocol.encode(command) + "\n").utf8)
-        guard line.withUnsafeBytes({ write(fd, $0.baseAddress, $0.count) }) == line.count else { return nil }
+        guard line.withUnsafeBytes({ write(fd, $0.baseAddress, $0.count) }) == line.count else { return .unreachable }
 
         var buf = [UInt8](repeating: 0, count: 1024)
         let n = buf.withUnsafeMutableBytes { read(fd, $0.baseAddress, $0.count) }
-        guard n > 0 else { return nil }
+        // EOF before any reply: the old daemon was torn down mid-request.
+        if n == 0 { return .unreachable }
+        guard n > 0 else { return .failed }
 
-        return try? JSONDecoder().decode(BatteryProtocol.Reply.self, from: Data(buf.prefix(n)))
+        guard let reply = try? JSONDecoder().decode(BatteryProtocol.Reply.self, from: Data(buf.prefix(n))) else { return .failed }
+        return .reply(reply)
     }
 }

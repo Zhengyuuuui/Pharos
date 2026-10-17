@@ -39,6 +39,7 @@ final class BatteryDaemon: @unchecked Sendable {
     private var lastHeartbeat: Date?
     private var policyState = BatteryPolicy.State()
     private var sleepAssertionID: IOPMAssertionID = 0
+    private var hardwareEngaged = true
 
     let hasCHTE: Bool
     let hasCH0C: Bool
@@ -75,7 +76,7 @@ final class BatteryDaemon: @unchecked Sendable {
             log("mode set to \(BatteryProtocol.encode(.setMode(m)))")
         case .syncMagSafe(let on):
             syncMagSafe = on
-            if !on, hasACLC { smc.write("ACLC", [0]) }
+            if !on, hasACLC { write("ACLC", [0]) }
         }
 
         let reply = BatteryProtocol.Reply(
@@ -121,47 +122,23 @@ final class BatteryDaemon: @unchecked Sendable {
             mode = .system
         }
 
-        // Apply hardware action
+        // Apply hardware action. Adapter-bypass keys (CHIE/CH0J) are only ever reset to 0:
+        // the Mac must stay on adapter power while charging is inhibited.
         switch decision.action {
         case .release:
             releaseHardwareLocked()
 
-        case .inhibitCharge:
+        case .inhibitCharge, .allowCharge:
+            let inhibit: UInt8 = decision.action == .inhibitCharge ? 1 : 0
             if hasCHTE {
-                smc.write("CHTE", [1, 0, 0, 0])
+                write("CHTE", [inhibit, 0, 0, 0])
             } else if hasCH0C {
-                smc.write("CH0C", [1])
+                write("CH0C", [inhibit])
             }
-            if hasCHIE { smc.write("CHIE", [0]) }
-            if hasCH0J { smc.write("CH0J", [0]) }
-            if syncMagSafe && hasACLC {
-                smc.write("ACLC", [decision.magSafeColor.rawValue])
-            }
-
-        case .allowCharge:
-            if hasCHTE {
-                smc.write("CHTE", [0, 0, 0, 0])
-            } else if hasCH0C {
-                smc.write("CH0C", [0])
-            }
-            if hasCHIE { smc.write("CHIE", [0]) }
-            if hasCH0J { smc.write("CH0J", [0]) }
-            if syncMagSafe && hasACLC {
-                smc.write("ACLC", [decision.magSafeColor.rawValue])
-            }
-
-        case .bypassAdapter:
-            // Safe fallback: never cut the AC adapter. Inhibit charging with continuous adapter power.
-            if hasCHTE {
-                smc.write("CHTE", [1, 0, 0, 0])
-            } else if hasCH0C {
-                smc.write("CH0C", [1])
-            }
-            if hasCHIE { smc.write("CHIE", [0]) }
-            if hasCH0J { smc.write("CH0J", [0]) }
-            if syncMagSafe && hasACLC {
-                smc.write("ACLC", [BatteryPolicy.MagSafeColor.green.rawValue])
-            }
+            if hasCHIE { write("CHIE", [0]) }
+            if hasCH0J { write("CH0J", [0]) }
+            if hasACLC { write("ACLC", [syncMagSafe ? decision.magSafeColor.rawValue : 0]) }
+            hardwareEngaged = true
         }
 
         // Apply sleep directive
@@ -188,18 +165,31 @@ final class BatteryDaemon: @unchecked Sendable {
         }
     }
 
-    private func releaseHardwareLocked() {
-        if hasCHTE { smc.write("CHTE", [0, 0, 0, 0]) }
-        if hasCH0C { smc.write("CH0C", [0]) }
-        if hasCHIE { smc.write("CHIE", [0]) }
-        if hasCH0J { smc.write("CH0J", [0]) }
-        if hasACLC { smc.write("ACLC", [0]) }
+    /// Every SMC write funnels through `BatteryPolicy.isSafeWrite` so no code path can
+    /// cut the adapter (CHIE=0x08) or switch the MagSafe LED off (ACLC=0x01).
+    private func write(_ key: String, _ bytes: [UInt8]) {
+        guard BatteryPolicy.isSafeWrite(key: key, bytes: bytes) else {
+            log("refused unsafe SMC write \(key)=\(bytes)")
+            return
+        }
+        if !smc.write(key, bytes) { log("SMC write \(key) failed") }
+    }
+
+    /// Idempotent: once released, later ticks leave the SMC untouched so macOS keeps full control.
+    private func releaseHardwareLocked(force: Bool = false) {
+        guard hardwareEngaged || force else { return }
+        if hasCHTE { write("CHTE", [0, 0, 0, 0]) }
+        if hasCH0C { write("CH0C", [0]) }
+        if hasCHIE { write("CHIE", [0]) }
+        if hasCH0J { write("CH0J", [0]) }
+        if hasACLC { write("ACLC", [0]) }
+        hardwareEngaged = false
     }
 
     func releaseAll() {
         lock.lock()
         defer { lock.unlock() }
-        releaseHardwareLocked()
+        releaseHardwareLocked(force: true)
         updateSleepAssertionLocked(.allowSleep)
         mode = .system
         policyState = BatteryPolicy.State()

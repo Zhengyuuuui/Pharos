@@ -20,11 +20,11 @@
   <img src="https://img.shields.io/badge/dependencies-none-brightgreen" alt="Dependencies">
   <img src="https://img.shields.io/badge/network-none-lightgrey" alt="No network">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.4-blue" alt="Version 2.4">
-  <img src="https://img.shields.io/badge/updated-2026--10--16-informational" alt="Last updated 2026-10-16">
+  <img src="https://img.shields.io/badge/version-2.5-blue" alt="Version 2.5">
+  <img src="https://img.shields.io/badge/updated-2026--10--17-informational" alt="Last updated 2026-10-17">
 </p>
 
-<p align="center"><sub>Last updated / 最后更新：2026-10-16 21:15 (UTC+8) · v2.4</sub></p>
+<p align="center"><sub>Last updated / 最后更新：2026-10-17 12:52 (UTC+8) · v2.5 · Author / 作者：zys · Model / 模型：OpenCode (claude-opus-5.5)</sub></p>
 
 <p align="center"><a href="#english">English</a> · <a href="#简体中文">简体中文</a> · <a href="#changelog--更新记录">Changelog / 更新记录</a></p>
 
@@ -44,6 +44,7 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 |---|---|
 | **Ports & memory** | Every dev project listening on a TCP port, grouped by folder, with memory incl. child processes; machine-wide memory, pressure and a 1-hour trend |
 | **Disk usage** | Startup disk, external drives, network shares and disk images — used / available like Finder, updated the moment a drive is plugged in |
+| **Battery charge limit** | macOS 15 native-style "Not Charging" plug state: hold the battery at 80 / 85 / 90 / 95 / 100 %, adapter powers the Mac directly (0 mA cell current), never cuts the adapter; one click back to macOS |
 | **Fans & temperature** | Fan speeds and CPU / GPU / memory / SSD / battery temperatures; optional fan control (fixed speed or max) with built-in safety rules |
 | **Stop processes** | `SIGTERM` first, `SIGKILL` only if it refuses; never system or other users' processes |
 | **Disk cleanup** | Temp folders and dev caches, file by file, with a retention window; the size shown is exactly what gets freed |
@@ -247,6 +248,7 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 |---|---|
 | **端口与内存监控** | 列出所有监听 TCP 端口的开发项目，按目录归组，内存含子进程；整机内存、内存压力与近 1 小时趋势 |
 | **磁盘用量** | 启动磁盘、外接硬盘、网络共享和磁盘映像的已用 / 可用，口径与 Finder 一致；接入硬盘后立即显示 |
+| **电池充电上限** | 复刻 macOS 15 原生「未在充电（小插头）」：电量保持在 80 / 85 / 90 / 95 / 100%，外接电源直通主板供电（电芯电流 0 mA），绝不切断适配器；一键交还 macOS 管理 |
 | **风扇与温度** | 风扇转速以及 CPU / GPU / 内存 / SSD / 电池温度；可选风扇控制（固定转速或满速），内置安全规则 |
 | **结束进程** | 先 `SIGTERM`，拒不退出才 `SIGKILL`；不碰系统进程和其他用户的进程 |
 | **磁盘清理** | 临时目录与开发缓存，按单个文件、按保留期判断；显示的体积就是实际能释放的体积 |
@@ -439,6 +441,30 @@ make icon                           # 用 Scripts/make-icon.swift 重新生成 A
 ## Changelog / 更新记录
 
 Times are UTC+8. 时间为北京时间（UTC+8）。
+
+### v2.5 — 2026-10-17 12:52
+
+> Author / 作者：zys · Model / 模型：OpenCode (claude-opus-5.5)
+
+**English**
+- **System Managed button**: next to "Charge to Full Now" and "Resume Charge Limit"; sends `system` to `pharos-battd`, which releases every SMC key and its sleep assertion, handing charging back to macOS
+- **Charge limit presets** reduced to 80 % (recommended) / 85 / 90 / 95 / 100 %; the preset the helper is actually enforcing is highlighted (`.borderedProminent`)
+- **Takeover badge** above the status card: green `● Pharos hardware charge limit active · Limit 80%` vs. gray `○ Managed natively by macOS`, driven only by the helper's reply
+- **Measured evidence**: status card shows `Battery cell current: 0 mA · Adapter powering the Mac directly`, classified from AppleSmartBattery `Amperage` + IOPS (`BatteryPowerFlow`), never from the percentage
+- **MagSafe LED matches macOS 15**: amber while holding at the limit (or firmware-driven when sync is off); the LED-off value was removed from the code
+- **Hard SMC write gate** (`BatteryPolicy.isSafeWrite`): every write in `pharos-battd` is checked — `CHIE` / `CH0J` may only be 0 (no adapter cut-off, no screen flicker), `ACLC` can never be `0x01`, unknown keys rejected; release is idempotent
+- **No more transient "Failed to send command"** after "Update Helper": socket client retries 3 × 150 ms when the daemon is restarting, and the install callback waits 300 ms before probing and restores the previous mode
+- Charge limit choice is remembered and re-applied when Pharos starts (enable "Launch at login" to keep the limit across reboots)
+
+**简体中文**
+- **「交由系统管理」按钮**：与「立即充满电」「恢复充电上限」并列；向 `pharos-battd` 发送 `system`，释放全部 SMC 寄存器与防睡眠断言，完全交还 macOS 原生管理
+- **充电上限挡位**精简为 80%（推荐）/ 85 / 90 / 95 / 100%；守护进程实际生效的挡位高亮显示（`.borderedProminent`）
+- **接管状态徽标**：状态卡片上方显示绿色「● Pharos 硬件限充生效中 · 上限 80%」或灰色「○ macOS 原生托管中」，只以守护进程回复为准
+- **硬件生效确凿数据**：状态卡片显示「电池电芯电流: 0 mA · 外接电源直通主板供电」，依据 AppleSmartBattery `Amperage` 与 IOPS 判定（`BatteryPowerFlow`），不以电量数字代替真实状态
+- **MagSafe 指示灯对齐 macOS 15**：限充保持时黄色/橙色常亮（关闭同步时由系统固件控制）；代码中已移除「关灯」取值
+- **SMC 写入硬闸门**（`BatteryPolicy.isSafeWrite`）：`pharos-battd` 每次写入都经校验——`CHIE` / `CH0J` 只能写 0（绝不切断适配器、不闪屏），`ACLC` 永不写 `0x01`，未知寄存器一律拒绝；释放操作幂等
+- **消除「更新特权组件」后的「发送指令失败」瞬态报错**：守护进程重启期间通信自动重试 3 次（间隔 150ms），安装回调延迟 300ms 后再探测并恢复更新前的模式
+- 记住限充设置，Pharos 启动后自动恢复（开启「登录时启动」即可在重启后持续限充）
 
 ### v2.4 — 2026-10-16 21:15
 

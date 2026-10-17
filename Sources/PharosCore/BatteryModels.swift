@@ -168,3 +168,26 @@ public enum ChargingProgress: Equatable, Sendable, Codable {
     /// Connected to adapter, battery 100% full, not charging.
     case fullyCharged
 }
+
+/// Where power actually flows, judged from the measured cell current (AppleSmartBattery
+/// `Amperage`) and the IOPS power-source state — never from the percentage alone.
+public enum BatteryPowerFlow: Equatable, Sendable {
+    /// Adapter connected and cell current ≈ 0 mA: adapter powers the logic board directly.
+    case passthrough
+    /// Adapter connected and current flowing into the cells.
+    case charging
+    /// Adapter connected but the cells are discharging (load exceeds adapter output).
+    case supplementing
+    /// Running on battery.
+    case onBattery
+
+    /// Sensor noise around 0 mA on Apple Silicon is a few mA; anything inside this band is idle.
+    public static let idleToleranceMilliamps = 30
+
+    public static func classify(_ r: BatteryReading) -> BatteryPowerFlow {
+        guard r.powerSource == .acPower else { return .onBattery }
+        if r.amperage > idleToleranceMilliamps { return .charging }
+        if r.amperage < -idleToleranceMilliamps { return .supplementing }
+        return .passthrough
+    }
+}
