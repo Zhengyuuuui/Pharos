@@ -103,12 +103,7 @@ struct ThermalView: View {
                 }
 
                 if let t = store.thermals {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(l10n.fansTitle).font(.system(size: 13, weight: .semibold))
-                        HStack(spacing: 12) {
-                            ForEach(t.fans) { FanCard(fan: $0, count: t.fans.count) }
-                        }
-                    }
+                    FanSpeedometerClusterView()
 
                     FanControlCard()
 
@@ -136,46 +131,7 @@ struct ThermalView: View {
     }
 }
 
-private struct FanCard: View {
-    @ObservedObject private var l10n = L10n.shared
-    let fan: FanReading
-    let count: Int
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Label(l10n.fanName(fan.index, of: count), systemImage: "fanblades")
-                    .font(.system(size: 11)).foregroundStyle(.secondary)
-                Spacer()
-                Text(l10n.fanMode(fan.mode))
-                    .font(.system(size: 10, weight: .medium))
-                    .padding(.horizontal, 6).padding(.vertical, 1)
-                    .background(Capsule().fill(fan.mode == .manual ? Color.orange.opacity(0.15) : Color.primary.opacity(0.07)))
-                    .foregroundStyle(fan.mode == .manual ? .orange : .secondary)
-            }
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(fan.actualRPM > 0 ? "\(fan.actualRPM)" : "0")
-                    .font(.system(size: 22, weight: .semibold).monospacedDigit())
-                Text("rpm").font(.system(size: 11)).foregroundStyle(.secondary)
-                if fan.actualRPM == 0 {
-                    Text(l10n.fanStopped).font(.system(size: 10)).foregroundStyle(.tertiary)
-                }
-            }
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Rectangle().fill(Color.primary.opacity(0.08))
-                    Rectangle().fill(Color.blue).frame(width: geo.size.width * fan.fraction)
-                }
-            }
-            .frame(height: 6)
-            .clipShape(RoundedRectangle(cornerRadius: 2))
-            Text(l10n.fanRange(fan.minRPM, fan.maxRPM)).font(.system(size: 10).monospacedDigit()).foregroundStyle(.secondary)
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
-    }
-}
+private typealias FanCard = ClassicFanBarCard
 
 private struct TempTile: View {
     @ObservedObject private var l10n = L10n.shared

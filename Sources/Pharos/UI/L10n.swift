@@ -410,6 +410,15 @@ final class L10n: ObservableObject {
         case .unknown: return en ? "Unknown" : "未知"
         }
     }
+    var fanViewModeGauge: String { en ? "Speedometer" : "汽车仪表盘" }
+    var fanViewModeBars: String { en ? "Classic Bars" : "经典条形" }
+    var fanDutyCycle: String { en ? "Duty Cycle" : "负载率" }
+    var fanTargetSpeed: String { en ? "Target" : "目标" }
+    var fanSpeedDifferential: String { en ? "Speed Delta" : "转速差" }
+    var fanBalanced: String { en ? "Balanced" : "对称均衡" }
+    var fanRedline: String { en ? "Redline Zone" : "高转速赤线区" }
+    var fanRPMUnit: String { en ? "RPM x 1000" : "转速 x 1000" }
+    var fanNoFansInstalled: String { en ? "Fanless Mac (No physical fans)" : "无物理风扇设计 (静音被动散热)" }
     func sensorGroup(_ g: SensorGroup) -> String {
         switch g {
         case .cpu: return "CPU"

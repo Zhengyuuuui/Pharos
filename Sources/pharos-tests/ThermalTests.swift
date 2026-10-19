@@ -45,3 +45,37 @@ func testThermalsLive() {
     expect(snap.fans.allSatisfy { $0.maxRPM >= $0.minRPM }, "live: fan ranges are sane")
     expect((snap.peakChipTemperature ?? 50) > 5, "live: chip temperature is plausible")
 }
+
+func testFanGaugeScale() {
+    let scale = FanGaugeScale(minRPM: 2317, maxRPM: 6800)
+    expectEq(scale.maxScale, 7000, "6800 rounded to next 1000 = 7000")
+    expectEq(scale.redlineRPM, 5700, "85% of 6800 = 5780 rounded to 5700")
+    expectEq(scale.startAngle, 135.0, "startAngle default 135")
+    expectEq(scale.sweepAngle, 270.0, "sweepAngle default 270")
+
+    // Progress fractions
+    expectEq(scale.fraction(for: 0), 0.0, "fraction 0 RPM = 0")
+    expectEq(scale.fraction(for: 3500), 0.5, "fraction 3500 RPM on 7000 = 0.5")
+    expectEq(scale.fraction(for: 7000), 1.0, "fraction 7000 RPM = 1.0")
+    expectEq(scale.fraction(for: 8000), 1.0, "fraction over maxScale clamped to 1.0")
+
+    // Angles
+    expectEq(scale.angle(for: 0), 135.0, "angle at 0 RPM = 135 deg")
+    expectEq(scale.angle(for: 3500), 270.0, "angle at 3500 RPM = 270 deg (top dead center)")
+    expectEq(scale.angle(for: 7000), 405.0, "angle at 7000 RPM = 405 deg")
+
+    // Redline checking
+    expect(!scale.isRedline(rpm: 3000), "3000 RPM not redline")
+    expect(!scale.isRedline(rpm: 5699), "5699 RPM not redline")
+    expect(scale.isRedline(rpm: 5700), "5700 RPM is redline")
+    expect(scale.isRedline(rpm: 6800), "6800 RPM is redline")
+
+    // Ticks
+    expectEq(scale.majorTicks.count, 8, "8 major ticks: 0k to 7k")
+    expectEq(scale.majorTicks.first, 0, "first major tick is 0")
+    expectEq(scale.majorTicks.last, 7000, "last major tick is 7000")
+    expectEq(scale.mediumTicks.count, 7, "7 medium ticks: 500 to 6500")
+    expectEq(scale.minorTicksCount, 70, "70 minor ticks at 100-rpm increments")
+    expectEq(scale.minorTickRPM(at: 10), 1000, "minor tick index 10 is 1000 RPM")
+}
+
