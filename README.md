@@ -20,11 +20,11 @@
   <img src="https://img.shields.io/badge/dependencies-none-brightgreen" alt="Dependencies">
   <img src="https://img.shields.io/badge/network-none-lightgrey" alt="No network">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.7-blue" alt="Version 2.7">
+  <img src="https://img.shields.io/badge/version-2.8-blue" alt="Version 2.8">
   <img src="https://img.shields.io/badge/updated-2026--10--19-informational" alt="Last updated 2026-10-19">
 </p>
 
-<p align="center"><sub>Last updated / 最后更新：2026-10-19 09:35 (UTC+8) · v2.7 · Author / 作者：zys · Model / 模型：Antigravity</sub></p>
+<p align="center"><sub>Last updated / 最后更新：2026-10-19 13:20 (UTC+8) · v2.8 · Author / 作者：zys · Model / 模型：Gemini 4 Argon</sub></p>
 
 <p align="center"><a href="#english">English</a> · <a href="#简体中文">简体中文</a> · <a href="#changelog--更新记录">Changelog / 更新记录</a></p>
 
@@ -45,7 +45,7 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 | **Ports & memory** | Every dev project listening on a TCP port, grouped by folder, with memory incl. child processes; machine-wide memory, pressure and a 1-hour trend |
 | **Disk usage** | Startup disk, external drives, network shares and disk images — used / available like Finder, updated the moment a drive is plugged in |
 | **Battery charge limit** | macOS 15 native-style "Not Charging" plug state: hold the battery at 80 / 85 / 90 / 95 / 100 %, adapter powers the Mac directly (0 mA cell current), never cuts the adapter; one click back to macOS |
-| **Fans & temperature** | Fan speeds and CPU / GPU / memory / SSD / battery temperatures; optional fan control (fixed speed or max) with built-in safety rules |
+| **Fans & temperature** | Fan speeds and CPU / GPU / memory / SSD / battery temperatures; automotive cockpit speedometer dials (60 FPS mechanical inertia engine & dynamic motion blur) & classic horizontal bars; optional fan control (fixed speed or max) with built-in safety rules |
 | **Stop processes** | `SIGTERM` first, `SIGKILL` only if it refuses; never system or other users' processes |
 | **Disk cleanup** | Temp folders and dev caches, file by file, with a retention window; the size shown is exactly what gets freed |
 | **Favorite projects** | Save project folders, start commands detected automatically, open in Terminal with one click |
@@ -205,6 +205,7 @@ Sources/
 │   ├── Backup           #   export / import format and merge rules
 │   ├── SMC / Thermals   #   read fans and temperatures from the SMC
 │   ├── FanPolicy        #   fan safety rules + helper protocol
+│   ├── FanGaugeMath     #   pure math scaling & polar angles for fan speedometer
 │   ├── FanHelperInstall #   helper paths, launchd plist, install script
 │   ├── Battery...       #   hardware battery charge limiting & SMC writes
 │   ├── AgentChats       #   AI agent chat databases & custom app scanning
@@ -261,7 +262,7 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 | **端口与内存监控** | 列出所有监听 TCP 端口的开发项目，按目录归组，内存含子进程；整机内存、内存压力与近 1 小时趋势 |
 | **磁盘用量** | 启动磁盘、外接硬盘、网络共享和磁盘映像的已用 / 可用，口径与 Finder 一致；接入硬盘后立即显示 |
 | **电池充电上限** | 复刻 macOS 15 原生「未在充电（小插头）」：电量保持在 80 / 85 / 90 / 95 / 100%，外接电源直通主板供电（电芯电流 0 mA），绝不切断适配器；一键交还 macOS 管理 |
-| **风扇与温度** | 风扇转速以及 CPU / GPU / 内存 / SSD / 电池温度；可选风扇控制（固定转速或满速），内置安全规则 |
+| **风扇与温度** | 风扇转速以及 CPU / GPU / 内存 / SSD / 电池温度；全新汽车座舱仪表盘表盘（60 FPS 物理惯性阻尼与动态高斯运动模糊）与经典条状卡片随心切换；可选风扇控制（固定转速或满速），内置安全规则 |
 | **结束进程** | 先 `SIGTERM`，拒不退出才 `SIGKILL`；不碰系统进程和其他用户的进程 |
 | **磁盘清理** | 临时目录与开发缓存，按单个文件、按保留期判断；显示的体积就是实际能释放的体积 |
 | **常用项目** | 收藏项目文件夹，自动识别启动命令，一键在终端中启动 |
@@ -460,9 +461,27 @@ make icon                           # 用 Scripts/make-icon.swift 重新生成 A
 
 Times are UTC+8. 时间为北京时间（UTC+8）。
 
+### v2.8 — 2026-10-19 13:20
+
+> Author / 作者：zys · Model / 模型：Gemini 4 Argon
+
+**English**
+- **Automotive cockpit fan speedometer cluster**: introduced high-precision cockpit tachometer and speedometer dials for cooling fans; features 270° dynamic sweep arc, redline danger zone, upright polar numerals, and target speed notch marker, while 100% preserving classic horizontal bar view with smooth picker transition
+- **60 FPS mechanical inertia acceleration engine**: authentic fan spool-up and deceleration physics driven by cubic Smoothstep S-curve ($3t^2 - 2t^3$) over 0.45s–1.85s; digital HUD displays frame-by-frame continuous rolling RPM digits with zero discrete jumps
+- **Dynamic Gaussian motion blur & 3D acceleration setting**: velocity-driven Gaussian motion blur on needle trails, ribbons, and HUD digits; added user toggle with an in-app notice banner allowing seamless fallback to lightweight 2D standard spring animation with zero background timers for energy savings
+- **Needle geometry & polar trigonometry alignment**: re-architected needle assembly with exact boundary-to-pivot offset ensuring 100% concentric alignment at `(0, 0)`; dials and tick marks use pure polar trigonometry ($(x = r\sin\theta, y = -r\cos\theta)$); shifted central digital HUD cluster downward to completely eliminate overlap with the center hub cap
+- **SwiftUI Gaussian motion blur reuse guide**: documented pure Swift zero-dependency dynamic velocity blur patterns, crossfading, ghost trails, and Metal rendering best practices in `docs/SWIFTUI_GAUSSIAN_MOTION_BLUR_GUIDE.md`
+
+**简体中文**
+- **拟真机车仪表盘风扇座舱（Speedometer Cluster）**：重磅推出高精度双表盘/单表盘汽车座舱速度表风格风扇仪表盘，拥有 270° 动态转速弧环、红线区预警弧、手动目标转速刻度箭头；与经典水平条状卡片 100% 并存且支持平滑转场切换
+- **60 FPS 物理机械惯性阻尼引擎**：基于三次 Smoothstep S 曲线（$3t^2 - 2t^3$）真实模拟风扇起转与减速物理阻尼，HUD 转速数字与指针逐帧连续滚动跳变，告别阶梯式断层
+- **动态高斯运动模糊与 3D 硬件加速设置**：速度突变时自动触发速度驱动的高斯运动模糊与拖尾残影；座舱顶部新增 3D 动效提示横幅与「减弱动态效果 / 开启 3D 加速」开关，关闭后零后台计时器开销，平滑降级至超低能耗经典弹簧模式
+- **同心转动轴心与极坐标正立排布**：重构同轴心指针装配组件与极坐标刻度定位（$x = r\sin\theta, y = -r\cos\theta$），彻底消除锚点漂移；将中央 HUD 读数集群下移，完美消除数字与中心轴盖的遮挡冲突
+- **SwiftUI 动态高斯运动模糊复用手册**：在 `docs/SWIFTUI_GAUSSIAN_MOTION_BLUR_GUIDE.md` 沉淀了纯 Swift 零依赖的速度驱动模糊、模式切换模糊、向心旋转残影拖尾等 4 大复用模板与 Metal 性能军规
+
 ### v2.7 — 2026-10-19 09:35
 
-> Author / 作者：zys · Model / 模型：Antigravity
+> Author / 作者：zys · Model / 模型：Gemini 4 Argon
 
 **English**
 - **Homebrew formula & cask management**: deeply scans `/opt/homebrew` and `/usr/local` `Cellar` (reading `INSTALL_RECEIPT.json` metadata, versions, descriptions, and pinned status) and `Caskroom`; provides quick terminal actions for `brew doctor`, `brew services list`, and `brew outdated`
