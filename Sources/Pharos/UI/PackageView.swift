@@ -120,6 +120,11 @@ struct PackageView: View {
                 ecosystemFilterCard(title: "Go", ecosystem: .go, icon: "arrow.right.circle.fill", color: .cyan)
             }
 
+            // Homebrew dedicated management and control bar
+            if store.selectedEcosystem == .homebrew {
+                homebrewControlBar
+            }
+
             // Featured Software & AI Tools Shelf (Prominently Placed at the Top)
             featuredToolsShelf
 
@@ -174,6 +179,72 @@ struct PackageView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Homebrew Control Bar
+    private var homebrewControlBar: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "mug.fill")
+                    .foregroundStyle(.orange)
+                    .font(.system(size: 14))
+                Text(l10n.homebrewControlTitle)
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                if let feedback = store.homebrewCleanFeedback {
+                    Text(l10n.homebrewCleanDirectlySuccess(feedback))
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                }
+            }
+            Text(l10n.homebrewControlSubtitle)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 8) {
+                Button {
+                    store.runHomebrewCleanup()
+                } label: {
+                    Label(l10n.homebrewCleanCacheBtn, systemImage: "trash")
+                }
+                .help(l10n.homebrewCleanCacheHelp)
+
+                Button {
+                    store.runHomebrewOutdated()
+                } label: {
+                    Label(l10n.homebrewOutdatedBtn, systemImage: "arrow.triangle.2.circlepath")
+                }
+                .help(l10n.homebrewOutdatedHelp)
+
+                Button {
+                    store.runHomebrewDoctor()
+                } label: {
+                    Label(l10n.homebrewDoctorBtn, systemImage: "stethoscope")
+                }
+                .help(l10n.homebrewDoctorHelp)
+
+                Button {
+                    store.runHomebrewServices()
+                } label: {
+                    Label(l10n.homebrewServicesBtn, systemImage: "gearshape.2")
+                }
+                .help(l10n.homebrewServicesHelp)
+
+                Spacer()
+
+                Button {
+                    store.cleanHomebrewCacheDirectly()
+                } label: {
+                    Label(l10n.homebrewCleanDirectlyBtn, systemImage: "sparkles")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            }
+            .controlSize(.small)
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.orange.opacity(0.06)))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.orange.opacity(0.18), lineWidth: 1))
     }
 
     // MARK: - Featured Tools Shelf
@@ -1135,8 +1206,30 @@ struct PackageView: View {
                 }
                 Spacer()
 
-                IconButton(systemImage: "folder", help: l10n.revealInFinder) {
-                    store.revealInFinder(path: repo.rootPath)
+                HStack(spacing: 6) {
+                    if repo.id == "homebrew-cache" {
+                        Button {
+                            store.runHomebrewCleanup()
+                        } label: {
+                            Label("brew cleanup", systemImage: "sparkles")
+                        }
+                        .controlSize(.mini)
+                        .buttonStyle(.bordered)
+                        .help(l10n.homebrewCleanCacheHelp)
+
+                        Button {
+                            store.cleanHomebrewCacheDirectly()
+                        } label: {
+                            Label(l10n.cleanRow, systemImage: "trash")
+                        }
+                        .controlSize(.mini)
+                        .buttonStyle(.bordered)
+                        .help(l10n.homebrewCleanDirectlyBtn)
+                    }
+
+                    IconButton(systemImage: "folder", help: l10n.revealInFinder) {
+                        store.revealInFinder(path: repo.rootPath)
+                    }
                 }
             }
 

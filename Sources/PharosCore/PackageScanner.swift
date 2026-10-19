@@ -132,7 +132,7 @@ public enum PackageScanner {
     private static func scanNodeGlobalCliTools(home: String, seenIds: inout Set<String>) -> [LocalPackageItem] {
         var results: [LocalPackageItem] = []
 
-        // 探测目录：nvm versions/*/bin 以及 ~/.npm-global/bin, ~/.bun/bin
+        // 探测目录：nvm versions/*/bin 以及 ~/.npm-global/bin, ~/.bun/bin, fnm, volta, pnpm, yarn, asdf, mise, homebrew node
         var binDirs: [String] = []
         let nvmNode = (home as NSString).appendingPathComponent(".nvm/versions/node")
         if let versions = try? FileManager.default.contentsOfDirectory(atPath: nvmNode) {
@@ -141,13 +141,23 @@ public enum PackageScanner {
                 binDirs.append(bin)
             }
         }
-        let npmGlobalBin = (home as NSString).appendingPathComponent(".npm-global/bin")
-        if FileManager.default.fileExists(atPath: npmGlobalBin) {
-            binDirs.append(npmGlobalBin)
-        }
-        let bunBin = (home as NSString).appendingPathComponent(".bun/bin")
-        if FileManager.default.fileExists(atPath: bunBin) {
-            binDirs.append(bunBin)
+        let additionalBins = [
+            (home as NSString).appendingPathComponent(".npm-global/bin"),
+            (home as NSString).appendingPathComponent(".bun/bin"),
+            (home as NSString).appendingPathComponent("Library/pnpm"),
+            (home as NSString).appendingPathComponent(".local/share/pnpm"),
+            (home as NSString).appendingPathComponent(".yarn/bin"),
+            (home as NSString).appendingPathComponent(".config/yarn/global/node_modules/.bin"),
+            (home as NSString).appendingPathComponent(".volta/bin"),
+            (home as NSString).appendingPathComponent(".fnm/current/bin"),
+            (home as NSString).appendingPathComponent(".local/share/fnm/current/bin"),
+            (home as NSString).appendingPathComponent(".asdf/shims"),
+            (home as NSString).appendingPathComponent(".local/share/mise/shims"),
+            "/opt/homebrew/lib/node_modules/.bin",
+            "/usr/local/lib/node_modules/.bin"
+        ]
+        for b in additionalBins where FileManager.default.fileExists(atPath: b) {
+            binDirs.append(b)
         }
 
         for binDir in binDirs {
@@ -466,62 +476,183 @@ public enum PackageScanner {
         return results
     }
 
-    // MARK: - Homebrew Global CLI Scanner
+    // MARK: - Homebrew Global CLI & Package Scanner
     private static func scanHomebrewGlobalCliTools(home: String, seenIds: inout Set<String>) -> [LocalPackageItem] {
         var results: [LocalPackageItem] = []
-        let brewBins = ["/opt/homebrew/bin", "/usr/local/bin"]
+        var prefixes = ["/opt/homebrew", "/usr/local"]
+        if let envPrefix = ProcessInfo.processInfo.environment["HOMEBREW_PREFIX"], !prefixes.contains(envPrefix) {
+            prefixes.insert(envPrefix, at: 0)
+        }
+        let testArm = (home as NSString).appendingPathComponent("opt/homebrew")
+        let testIntel = (home as NSString).appendingPathComponent("usr/local")
+        if FileManager.default.fileExists(atPath: testArm) && !prefixes.contains(testArm) {
+            prefixes.append(testArm)
+        }
+        if FileManager.default.fileExists(atPath: testIntel) && !prefixes.contains(testIntel) {
+            prefixes.append(testIntel)
+        }
 
-        for brewBin in brewBins {
-            guard let files = try? FileManager.default.contentsOfDirectory(atPath: brewBin) else { continue }
-            for file in files where !file.hasPrefix(".") {
-                let binPath = (brewBin as NSString).appendingPathComponent(file)
-                guard let st = safeStat(at: binPath), !st.isDir else { continue }
-                let id = "cli:brew:\(file)"
-                guard !seenIds.contains(id) else { continue }
+        for prefix in prefixes {
+            guard FileManager.default.fileExists(atPath: prefix) else { continue }
+            let cellar = (prefix as NSString).appendingPathComponent("Cellar")
+            let caskroom = (prefix as NSString).appendingPathComponent("Caskroom")
+            let binDir = (prefix as NSString).appendingPathComponent("bin")
 
-                var version: String? = nil
-                var installPath = binPath
+            // 1. 扫描 Cellar (Formulae 命令行与库包)
+            if let formulae = try? FileManager.default.contentsOfDirectory(atPath: cellar) {
+                for formula in formulae where !formula.hasPrefix(".") {
+                    let formulaDir = (cellar as NSString).appendingPathComponent(formula)
+                    guard let versions = try? FileManager.default.contentsOfDirectory(atPath: formulaDir) else { continue }
+                    let validVersions = versions.filter { !$0.hasPrefix(".") }
+                    guard let latestVer = validVersions.sorted().last else { continue }
+                    let verDir = (formulaDir as NSString).appendingPathComponent(latestVer)
 
-                if st.isSymlink {
-                    let resolved = URL(fileURLWithPath: binPath).resolvingSymlinksInPath().path
-                    installPath = resolved
-                    // 检查是否指向 ../Cellar/<name>/<version>/...
-                    if resolved.contains("/Cellar/") {
-                        let parts = resolved.components(separatedBy: "/Cellar/")
-                        if parts.count > 1 {
-                            let subParts = parts[1].components(separatedBy: "/")
-                            if subParts.count >= 2 {
-                                version = subParts[1]
+                    let id = "cli:brew:\(formula)"
+                    guard !seenIds.contains(id) else { continue }
+
+                    var summary: String? = nil
+                    var license: String? = nil
+                    var installedOnRequest: Bool = false
+                    var installDate = Date()
+
+                    let receiptPath = (verDir as NSString).appendingPathComponent("INSTALL_RECEIPT.json")
+                    if let data = try? Data(contentsOf: URL(fileURLWithPath: receiptPath)),
+                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                        if let req = json["installed_on_request"] as? Bool {
+                            installedOnRequest = req
+                        }
+                        if let time = json["time"] as? TimeInterval {
+                            installDate = Date(timeIntervalSince1970: time)
+                        }
+                        if let lic = json["license"] as? String {
+                            license = lic
+                        }
+                        if let desc = json["desc"] as? String {
+                            summary = desc
+                        }
+                    }
+
+                    let candidateBin = (binDir as NSString).appendingPathComponent(formula)
+                    let execPath = FileManager.default.fileExists(atPath: candidateBin) ? candidateBin : nil
+                    let (formulaSize, _) = directorySize(at: verDir, maxFiles: 1_000)
+
+                    let rule = featuredCliCatalog[formula.lowercased()]
+                    let isFeatured = (rule != nil) || installedOnRequest
+                    let categoryTag = rule?.tag ?? (installedOnRequest ? "独立软件" : "基础依赖")
+                    let finalSummary = rule?.summary ?? summary ?? "Homebrew Formula 软件包"
+
+                    seenIds.insert(id)
+                    results.append(LocalPackageItem(
+                        id: id,
+                        name: formula,
+                        installedVersion: latestVer,
+                        declaredVersion: nil,
+                        ecosystem: .homebrew,
+                        scope: .globalCli,
+                        healthStatus: .normal,
+                        summary: finalSummary,
+                        license: license,
+                        installPath: verDir,
+                        executablePath: execPath,
+                        fileSizeBytes: formulaSize,
+                        lastModified: installDate,
+                        projectName: nil,
+                        isDevDependency: false,
+                        isFeatured: isFeatured,
+                        categoryTag: categoryTag
+                    ))
+                }
+            }
+
+            // 2. 扫描 Caskroom (Cask 独立桌面应用与开发工具)
+            if let casks = try? FileManager.default.contentsOfDirectory(atPath: caskroom) {
+                for cask in casks where !cask.hasPrefix(".") {
+                    let caskDir = (caskroom as NSString).appendingPathComponent(cask)
+                    guard let versions = try? FileManager.default.contentsOfDirectory(atPath: caskDir) else { continue }
+                    let validVersions = versions.filter { !$0.hasPrefix(".") }
+                    guard let latestVer = validVersions.sorted().last else { continue }
+                    let verDir = (caskDir as NSString).appendingPathComponent(latestVer)
+
+                    let id = "cli:cask:\(cask)"
+                    guard !seenIds.contains(id) else { continue }
+
+                    let (caskSize, _) = directorySize(at: verDir, maxFiles: 500)
+                    let rule = featuredCliCatalog[cask.lowercased()]
+
+                    seenIds.insert(id)
+                    results.append(LocalPackageItem(
+                        id: id,
+                        name: cask,
+                        installedVersion: latestVer,
+                        declaredVersion: nil,
+                        ecosystem: .homebrew,
+                        scope: .globalCli,
+                        healthStatus: .normal,
+                        summary: rule?.summary ?? "Homebrew Cask 独立应用",
+                        license: nil,
+                        installPath: verDir,
+                        executablePath: nil,
+                        fileSizeBytes: caskSize,
+                        lastModified: safeStat(at: verDir)?.mtime ?? Date(),
+                        projectName: nil,
+                        isDevDependency: false,
+                        isFeatured: true,
+                        categoryTag: "Homebrew Cask"
+                    ))
+                }
+            }
+
+            // 3. 补充 /bin 下其他非 Cellar 软链接或工具
+            if let files = try? FileManager.default.contentsOfDirectory(atPath: binDir) {
+                for file in files where !file.hasPrefix(".") {
+                    let binPath = (binDir as NSString).appendingPathComponent(file)
+                    guard let st = safeStat(at: binPath), !st.isDir else { continue }
+                    let id = "cli:brew:\(file)"
+                    guard !seenIds.contains(id) else { continue }
+
+                    var version: String? = nil
+                    var installPath = binPath
+
+                    if st.isSymlink {
+                        let resolved = URL(fileURLWithPath: binPath).resolvingSymlinksInPath().path
+                        installPath = resolved
+                        if resolved.contains("/Cellar/") {
+                            let parts = resolved.components(separatedBy: "/Cellar/")
+                            if parts.count > 1 {
+                                let subParts = parts[1].components(separatedBy: "/")
+                                if subParts.count >= 2 {
+                                    version = subParts[1]
+                                }
                             }
                         }
                     }
+
+                    let rule = featuredCliCatalog[file.lowercased()]
+                    let isFeatured = (rule != nil)
+                    let categoryTag = rule?.tag
+                    let finalSummary = rule?.summary ?? "Homebrew 命令行工具"
+
+                    seenIds.insert(id)
+                    results.append(LocalPackageItem(
+                        id: id,
+                        name: file,
+                        installedVersion: version,
+                        declaredVersion: nil,
+                        ecosystem: .homebrew,
+                        scope: .globalCli,
+                        healthStatus: .normal,
+                        summary: finalSummary,
+                        license: nil,
+                        installPath: installPath,
+                        executablePath: binPath,
+                        fileSizeBytes: st.size,
+                        lastModified: st.mtime,
+                        projectName: nil,
+                        isDevDependency: false,
+                        isFeatured: isFeatured,
+                        categoryTag: categoryTag
+                    ))
                 }
-
-                let rule = featuredCliCatalog[file.lowercased()]
-                let isFeatured = (rule != nil)
-                let categoryTag = rule?.tag
-                let finalSummary = rule?.summary ?? "Homebrew 安装的命令行工具"
-
-                seenIds.insert(id)
-                results.append(LocalPackageItem(
-                    id: id,
-                    name: file,
-                    installedVersion: version,
-                    declaredVersion: nil,
-                    ecosystem: .homebrew,
-                    scope: .globalCli,
-                    healthStatus: .normal,
-                    summary: finalSummary,
-                    license: nil,
-                    installPath: installPath,
-                    executablePath: binPath,
-                    fileSizeBytes: st.size,
-                    lastModified: st.mtime,
-                    projectName: nil,
-                    isDevDependency: false,
-                    isFeatured: isFeatured,
-                    categoryTag: categoryTag
-                ))
             }
         }
         return results
@@ -711,6 +842,106 @@ public enum PackageScanner {
                     description: "本地已安装的 Java 开发套件环境与标准库模块"
                 ))
             }
+        }
+
+        // 2.9 Homebrew 下载与 Bottle 缓存 (~/Library/Caches/Homebrew)
+        let brewCachePath = (home as NSString).appendingPathComponent("Library/Caches/Homebrew")
+        if FileManager.default.fileExists(atPath: brewCachePath) {
+            let (size, count) = directorySize(at: brewCachePath)
+            repos.append(PackageCacheRepoSummary(
+                id: "homebrew-cache",
+                name: "Homebrew 下载与 Bottle 缓存",
+                ecosystem: .homebrew,
+                rootPath: brewCachePath,
+                fileSizeBytes: size,
+                itemCount: count,
+                description: "Homebrew 安装包 (Bottles / Casks / 源码 tarball) 与 API 元数据缓存"
+            ))
+        }
+
+        // 2.10 pip 预编译 Wheel 与源码缓存 (~/Library/Caches/pip, ~/.cache/pip)
+        let pipPaths = [
+            (home as NSString).appendingPathComponent("Library/Caches/pip"),
+            (home as NSString).appendingPathComponent(".cache/pip")
+        ]
+        for p in pipPaths where FileManager.default.fileExists(atPath: p) {
+            let (size, count) = directorySize(at: p)
+            if size > 0 || count > 0 {
+                repos.append(PackageCacheRepoSummary(
+                    id: "pip-cache",
+                    name: "Python pip 预编译 Wheel 缓存",
+                    ecosystem: .python,
+                    rootPath: p,
+                    fileSizeBytes: size,
+                    itemCount: count,
+                    description: "pip 下载的 Python 预构建轮子 (Wheels) 与 tar.gz 源码包缓存"
+                ))
+                break
+            }
+        }
+
+        // 2.11 Gradle 依赖构件与守护进程缓存 (~/.gradle/caches)
+        let gradlePath = (home as NSString).appendingPathComponent(".gradle/caches")
+        if FileManager.default.fileExists(atPath: gradlePath) {
+            let (size, count) = directorySize(at: gradlePath)
+            repos.append(PackageCacheRepoSummary(
+                id: "gradle-cache",
+                name: "Gradle 依赖与构建缓存",
+                ecosystem: .java,
+                rootPath: gradlePath,
+                fileSizeBytes: size,
+                itemCount: count,
+                description: "Gradle 构建下载的 Jar 构件、解压文件与编译守护进程缓存"
+            ))
+        }
+
+        // 2.12 Go 编译与模块缓存 (~/Library/Caches/go-build, ~/go/pkg/mod)
+        let goBuildPath = (home as NSString).appendingPathComponent("Library/Caches/go-build")
+        if FileManager.default.fileExists(atPath: goBuildPath) {
+            let (size, count) = directorySize(at: goBuildPath)
+            repos.append(PackageCacheRepoSummary(
+                id: "go-build-cache",
+                name: "Go 编译构建缓存",
+                ecosystem: .go,
+                rootPath: goBuildPath,
+                fileSizeBytes: size,
+                itemCount: count,
+                description: "Go 编译器生成的预编译包对象与操作哈希缓存"
+            ))
+        }
+        let goModCandidates = [
+            (home as NSString).appendingPathComponent("go/pkg/mod"),
+            (home as NSString).appendingPathComponent("Library/Caches/go-mod")
+        ]
+        for gmp in goModCandidates where FileManager.default.fileExists(atPath: gmp) {
+            let (size, count) = directorySize(at: gmp)
+            if size > 0 || count > 0 {
+                repos.append(PackageCacheRepoSummary(
+                    id: "go-mod-cache",
+                    name: "Go Modules 源码与校验缓存",
+                    ecosystem: .go,
+                    rootPath: gmp,
+                    fileSizeBytes: size,
+                    itemCount: count,
+                    description: "go get / go build 下载的第三方模块源码镜像与校验缓存"
+                ))
+                break
+            }
+        }
+
+        // 2.13 CocoaPods 仓库与源码缓存 (~/Library/Caches/CocoaPods)
+        let cocoapodsPath = (home as NSString).appendingPathComponent("Library/Caches/CocoaPods")
+        if FileManager.default.fileExists(atPath: cocoapodsPath) {
+            let (size, count) = directorySize(at: cocoapodsPath)
+            repos.append(PackageCacheRepoSummary(
+                id: "cocoapods-cache",
+                name: "CocoaPods 仓库与源码缓存",
+                ecosystem: .swift,
+                rootPath: cocoapodsPath,
+                fileSizeBytes: size,
+                itemCount: count,
+                description: "CocoaPods Specs Git 索引镜像与第三方 Pod 源码压缩包缓存"
+            ))
         }
 
         return repos.sorted { $0.fileSizeBytes > $1.fileSizeBytes }
@@ -1385,9 +1616,33 @@ public enum PackageScanner {
         )
     }
 
+    /// 开发者常见项目存放根目录候选列表 (自动探测存在性)
+    public static func defaultSearchRoots(home: String = NSHomeDirectory()) -> [String] {
+        let candidates = [
+            "Developer",
+            "Projects",
+            "Workspace",
+            "workspaces",
+            "code",
+            "dev",
+            "src",
+            "git",
+            "Desktop",
+            "Documents"
+        ]
+        var roots: [String] = []
+        for folder in candidates {
+            let p = (home as NSString).appendingPathComponent(folder)
+            if FileManager.default.fileExists(atPath: p) {
+                roots.append(p)
+            }
+        }
+        return roots.isEmpty ? [(home as NSString).appendingPathComponent("Documents")] : roots
+    }
+
     /// 快速探索开发者常见项目目录 (支持 Node、Python、Swift、Rust 等)
     public static func discoverProjectPaths(
-        searchRoots: [String] = [NSHomeDirectory() + "/Documents"],
+        searchRoots: [String] = defaultSearchRoots(),
         maxDepth: Int = 3
     ) -> [String] {
         var found: [String] = []

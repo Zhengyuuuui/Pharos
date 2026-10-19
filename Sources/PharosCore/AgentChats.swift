@@ -29,6 +29,7 @@ public enum AgentEditorKind: String, Codable, CaseIterable, Identifiable {
     case ccSwitch = "ccSwitch"
     case yDevSphere = "yDevSphere"
     case devin = "devin"
+    case custom = "custom"
 
     public var id: String { rawValue }
 
@@ -61,6 +62,7 @@ public enum AgentEditorKind: String, Codable, CaseIterable, Identifiable {
         case .ccSwitch: return "CC Switch"
         case .yDevSphere: return "YDevSphere"
         case .devin: return "Devin"
+        case .custom: return "自定义应用"
         }
     }
 
@@ -93,6 +95,7 @@ public enum AgentEditorKind: String, Codable, CaseIterable, Identifiable {
         case .ccSwitch: return "arrow.triangle.swap"
         case .yDevSphere: return "globe.americas.fill"
         case .devin: return "sparkles.rectangle.stack"
+        case .custom: return "app.badge.checkmark"
         }
     }
 
@@ -125,6 +128,7 @@ public enum AgentEditorKind: String, Codable, CaseIterable, Identifiable {
         case .ccSwitch: return ["CC Switch.app"]
         case .yDevSphere: return ["YDevSphere.app"]
         case .devin: return ["Devin.app"]
+        case .custom: return []
         }
     }
 
@@ -157,19 +161,25 @@ public enum AgentEditorKind: String, Codable, CaseIterable, Identifiable {
         case .ccSwitch: return ["com.ccswitch.desktop"]
         case .yDevSphere: return ["com.ydevsphere.app"]
         case .devin: return ["ai.cognition.devin", "com.cognition.devin"]
+        case .custom: return []
         }
     }
 
     public var installedAppPath: String? {
         let fm = FileManager.default
         let home = NSHomeDirectory()
+        let searchRoots = [
+            "/Applications",
+            "\(home)/Applications",
+            "/Applications/Utilities",
+            "/System/Applications",
+            "/System/Applications/Utilities"
+        ]
         for name in appNames {
-            let p1 = "/Applications/\(name)"
-            if fm.fileExists(atPath: p1) { return p1 }
-            let p2 = "\(home)/Applications/\(name)"
-            if fm.fileExists(atPath: p2) { return p2 }
-            let p3 = "/System/Applications/\(name)"
-            if fm.fileExists(atPath: p3) { return p3 }
+            for root in searchRoots {
+                let p = "\(root)/\(name)"
+                if fm.fileExists(atPath: p) { return p }
+            }
         }
         return nil
     }
@@ -341,6 +351,10 @@ public enum AgentEditorKind: String, Codable, CaseIterable, Identifiable {
                 AgentKnownPath(label: "Devin 全局共享状态数据库", fullPath: "\(home)/.devin-shared/sharedStorage/state.vscdb", scope: .global),
                 AgentKnownPath(label: "Devin 数据与扩展配置目录", fullPath: "\(home)/.devin", scope: .global, isDirectory: true)
             ]
+        case .custom:
+            return [
+                AgentKnownPath(label: "自定义应用存储目录", fullPath: "\(home)/Library/Application Support", scope: .global, isDirectory: true)
+            ]
         }
     }
 }
@@ -439,6 +453,8 @@ public struct AgentDatabaseEntry: Identifiable, Codable, Equatable {
     public let isOrphaned: Bool
     public let conversationCount: Int
     public let conversations: [AgentConversationSummary]
+    public let customEditorName: String?
+    public let customAppPath: String?
 
     public init(
         id: String,
@@ -453,7 +469,9 @@ public struct AgentDatabaseEntry: Identifiable, Codable, Equatable {
         workspaceName: String,
         isOrphaned: Bool,
         conversationCount: Int,
-        conversations: [AgentConversationSummary] = []
+        conversations: [AgentConversationSummary] = [],
+        customEditorName: String? = nil,
+        customAppPath: String? = nil
     ) {
         self.id = id
         self.editor = editor
@@ -468,12 +486,14 @@ public struct AgentDatabaseEntry: Identifiable, Codable, Equatable {
         self.isOrphaned = isOrphaned
         self.conversationCount = conversationCount
         self.conversations = conversations
+        self.customEditorName = customEditorName
+        self.customAppPath = customAppPath
     }
 }
 
 public enum AgentScanner {
-    /// Scans all supported local AI agent editors for conversation databases.
-    public static func scan(homeDirectory: String = NSHomeDirectory()) -> [AgentDatabaseEntry] {
+    /// Scans all supported local AI agent editors for conversation databases, plus any user-specified custom application paths.
+    public static func scan(homeDirectory: String = NSHomeDirectory(), customAppPaths: [String] = []) -> [AgentDatabaseEntry] {
         var entries: [AgentDatabaseEntry] = []
         entries += scanCursor(home: homeDirectory)
         entries += scanTrae(home: homeDirectory)
@@ -503,8 +523,266 @@ public enum AgentScanner {
         entries += scanYDevSphere(home: homeDirectory)
         entries += scanDevin(home: homeDirectory)
 
-        // Sort by file size descending
-        return entries.sorted { $0.fileSizeBytes > $1.fileSizeBytes }
+        for path in customAppPaths {
+            entries += scanApplication(at: path, homeDirectory: homeDirectory)
+        }
+
+        // Deduplicate by entry.id and sort by file size descending
+        var seen = Set<String>()
+        var deduped: [AgentDatabaseEntry] = []
+        for e in entries {
+            if seen.insert(e.id).inserted {
+                deduped.append(e)
+            }
+        }
+        return deduped.sorted { $0.fileSizeBytes > $1.fileSizeBytes }
+    }
+
+    /// Specifically scans a single application added by the user (from /Applications or any path).
+    public static func scanApplication(at appPath: String, homeDirectory: String = NSHomeDirectory()) -> [AgentDatabaseEntry] {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: appPath) else { return [] }
+
+        // Read Info.plist if available
+        let plistPath = (appPath as NSString).appendingPathComponent("Contents/Info.plist")
+        var bundleId: String?
+        var bundleName: String?
+        var displayName: String?
+
+        if let data = try? Data(contentsOf: URL(fileURLWithPath: plistPath)),
+           let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any] {
+            bundleId = plist["CFBundleIdentifier"] as? String
+            bundleName = plist["CFBundleName"] as? String
+            displayName = plist["CFBundleDisplayName"] as? String
+        }
+
+        let rawAppName = ((appPath as NSString).lastPathComponent as NSString).deletingPathExtension
+        let resolvedName = displayName ?? bundleName ?? rawAppName
+
+        // Check if it matches a predefined AgentEditorKind
+        let appFileName = (appPath as NSString).lastPathComponent
+        var matchedKind: AgentEditorKind? = nil
+        for kind in AgentEditorKind.allCases where kind != .custom {
+            if let bid = bundleId, kind.bundleIdentifiers.contains(bid) { matchedKind = kind; break }
+            if kind.appNames.contains(appFileName) { matchedKind = kind; break }
+            if kind.displayName.lowercased() == resolvedName.lowercased() { matchedKind = kind; break }
+            if resolvedName.lowercased().contains(kind.rawValue.lowercased()) { matchedKind = kind; break }
+        }
+
+        var results: [AgentDatabaseEntry] = []
+
+        if let kind = matchedKind {
+            switch kind {
+            case .cursor: results += scanCursor(home: homeDirectory)
+            case .trae: results += scanTrae(home: homeDirectory)
+            case .windsurf: results += scanWindsurf(home: homeDirectory)
+            case .vscode: results += scanVSCode(home: homeDirectory)
+            case .antigravity: results += scanAntigravity(home: homeDirectory)
+            case .qoder: results += scanQoder(home: homeDirectory)
+            case .cherryStudio: results += scanCherryStudio(home: homeDirectory)
+            case .codeBuddy: results += scanCodeBuddy(home: homeDirectory)
+            case .kiro: results += scanKiro(home: homeDirectory)
+            case .openCode: results += scanOpenCode(home: homeDirectory)
+            case .claudeCode: results += scanClaudeCode(home: homeDirectory)
+            case .zed: results += scanZed(home: homeDirectory)
+            case .workBuddy: results += scanWorkBuddy(home: homeDirectory)
+            case .miniMax: results += scanMiniMax(home: homeDirectory)
+            case .zCode: results += scanZCode(home: homeDirectory)
+            case .continueExt: results += scanContinue(home: homeDirectory)
+            case .aider: results += scanAider(home: homeDirectory)
+            case .doubao: results += scanDoubao(home: homeDirectory)
+            case .chatgpt: results += scanChatGPT(home: homeDirectory)
+            case .marvis: results += scanMarvis(home: homeDirectory)
+            case .wechatDevTools: results += scanWeChatDevTools(home: homeDirectory)
+            case .hbuilder: results += scanHBuilder(home: homeDirectory)
+            case .deepseek: results += scanDeepSeek(home: homeDirectory)
+            case .autoClaw: results += scanAutoClaw(home: homeDirectory)
+            case .ccSwitch: results += scanCCSwitch(home: homeDirectory)
+            case .yDevSphere: results += scanYDevSphere(home: homeDirectory)
+            case .devin: results += scanDevin(home: homeDirectory)
+            case .custom: break
+            }
+        }
+
+        // Deep probe candidate storage directories for this app
+        var candidateDirs: Set<String> = []
+        var namesToProbe: [String] = [resolvedName, rawAppName]
+        if let bn = bundleName { namesToProbe.append(bn) }
+        if let bid = bundleId, let lastPart = bid.components(separatedBy: ".").last { namesToProbe.append(lastPart) }
+
+        for name in namesToProbe {
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+            candidateDirs.insert("\(homeDirectory)/Library/Application Support/\(trimmed)")
+            candidateDirs.insert("\(homeDirectory)/Library/Application Support/\(trimmed) CN")
+            candidateDirs.insert("\(homeDirectory)/Library/Application Support/\(trimmed) AI")
+            candidateDirs.insert("\(homeDirectory)/.\(trimmed.lowercased())")
+            candidateDirs.insert("\(homeDirectory)/.\(trimmed.lowercased())-ai")
+            candidateDirs.insert("\(homeDirectory)/.config/\(trimmed.lowercased())")
+            candidateDirs.insert("\(homeDirectory)/.local/share/\(trimmed.lowercased())")
+        }
+
+        if let bid = bundleId, !bid.isEmpty {
+            candidateDirs.insert("\(homeDirectory)/Library/Application Support/\(bid)")
+            candidateDirs.insert("\(homeDirectory)/Library/Containers/\(bid)/Data/Library/Application Support/\(resolvedName)")
+            candidateDirs.insert("\(homeDirectory)/Library/Containers/\(bid)/Data/Library/Application Support")
+        }
+
+        if resolvedName.lowercased().contains("ollama") {
+            candidateDirs.insert("\(homeDirectory)/.ollama")
+            candidateDirs.insert("\(homeDirectory)/Library/Application Support/Ollama")
+        }
+        if resolvedName.lowercased().contains("lm studio") {
+            candidateDirs.insert("\(homeDirectory)/.cache/lm-studio")
+            candidateDirs.insert("\(homeDirectory)/Library/Application Support/LM Studio")
+        }
+
+        let editorKind = matchedKind ?? .custom
+
+        for dir in candidateDirs {
+            guard fm.fileExists(atPath: dir) else { continue }
+
+            // 1. VS Code style workspaceStorage
+            let wsCandidates = [
+                (dir as NSString).appendingPathComponent("User/workspaceStorage"),
+                (dir as NSString).appendingPathComponent("workspaceStorage")
+            ]
+            for wsRoot in wsCandidates where fm.fileExists(atPath: wsRoot) {
+                let wsEntries = scanWorkspaceStorage(root: wsRoot, editor: editorKind)
+                for entry in wsEntries {
+                    results.append(AgentDatabaseEntry(
+                        id: entry.id,
+                        editor: editorKind,
+                        scope: .workspace,
+                        filePath: entry.filePath,
+                        fileName: entry.fileName,
+                        storageDirectory: entry.storageDirectory,
+                        fileSizeBytes: entry.fileSizeBytes,
+                        lastModified: entry.lastModified,
+                        workspacePath: entry.workspacePath,
+                        workspaceName: entry.workspaceName,
+                        isOrphaned: entry.isOrphaned,
+                        conversationCount: entry.conversationCount,
+                        conversations: entry.conversations,
+                        customEditorName: resolvedName,
+                        customAppPath: appPath
+                    ))
+                }
+            }
+
+            // 2. Global state.vscdb
+            let globalCandidates = [
+                (dir as NSString).appendingPathComponent("User/globalStorage/state.vscdb"),
+                (dir as NSString).appendingPathComponent("globalStorage/state.vscdb")
+            ]
+            for gPath in globalCandidates where fm.fileExists(atPath: gPath) {
+                if let attrs = try? fm.attributesOfItem(atPath: gPath),
+                   let size = attrs[.size] as? UInt64,
+                   let mtime = attrs[.modificationDate] as? Date {
+                    var total = size
+                    if let wal = try? fm.attributesOfItem(atPath: gPath + "-wal"), let ws = wal[.size] as? UInt64 {
+                        total += ws
+                    }
+                    let convs = AgentSQLiteReader.readCursorConversations(dbPath: gPath)
+                    results.append(AgentDatabaseEntry(
+                        id: gPath,
+                        editor: editorKind,
+                        scope: .global,
+                        filePath: gPath,
+                        fileName: "state.vscdb",
+                        storageDirectory: (gPath as NSString).deletingLastPathComponent,
+                        fileSizeBytes: total,
+                        lastModified: mtime,
+                        workspacePath: nil,
+                        workspaceName: "\(resolvedName) 全局状态",
+                        isOrphaned: false,
+                        conversationCount: convs.count,
+                        conversations: convs,
+                        customEditorName: resolvedName,
+                        customAppPath: appPath
+                    ))
+                }
+            }
+
+            // 3. Scan directory files for SQLite databases (*.db, *.sqlite, *.sqlite3)
+            let dbFiles = findDatabaseFiles(in: dir, maxDepth: 2)
+            for filePath in dbFiles {
+                let fileName = (filePath as NSString).lastPathComponent
+                if fileName == "state.vscdb" && results.contains(where: { $0.filePath == filePath }) {
+                    continue
+                }
+                guard AgentSQLiteReader.isSQLiteFile(atPath: filePath) else { continue }
+                guard let attrs = try? fm.attributesOfItem(atPath: filePath),
+                      let size = attrs[.size] as? UInt64,
+                      let mtime = attrs[.modificationDate] as? Date else { continue }
+
+                var total = size
+                if let wal = try? fm.attributesOfItem(atPath: filePath + "-wal"), let ws = wal[.size] as? UInt64 {
+                    total += ws
+                }
+
+                let convs = AgentSQLiteReader.readGenericConversations(dbPath: filePath)
+                let scope: AgentDatabaseScope = filePath.contains("cache") || filePath.contains("index") ? .vectorCache : .global
+
+                results.append(AgentDatabaseEntry(
+                    id: filePath,
+                    editor: editorKind,
+                    scope: scope,
+                    filePath: filePath,
+                    fileName: fileName,
+                    storageDirectory: (filePath as NSString).deletingLastPathComponent,
+                    fileSizeBytes: total,
+                    lastModified: mtime,
+                    workspacePath: nil,
+                    workspaceName: "\(resolvedName) (\(fileName))",
+                    isOrphaned: false,
+                    conversationCount: convs.count,
+                    conversations: convs,
+                    customEditorName: resolvedName,
+                    customAppPath: appPath
+                ))
+            }
+        }
+
+        // Deduplicate by entry.id
+        var seen = Set<String>()
+        var uniqueResults: [AgentDatabaseEntry] = []
+        for e in results {
+            if seen.insert(e.id).inserted {
+                uniqueResults.append(e)
+            }
+        }
+
+        return uniqueResults.sorted { $0.fileSizeBytes > $1.fileSizeBytes }
+    }
+
+    private static func findDatabaseFiles(in dir: String, maxDepth: Int) -> [String] {
+        guard maxDepth >= 0 else { return [] }
+        let fm = FileManager.default
+        guard let items = try? fm.contentsOfDirectory(atPath: dir) else { return [] }
+        var results: [String] = []
+        for item in items {
+            if item.hasPrefix(".") || item == "node_modules" || item == "Pods" || item == "DerivedData" || item == "Cache" || item == "Caches" {
+                continue
+            }
+            let fullPath = (dir as NSString).appendingPathComponent(item)
+            var isDir: ObjCBool = false
+            if fm.fileExists(atPath: fullPath, isDirectory: &isDir) {
+                if isDir.boolValue {
+                    if maxDepth > 0 && !["GPUCache", "DawnCache", "blob_storage", "Session Storage", "IndexedDB", "Local Storage"].contains(item) {
+                        results += findDatabaseFiles(in: fullPath, maxDepth: maxDepth - 1)
+                    }
+                } else {
+                    let ext = (item as NSString).pathExtension.lowercased()
+                    if ["db", "sqlite", "sqlite3", "vscdb", "db3"].contains(ext) {
+                        if !item.hasSuffix("-wal") && !item.hasSuffix("-shm") && !item.hasSuffix("-journal") {
+                            results.append(fullPath)
+                        }
+                    }
+                }
+            }
+        }
+        return results
     }
 
     // MARK: - Cursor
@@ -2280,6 +2558,8 @@ public enum AgentScanner {
                 conversations = AgentSQLiteReader.readTraeSessions(dbPath: dbPath)
             } else if editor == .kiro {
                 conversations = AgentSQLiteReader.readTraeSessions(dbPath: dbPath)
+            } else {
+                conversations = AgentSQLiteReader.readGenericConversations(dbPath: dbPath)
             }
 
             list.append(AgentDatabaseEntry(

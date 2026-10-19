@@ -728,6 +728,31 @@ final class L10n: ObservableObject {
     var backupDatabase: String { en ? "Backup DB" : "备份数据库" }
     var cleanDatabase: String { en ? "Delete DB" : "删除数据库" }
     var confirmCleanDb: String { en ? "Confirm Delete?" : "确认删除？" }
+    var delete: String { en ? "Delete" : "删除" }
+    func deleteDbFirstAlertTitle(_ name: String) -> String {
+        en ? "Delete \"\(name)\" database?" : "确认删除「\(name)」数据库？"
+    }
+    func deleteDbFirstAlertMessage(path: String, size: String, scope: String) -> String {
+        en ? "This will remove the local conversation database file:\n• Scope: \(scope)\n• Size: \(size)\n• Path: \(path)\n\nAre you sure you want to proceed?"
+           : "即将删除该本地对话数据库文件：\n• 类型：\(scope)\n• 大小：\(size)\n• 路径：\(path)\n\n确定要继续吗？"
+    }
+    func deleteDbEditorRunningWarning(_ editorName: String) -> String {
+        en ? "\(editorName) is currently running. Deleting active database files may cause editor anomalies or data loss."
+           : "当前 \(editorName) 正在运行中。删除正在使用的数据库可能导致编辑器异常或数据丢失。"
+    }
+    var deleteDbProceedToConfirm: String {
+        en ? "Continue to Delete…" : "继续删除…"
+    }
+    func deleteDbSecondAlertTitle(_ name: String) -> String {
+        en ? "Permanently delete \"\(name)\"?" : "最终确认：彻底删除「\(name)」？"
+    }
+    var deleteDbSecondAlertMessage: String {
+        en ? "This action is PERMANENT and IRREVERSIBLE. All associated chat history in this database will be completely removed. We strongly recommend making a backup before proceeding."
+           : "此操作不可逆！该数据库及其中包含的全部历史对话记录将被彻底清除，无法恢复。如果数据重要，请务必先点击备份。"
+    }
+    var deleteDbFinalConfirmButton: String {
+        en ? "Permanently Delete" : "确认彻底删除"
+    }
     var conversationsInDb: String { en ? "Conversations in Database" : "数据库内对话记录" }
     var noConversationsParsed: String {
         en ? "No individual session records parsed (internal state or binary cache)."
@@ -774,6 +799,35 @@ final class L10n: ObservableObject {
     func agentDbCount(_ n: Int) -> String { en ? "\(n) DBs" : "\(n) 个库" }
     var agentChartCollapse: String { en ? "Collapse chart" : "收起图表" }
     var agentChartExpand: String { en ? "Expand chart" : "展开图表" }
+    var agentAddCustomApp: String { en ? "Add Application" : "手动添加应用" }
+    var agentAddCustomAppShort: String { en ? "Add App" : "手动添加" }
+    var agentAddCustomAppHelp: String {
+        en ? "Select and scan an unrecognized editor or AI app from /Applications"
+           : "从 /Applications 中选择并单独扫描未自动识别的编辑器或 AI 应用"
+    }
+    var agentAddAppPanelTitle: String { en ? "Select Application to Scan" : "选择要扫描的应用程序" }
+    var agentAddAppPanelMessage: String {
+        en ? "Select an unrecognized editor or AI application from /Applications to scan its local conversation databases and workspace storage."
+           : "选择 /Applications 下未识别的编辑器或 AI 应用，单独扫描其本地对话数据库与工作区存储。"
+    }
+    var agentAddAppPanelPrompt: String { en ? "Add & Scan" : "添加并扫描" }
+    func agentAddAppSuccess(_ name: String, count: Int, size: String) -> String {
+        en ? "Scanned “\(name)”: found \(count) database(s) (\(size))."
+           : "已添加并扫描「\(name)」：发现 \(count) 个数据库（共 \(size)）。"
+    }
+    func agentAddAppNoDbsFound(_ name: String) -> String {
+        en ? "Scanned “\(name)”, but no conversation databases were found in standard storage paths."
+           : "已扫描「\(name)」，但在标准存储目录中未发现对话数据库。"
+    }
+    var agentRemoveCustomApp: String { en ? "Remove App" : "移除应用" }
+    var agentRemoveCustomAppHelp: String {
+        en ? "Remove this application from Pharos management"
+           : "从 Pharos 管理列表中移除此手动添加的应用"
+    }
+    func agentRemoveCustomAppConfirm(_ name: String) -> String {
+        en ? "Are you sure you want to remove “\(name)” from the list?"
+           : "确定从列表中移除「\(name)」吗？"
+    }
     var agentEditorsHeader: String { en ? "AI Editors" : "AI 编辑器" }
     func agentInactiveEditorsHeader(_ n: Int) -> String { en ? "Editors without data (\(n))" : "无数据的编辑器（\(n)）" }
     var agentBackToAll: String { en ? "All Editors" : "全部编辑器" }
@@ -781,6 +835,14 @@ final class L10n: ObservableObject {
     var agentTabConversations: String { en ? "Conversations" : "对话" }
     var agentSearchConversations: String { en ? "Search titles or snippets…" : "搜索对话标题或摘要…" }
     var agentSearchResults: String { en ? "Search Results" : "搜索结果" }
+    var allDatabasesHeader: String { en ? "All Databases" : "全部数据库" }
+    var agentDbNoMatch: String { en ? "No databases match." : "没有匹配的数据库。" }
+    var cleanEditorOrphaned: String { en ? "Clean Orphaned" : "清理残留工作区" }
+    var cleanEditorOrphanedHelp: String {
+        en ? "Delete orphaned workspace storage folders for this editor"
+           : "清理该编辑器中项目已不存在的残留工作区存储"
+    }
+    var cleanEditorOrphanedConfirm: String { en ? "Clean Orphaned?" : "确认清理残留？" }
     func agentPathsNotCreated(_ n: Int) -> String { en ? "\(n) known path(s) not created yet" : "\(n) 个已知路径尚未生成" }
     var agentTruncatedNote: String {
         en ? "Only the latest 100 sessions per database are read."
@@ -1026,6 +1088,37 @@ final class L10n: ObservableObject {
     var tempCleanupSubtitle: String {
         en ? "Clean scratch files generated by build scripts, CLI tools, and background agents in /tmp and /var/tmp"
            : "清理 /private/tmp、/var/tmp 及用户临时文件夹中积累的即时生成物"
+    }
+
+    // Homebrew Management & Control
+    var homebrewControlTitle: String { en ? "Homebrew System & Package Control" : "Homebrew 软件包与系统管控" }
+    var homebrewControlSubtitle: String {
+        en ? "Manage installed Formulae, Casks, background services, and prune bottle download caches"
+           : "管控本地已安装的 Formula 依赖、Cask 应用、后台运行服务，并一键清理缓存与诊断体检"
+    }
+    var homebrewCleanCacheBtn: String { en ? "Clean Cache (brew cleanup)" : "清理缓存 (brew cleanup)" }
+    var homebrewCleanCacheHelp: String {
+        en ? "Runs brew cleanup in terminal to prune outdated formula bottles, cask downloads, and free gigabytes of space"
+           : "在终端运行 brew cleanup --prune=all，清理所有旧版本软件包、过期的 Bottle 与 Cask 下载缓存"
+    }
+    var homebrewDoctorBtn: String { en ? "Doctor (brew doctor)" : "环境体检 (brew doctor)" }
+    var homebrewDoctorHelp: String {
+        en ? "Runs brew doctor in terminal to inspect Homebrew setup and diagnose formula conflicts or broken symlinks"
+           : "在终端运行 brew doctor，检查 Homebrew 环境健康度、符号链接完整性与潜在配置冲突"
+    }
+    var homebrewOutdatedBtn: String { en ? "Outdated (brew outdated)" : "检查可升级 (brew outdated)" }
+    var homebrewOutdatedHelp: String {
+        en ? "Inspect formulas and casks that have new versions available upstream"
+           : "在终端运行 brew outdated，列出当前已安装且上游有新版本可更新的 Formula 与 Cask"
+    }
+    var homebrewServicesBtn: String { en ? "Services (brew services)" : "后台服务 (brew services)" }
+    var homebrewServicesHelp: String {
+        en ? "Inspect or manage background daemons (e.g. MySQL, Redis, Nginx, PostgreSQL) managed by Homebrew"
+           : "在终端运行 brew services list，查看由 Homebrew 启动管理的后台数据库与守护进程状态"
+    }
+    var homebrewCleanDirectlyBtn: String { en ? "Clean Folder Directly" : "直接清理缓存目录" }
+    func homebrewCleanDirectlySuccess(_ size: String) -> String {
+        en ? "Cleaned Homebrew cache: \(size) freed" : "Homebrew 缓存清理成功，已释放 \(size)"
     }
 
     // MARK: - Battery & Charging Control

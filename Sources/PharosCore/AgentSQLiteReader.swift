@@ -544,6 +544,108 @@ public struct AgentSQLiteReader {
         return results
     }
 
+    /// Reads conversation records from generic SQLite databases by probing common schemas
+    public static func readGenericConversations(dbPath: String) -> [AgentConversationSummary] {
+        guard isSQLiteFile(atPath: dbPath) else { return [] }
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_close(db) }
+
+        // Find available table names
+        var tables: Set<String> = []
+        let tableQuery = "SELECT name FROM sqlite_master WHERE type='table';"
+        var tableStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, tableQuery, -1, &tableStmt, nil) == SQLITE_OK {
+            defer { sqlite3_finalize(tableStmt) }
+            while sqlite3_step(tableStmt) == SQLITE_ROW {
+                if let name = sqlite3_column_text(tableStmt, 0).flatMap({ String(cString: $0) }) {
+                    tables.insert(name)
+                }
+            }
+        }
+
+        // Table priority order
+        let candidateTables = ["chats", "conversations", "chat_sessions", "chat_session", "sessions", "threads", "messages"]
+        for targetTable in candidateTables {
+            guard tables.contains(targetTable) else { continue }
+            // Probe columns
+            let colQuery = "PRAGMA table_info(\(targetTable));"
+            var colStmt: OpaquePointer?
+            var colNames: [String] = []
+            if sqlite3_prepare_v2(db, colQuery, -1, &colStmt, nil) == SQLITE_OK {
+                defer { sqlite3_finalize(colStmt) }
+                while sqlite3_step(colStmt) == SQLITE_ROW {
+                    if let colName = sqlite3_column_text(colStmt, 1).flatMap({ String(cString: $0) }) {
+                        colNames.append(colName.lowercased())
+                    }
+                }
+            }
+
+            let idCol = colNames.first { ["id", "conversation_id", "session_id", "chat_id", "uuid"].contains($0) }
+            let titleCol = colNames.first { ["title", "name", "session_title", "topic", "preview", "summary", "subject"].contains($0) }
+            let createdCol = colNames.first { ["created_at", "createdat", "create_time", "gmt_create", "timestamp", "time"].contains($0) }
+            let updatedCol = colNames.first { ["updated_at", "updatedat", "update_time", "last_updated", "gmt_modified", "last_modified"].contains($0) }
+
+            guard idCol != nil || titleCol != nil else { continue }
+
+            let selectId = idCol ?? "ROWID"
+            let selectTitle = titleCol ?? "'Session'"
+            let selectCreated = createdCol ?? "NULL"
+            let selectUpdated = updatedCol ?? "NULL"
+            let orderCol = updatedCol ?? createdCol ?? selectId
+
+            let selectQuery = "SELECT \(selectId), \(selectTitle), \(selectCreated), \(selectUpdated) FROM \(targetTable) ORDER BY \(orderCol) DESC LIMIT 100;"
+            var stmt: OpaquePointer?
+            var list: [AgentConversationSummary] = []
+            if sqlite3_prepare_v2(db, selectQuery, -1, &stmt, nil) == SQLITE_OK {
+                defer { sqlite3_finalize(stmt) }
+                while sqlite3_step(stmt) == SQLITE_ROW {
+                    let idStr = sqlite3_column_text(stmt, 0).flatMap { String(cString: $0) } ?? UUID().uuidString
+                    let rawTitle = sqlite3_column_text(stmt, 1).flatMap { String(cString: $0) } ?? "Conversation"
+                    let createdStr = sqlite3_column_text(stmt, 2).flatMap { String(cString: $0) }
+                    let updatedStr = sqlite3_column_text(stmt, 3).flatMap { String(cString: $0) }
+
+                    let createdDate: Date? = {
+                        guard let s = createdStr else { return nil }
+                        if let ms = Double(s), ms > 1_000_000_000 {
+                            return ms > 10_000_000_000 ? Date(timeIntervalSince1970: ms / 1000.0) : Date(timeIntervalSince1970: ms)
+                        }
+                        return parseDate(s)
+                    }()
+
+                    let updatedDate: Date? = {
+                        guard let s = updatedStr else { return nil }
+                        if let ms = Double(s), ms > 1_000_000_000 {
+                            return ms > 10_000_000_000 ? Date(timeIntervalSince1970: ms / 1000.0) : Date(timeIntervalSince1970: ms)
+                        }
+                        return parseDate(s)
+                    }()
+
+                    list.append(AgentConversationSummary(
+                        id: idStr,
+                        title: rawTitle.isEmpty ? "Conversation" : rawTitle,
+                        createdAt: createdDate,
+                        updatedAt: updatedDate,
+                        mode: targetTable,
+                        messageCount: nil,
+                        snippet: nil
+                    ))
+                }
+            }
+            if !list.isEmpty {
+                return list
+            }
+        }
+
+        // Try reading ItemTable if available
+        if tables.contains("ItemTable") {
+            let itemConvs = readCursorConversations(dbPath: dbPath)
+            if !itemConvs.isEmpty { return itemConvs }
+        }
+
+        return []
+    }
+
     /// Date parsing helper for SQLite date strings (ISO8601 or standard date formats)
     public static func parseDate(_ string: String) -> Date? {
         let isoFormatter = ISO8601DateFormatter()

@@ -95,15 +95,38 @@ final class PackageStore: ObservableObject {
         isScanning = true
         hasScanned = true
 
+        // 收集已知活跃项目、收藏工作区与各 AI 编辑器的工作区路径
+        var activeRoots = Set<String>()
+        if let store = AppDelegate.shared?.store {
+            for p in store.projects {
+                if let dir = p.directory, !dir.isEmpty {
+                    activeRoots.insert(dir)
+                }
+            }
+        }
+        for fav in WorkspaceStore.shared.favorites {
+            activeRoots.insert(fav.directory)
+        }
+        for e in AgentChatStore.shared.entries {
+            if let ws = e.workspacePath, !ws.isEmpty {
+                activeRoots.insert(ws)
+            }
+        }
+        let initialRoots = Array(activeRoots)
+
         Task.detached(priority: .userInitiated) { [weak self] in
             let (clis, caches, finalSummaries) = autoreleasepool {
                 let clis = PackageScanner.scanGlobalCliTools()
                 let caches = PackageScanner.scanCacheRepositories()
 
-                // 探索已知活跃项目与 ~/Documents
-                let docRoots = PackageScanner.discoverProjectPaths(maxDepth: 3)
+                // 探索系统常见开发者目录与已知活跃项目
+                var allRoots = Set(initialRoots)
+                for path in PackageScanner.discoverProjectPaths(maxDepth: 3) {
+                    allRoots.insert(path)
+                }
+
                 var summaries: [ProjectDependencySummary] = []
-                for path in docRoots {
+                for path in allRoots {
                     if let summary = PackageScanner.scanProjectDependencies(projectPath: path) {
                         summaries.append(summary)
                     }
@@ -352,6 +375,61 @@ final class PackageStore: ObservableObject {
             NSWorkspace.shared.open(tempScriptUrl)
         } catch {
             print("Failed to run uninstall script in terminal: \(error)")
+        }
+    }
+
+    // MARK: - Homebrew Control & Management
+    func runTerminalCommand(_ command: String, title: String) {
+        let script = LaunchScript.contents(
+            directory: NSHomeDirectory(),
+            command: command,
+            title: "Pharos: \(title)",
+            shell: nil,
+            interactiveLogin: true
+        )
+        let tempScriptUrl = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("pharos-brew-\(UUID().uuidString).command")
+        do {
+            try LaunchScript.write(script, to: tempScriptUrl)
+            NSWorkspace.shared.open(tempScriptUrl)
+        } catch {
+            print("Failed to run command in terminal: \(error)")
+        }
+    }
+
+    func runHomebrewCleanup() {
+        runTerminalCommand("brew cleanup --prune=all", title: "Homebrew Cleanup")
+    }
+
+    func runHomebrewDoctor() {
+        runTerminalCommand("brew doctor", title: "Homebrew Doctor")
+    }
+
+    func runHomebrewOutdated() {
+        runTerminalCommand("brew outdated", title: "Homebrew Outdated Packages")
+    }
+
+    func runHomebrewServices() {
+        runTerminalCommand("brew services list", title: "Homebrew Services")
+    }
+
+    @Published var homebrewCleanFeedback: String? = nil
+
+    func cleanHomebrewCacheDirectly() {
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let target = DiskCleaner.Target(
+                id: "homebrew",
+                path: NSHomeDirectory() + "/Library/Caches/Homebrew",
+                title: "homebrew",
+                group: .packages,
+                maxAgeDays: nil
+            )
+            let result = DiskCleaner.cleanOne(target)
+            let caches = PackageScanner.scanCacheRepositories()
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.cacheRepos = caches
+                self.homebrewCleanFeedback = ByteFormat.disk(result.freedBytes)
+            }
         }
     }
 }

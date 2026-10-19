@@ -36,6 +36,27 @@ final class AgentChatStore: ObservableObject {
             recomputeFiltered()
         }
     }
+    @Published var selectedCustomName: String? = nil
+    @Published var selectedCustomAppPath: String? = nil
+
+    func selectEditor(_ summary: AgentEditorSummary) {
+        selectedCustomName = summary.customEditorName
+        selectedCustomAppPath = summary.customAppPath
+        selectedEditor = summary.editor
+    }
+
+    func resetSelection() {
+        selectedCustomName = nil
+        selectedCustomAppPath = nil
+        selectedEditor = nil
+    }
+
+    private let customAppPathsKey = "customAgentAppPaths"
+    var customAppPaths: [String] {
+        get { UserDefaults.standard.stringArray(forKey: customAppPathsKey) ?? [] }
+        set { UserDefaults.standard.set(newValue, forKey: customAppPathsKey) }
+    }
+
     @Published var selectedScope: AgentDatabaseScope? = nil {
         didSet { recomputeFiltered() }
     }
@@ -79,18 +100,25 @@ final class AgentChatStore: ObservableObject {
 
     /// Editors with nothing detected on disk.
     var inactiveEditors: [AgentEditorKind] {
-        AgentEditorKind.allCases.filter { summaryByEditor[$0] == nil }
+        AgentEditorKind.allCases.filter { ed in
+            ed != .custom && summaryByEditor[ed] == nil
+        }
     }
 
-    /// Overview shows the database list only when the user is actually looking for something.
+    /// Overview shows search results only when the user is actively searching.
     var isOverviewFiltering: Bool {
-        !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty || showOnlyOrphaned || selectedScope != nil
+        !searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    func summary(for editor: AgentEditorKind) -> AgentEditorSummary? { summaryByEditor[editor] }
+    func summary(for editor: AgentEditorKind, customName: String? = nil) -> AgentEditorSummary? {
+        if editor == .custom {
+            return summaries.first { $0.editor == .custom && $0.customEditorName == customName }
+        }
+        return summaryByEditor[editor]
+    }
 
-    func conversationRefs(for editor: AgentEditorKind) -> [AgentConversationRef] {
-        AgentChatCatalog.conversations(for: editor, in: entries, query: detailSearch)
+    func conversationRefs(for editor: AgentEditorKind, customName: String? = nil) -> [AgentConversationRef] {
+        AgentChatCatalog.conversations(for: editor, in: entries, query: detailSearch, customName: customName)
     }
 
     func isTruncated(_ editor: AgentEditorKind) -> Bool {
@@ -99,7 +127,12 @@ final class AgentChatStore: ObservableObject {
 
     private func recomputeFiltered() {
         let base = entries.filter { entry in
-            if let editor = selectedEditor, entry.editor != editor { return false }
+            if let editor = selectedEditor {
+                if entry.editor != editor { return false }
+                if editor == .custom, let custom = selectedCustomName, entry.customEditorName != custom {
+                    return false
+                }
+            }
             if let scope = selectedScope, entry.scope != scope { return false }
             if showOnlyOrphaned && !entry.isOrphaned { return false }
             return AgentChatCatalog.matches(entry, query: searchQuery)
@@ -110,6 +143,9 @@ final class AgentChatStore: ObservableObject {
     // MARK: - Write-operation policy
 
     func isEditorRunning(_ editor: AgentEditorKind) -> Bool {
+        if editor == .custom {
+            return false
+        }
         let ids = Set(editor.bundleIdentifiers)
         guard !ids.isEmpty else { return false }
         return NSWorkspace.shared.runningApplications.contains { app in
@@ -117,8 +153,22 @@ final class AgentChatStore: ObservableObject {
         }
     }
 
+    func isCustomAppRunning(appPath: String?) -> Bool {
+        guard let appPath else { return false }
+        let normPath = (appPath as NSString).standardizingPath
+        return NSWorkspace.shared.runningApplications.contains { app in
+            guard let bundleURL = app.bundleURL else { return false }
+            return (bundleURL.path as NSString).standardizingPath == normPath
+        }
+    }
+
     func deleteVerdict(_ entry: AgentDatabaseEntry) -> AgentDeletePolicy.Verdict {
-        AgentDeletePolicy.evaluate(entry, knownPaths: entry.editor.knownStoragePaths(), appRunning: isEditorRunning(entry.editor))
+        let known = entry.editor == .custom ? [
+            AgentKnownPath(label: entry.workspaceName, fullPath: entry.filePath, scope: entry.scope),
+            AgentKnownPath(label: entry.workspaceName, fullPath: entry.storageDirectory, scope: entry.scope, isDirectory: true)
+        ] : entry.editor.knownStoragePaths()
+        let running = entry.editor == .custom ? isCustomAppRunning(appPath: entry.customAppPath) : isEditorRunning(entry.editor)
+        return AgentDeletePolicy.evaluate(entry, knownPaths: known, appRunning: running)
     }
 
     func scanIfNeeded() {
@@ -132,9 +182,10 @@ final class AgentChatStore: ObservableObject {
         guard !isScanning else { return }
         isScanning = true
         hasScanned = true
+        let paths = customAppPaths
         Task.detached(priority: .userInitiated) { [weak self] in
             let results = autoreleasepool {
-                AgentScanner.scan()
+                AgentScanner.scan(customAppPaths: paths)
             }
             await MainActor.run { [weak self] in
                 guard let self else { return }
@@ -142,6 +193,71 @@ final class AgentChatStore: ObservableObject {
                 self.isScanning = false
             }
         }
+    }
+
+    /// Adds a user-selected application bundle from /Applications and triggers a dedicated scan.
+    func addCustomApplication() {
+        let l10n = L10n.shared
+        let panel = NSOpenPanel()
+        panel.title = l10n.agentAddAppPanelTitle
+        panel.message = l10n.agentAddAppPanelMessage
+        panel.prompt = l10n.agentAddAppPanelPrompt
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.treatsFilePackagesAsDirectories = false
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        addAndScanApplication(at: url.path)
+    }
+
+    /// Specifically scans a single application added by the user.
+    func addAndScanApplication(at path: String) {
+        var paths = customAppPaths
+        if !paths.contains(path) {
+            paths.append(path)
+            customAppPaths = paths
+        }
+
+        isScanning = true
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let newEntries = autoreleasepool {
+                AgentScanner.scanApplication(at: path)
+            }
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.isScanning = false
+                let appName = (path as NSString).lastPathComponent.replacingOccurrences(of: ".app", with: "")
+
+                if newEntries.isEmpty {
+                    self.isSuccessMessage = false
+                    self.statusMessage = L10n.shared.agentAddAppNoDbsFound(appName)
+                } else {
+                    var updated = self.entries.filter { old in !newEntries.contains { $0.id == old.id } }
+                    updated.append(contentsOf: newEntries)
+                    self.entries = updated
+                    let totalBytes = newEntries.reduce(0) { $0 + $1.fileSizeBytes }
+                    self.isSuccessMessage = true
+                    self.statusMessage = L10n.shared.agentAddAppSuccess(appName, count: newEntries.count, size: ByteFormat.short(totalBytes))
+                }
+            }
+        }
+    }
+
+    /// Removes a custom application and its entries from Pharos.
+    func removeCustomApplication(named name: String?, appPath: String?) {
+        if let appPath {
+            var paths = customAppPaths
+            paths.removeAll { $0 == appPath }
+            customAppPaths = paths
+        }
+        entries.removeAll { e in
+            if let name, e.customEditorName == name { return true }
+            if let appPath, e.customAppPath == appPath { return true }
+            return false
+        }
+        resetSelection()
     }
 
     /// Releases heavy conversation arrays and text excerpts while retaining
@@ -164,7 +280,9 @@ final class AgentChatStore: ObservableObject {
                 workspaceName: e.workspaceName,
                 isOrphaned: e.isOrphaned,
                 conversationCount: e.conversationCount,
-                conversations: []
+                conversations: [],
+                customEditorName: e.customEditorName,
+                customAppPath: e.customAppPath
             )
         }
     }
@@ -222,11 +340,67 @@ final class AgentChatStore: ObservableObject {
         }
     }
 
+    /// Prompts the user with 2 consecutive confirmation dialogs before deleting the database.
+    func confirmAndDelete(_ entry: AgentDatabaseEntry) {
+        let l10n = L10n.shared
+
+        // --- Dialog 1: Warning about the database file & editor running state ---
+        let alert1 = NSAlert()
+        alert1.alertStyle = .warning
+        alert1.messageText = l10n.deleteDbFirstAlertTitle(entry.workspaceName)
+
+        let scopeLabel = entry.scope == .global ? l10n.agentScopeShortGlobal : (entry.scope == .vectorCache ? l10n.agentScopeShortCache : l10n.agentScopeShortWorkspace)
+        var info1 = l10n.deleteDbFirstAlertMessage(
+            path: entry.filePath,
+            size: ByteFormat.disk(entry.fileSizeBytes),
+            scope: scopeLabel
+        )
+        if isEditorRunning(entry.editor) {
+            info1 += "\n\n⚠️ " + l10n.deleteDbEditorRunningWarning(entry.editor.displayName)
+        }
+        alert1.informativeText = info1
+
+        let btnProceed = alert1.addButton(withTitle: l10n.deleteDbProceedToConfirm)
+        alert1.addButton(withTitle: l10n.cancel)
+        btnProceed.hasDestructiveAction = true
+
+        guard alert1.runModal() == .alertFirstButtonReturn else {
+            return
+        }
+
+        // --- Dialog 2: Critical irreversible warning ---
+        let alert2 = NSAlert()
+        alert2.alertStyle = .critical
+        alert2.messageText = l10n.deleteDbSecondAlertTitle(entry.workspaceName)
+        alert2.informativeText = l10n.deleteDbSecondAlertMessage
+
+        let btnDelete = alert2.addButton(withTitle: l10n.deleteDbFinalConfirmButton)
+        alert2.addButton(withTitle: l10n.cancel)
+        btnDelete.hasDestructiveAction = true
+
+        guard alert2.runModal() == .alertFirstButtonReturn else {
+            return
+        }
+
+        // Both confirmed -> perform actual deletion
+        deleteEntry(entry)
+    }
+
     func deleteEntry(_ entry: AgentDatabaseEntry) {
         let l10n = L10n.shared
         do {
-            try AgentDatabaseManager.deleteEntry(entry, appRunning: isEditorRunning(entry.editor))
-            entries.removeAll { $0.id == entry.id }
+            let known = entry.editor == .custom ? [
+                AgentKnownPath(label: entry.workspaceName, fullPath: entry.filePath, scope: entry.scope),
+                AgentKnownPath(label: entry.workspaceName, fullPath: entry.storageDirectory, scope: entry.scope, isDirectory: true)
+            ] : entry.editor.knownStoragePaths()
+            let running = entry.editor == .custom ? isCustomAppRunning(appPath: entry.customAppPath) : isEditorRunning(entry.editor)
+            try AgentDatabaseManager.deleteEntry(entry, knownPaths: known, appRunning: running)
+            if entry.isOrphaned && entry.scope == .workspace {
+                let dir = entry.storageDirectory
+                entries.removeAll { $0.storageDirectory == dir || $0.filePath.hasPrefix(dir) }
+            } else {
+                entries.removeAll { $0.id == entry.id }
+            }
             isSuccessMessage = true
             statusMessage = l10n.agentDbCleanSuccess(entry.workspaceName)
         } catch AgentDatabaseManager.DeleteError.refused(let verdict) {
@@ -240,6 +414,18 @@ final class AgentChatStore: ObservableObject {
 
     func cleanAllOrphaned() {
         let targets = orphanedEntries
+        guard !targets.isEmpty else { return }
+        let result = AgentDatabaseManager.cleanOrphanedEntries(targets)
+        let removed = Set(result.deletedIds)
+        entries.removeAll { removed.contains($0.id) }
+        isSuccessMessage = result.failed == 0
+        statusMessage = L10n.shared.agentOrphanedCleanResult(
+            count: removed.count, size: ByteFormat.short(result.bytesFreed), skipped: result.skipped, failed: result.failed
+        )
+    }
+
+    func cleanOrphaned(for editor: AgentEditorKind) {
+        let targets = entries.filter { $0.editor == editor && $0.isOrphaned }
         guard !targets.isEmpty else { return }
         let result = AgentDatabaseManager.cleanOrphanedEntries(targets)
         let removed = Set(result.deletedIds)

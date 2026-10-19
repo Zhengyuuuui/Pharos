@@ -273,11 +273,11 @@ func testAgentDeletePolicy() {
     let ws = "\(root)/workspaceStorage/abc"
 
     let global = makeEntry(scope: .global, file: "\(root)/globalStorage/state.vscdb", dir: "\(root)/globalStorage")
-    expectEq(AgentDeletePolicy.evaluate(global, knownPaths: known, appRunning: false), .globalDatabase, "global DB never deleted")
+    expectEq(AgentDeletePolicy.evaluate(global, knownPaths: known, appRunning: false), .allowed(target: "\(root)/globalStorage/state.vscdb", isDirectory: false), "global DB deletable with confirmation")
 
     let liveWs = makeEntry(scope: .workspace, file: "\(ws)/state.vscdb", dir: ws)
     expectEq(AgentDeletePolicy.evaluate(liveWs, knownPaths: known, appRunning: false), .allowed(target: "\(ws)/state.vscdb", isDirectory: false), "workspace DB deletable when app closed")
-    expectEq(AgentDeletePolicy.evaluate(liveWs, knownPaths: known, appRunning: true), .appRunning, "workspace DB refused while app runs")
+    expectEq(AgentDeletePolicy.evaluate(liveWs, knownPaths: known, appRunning: true), .allowed(target: "\(ws)/state.vscdb", isDirectory: false), "workspace DB deletable with confirmation even while app runs")
 
     let orphan = makeEntry(scope: .workspace, file: "\(ws)/state.vscdb", dir: ws, orphaned: true)
     expectEq(AgentDeletePolicy.evaluate(orphan, knownPaths: known, appRunning: true), .allowed(target: ws, isDirectory: true), "orphaned workspace folder deletable even while app runs")
@@ -296,6 +296,12 @@ func testAgentDeletePolicy() {
 
     let cache = makeEntry(scope: .vectorCache, file: "/Users/t/.cache/idx/k.db", dir: "/Users/t/.cache/idx")
     expectEq(AgentDeletePolicy.evaluate(cache, knownPaths: known, appRunning: false), .allowed(target: "/Users/t/.cache/idx/k.db", isDirectory: false), "cache DB deletable")
+
+    let nestedRoot = "/Users/t/Library/Application Support/微信开发者工具"
+    let nestedKnown = [AgentKnownPath(label: "wc", fullPath: nestedRoot, scope: .workspace, isDirectory: true)]
+    let nestedDir = "\(nestedRoot)/hash123/Default/Editor/1.78/user-data/User/workspaceStorage/proj456"
+    let nestedOrphan = makeEntry(scope: .workspace, file: "\(nestedDir)/state.vscdb", dir: nestedDir, orphaned: true)
+    expectEq(AgentDeletePolicy.evaluate(nestedOrphan, knownPaths: nestedKnown, appRunning: false), .allowed(target: nestedDir, isDirectory: true), "nested profile workspaceStorage orphan deletable")
 
     let tmp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("pharos-orphans-\(UUID().uuidString)")
     let wsRoot = tmp.appendingPathComponent("workspaceStorage")
@@ -365,4 +371,75 @@ func testLiveAgentScanner() {
         print("  - [\(entry.editor.displayName)] \(entry.fileName) (\(String(format: "%.1f", mb)) MB, \(entry.conversationCount) convs): \(entry.workspaceName)")
     }
     expect(list.count > 0, "found local AI agent databases")
+}
+
+func testCustomApplicationScanner() {
+    let tmp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("pharos-custom-app-\(UUID().uuidString)")
+    let home = tmp.appendingPathComponent("fake-home")
+    let appBundle = tmp.appendingPathComponent("MyCustomAI.app")
+    let contents = appBundle.appendingPathComponent("Contents")
+    try? FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
+    try? FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tmp) }
+
+    // 1. Write Info.plist
+    let plist: [String: Any] = [
+        "CFBundleIdentifier": "com.example.mycustomai",
+        "CFBundleName": "MyCustomAI",
+        "CFBundleDisplayName": "My Custom AI",
+        "CFBundleExecutable": "MyCustomAI"
+    ]
+    let plistData = try? PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+    try? plistData?.write(to: contents.appendingPathComponent("Info.plist"))
+
+    // 2. Create Application Support directories & databases
+    let appSupport = home.appendingPathComponent("Library/Application Support/My Custom AI")
+    let wsDir = appSupport.appendingPathComponent("User/workspaceStorage/ws101")
+    try? FileManager.default.createDirectory(at: wsDir, withIntermediateDirectories: true)
+
+    // A. SQLite database in appSupport root
+    let dbPath = appSupport.appendingPathComponent("conversations.db").path
+    var db: OpaquePointer?
+    if sqlite3_open(dbPath, &db) == SQLITE_OK {
+        sqlite3_exec(db, "CREATE TABLE chats (id TEXT, title TEXT, created_at TEXT);", nil, nil, nil)
+        sqlite3_exec(db, "INSERT INTO chats VALUES ('c1', 'Custom chat session 1', '2026-10-18 12:00:00');", nil, nil, nil)
+        sqlite3_close(db)
+    }
+
+    // B. VSCode-style workspaceStorage state.vscdb
+    let wsDbPath = wsDir.appendingPathComponent("state.vscdb").path
+    if sqlite3_open(wsDbPath, &db) == SQLITE_OK {
+        sqlite3_exec(db, "CREATE TABLE ItemTable (key TEXT, value TEXT);", nil, nil, nil)
+        sqlite3_close(db)
+    }
+    let wsJson: [String: Any] = ["folder": "file:///Users/test/workspace/myproject"]
+    if let d = try? JSONSerialization.data(withJSONObject: wsJson) {
+        try? d.write(to: wsDir.appendingPathComponent("workspace.json"))
+    }
+
+    // 3. Scan the application
+    let entries = AgentScanner.scanApplication(at: appBundle.path, homeDirectory: home.path)
+    expect(entries.count >= 2, "found at least 2 databases in custom app (found \(entries.count))")
+
+    for entry in entries {
+        expectEq(entry.editor, .custom, "editor kind is custom")
+        expectEq(entry.customEditorName, "My Custom AI", "resolved name matches CFBundleDisplayName")
+        expectEq(entry.customAppPath, appBundle.path, "customAppPath recorded")
+    }
+
+    // Verify conversation parsing from generic reader
+    if let convDb = entries.first(where: { $0.fileName == "conversations.db" }) {
+        expectEq(convDb.conversationCount, 1, "parsed 1 conversation from chats table")
+        expectEq(convDb.conversations.first?.title, "Custom chat session 1", "conversation title matches")
+    }
+
+    // 4. Summarize and verify grouping
+    let summaries = AgentChatCatalog.summarize(entries)
+    expectEq(summaries.count, 1, "custom app summarized into 1 card")
+    expectEq(summaries.first?.displayName, "My Custom AI", "summary displays custom name")
+    expectEq(summaries.first?.customAppPath, appBundle.path, "summary preserves app path")
+
+    // 5. Test scan with customAppPaths
+    let allEntries = AgentScanner.scan(homeDirectory: home.path, customAppPaths: [appBundle.path])
+    expect(allEntries.contains { $0.customEditorName == "My Custom AI" }, "scan(customAppPaths:) includes custom app")
 }

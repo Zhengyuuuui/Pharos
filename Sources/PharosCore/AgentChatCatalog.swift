@@ -3,6 +3,8 @@ import Foundation
 /// Per-editor rollup of detected databases, computed once per scan instead of on every render.
 public struct AgentEditorSummary: Identifiable, Equatable {
     public let editor: AgentEditorKind
+    public let customEditorName: String?
+    public let customAppPath: String?
     public let totalBytes: UInt64
     public let databaseCount: Int
     public let conversationCount: Int
@@ -12,7 +14,42 @@ public struct AgentEditorSummary: Identifiable, Equatable {
     public let orphanedCount: Int
     public let lastModified: Date?
 
-    public var id: String { editor.rawValue }
+    public init(
+        editor: AgentEditorKind,
+        customEditorName: String? = nil,
+        customAppPath: String? = nil,
+        totalBytes: UInt64,
+        databaseCount: Int,
+        conversationCount: Int,
+        workspaceBytes: UInt64,
+        globalBytes: UInt64,
+        cacheBytes: UInt64,
+        orphanedCount: Int,
+        lastModified: Date?
+    ) {
+        self.editor = editor
+        self.customEditorName = customEditorName
+        self.customAppPath = customAppPath
+        self.totalBytes = totalBytes
+        self.databaseCount = databaseCount
+        self.conversationCount = conversationCount
+        self.workspaceBytes = workspaceBytes
+        self.globalBytes = globalBytes
+        self.cacheBytes = cacheBytes
+        self.orphanedCount = orphanedCount
+        self.lastModified = lastModified
+    }
+
+    public var id: String {
+        if let custom = customEditorName {
+            return "\(editor.rawValue):\(custom)"
+        }
+        return editor.rawValue
+    }
+
+    public var displayName: String {
+        customEditorName ?? editor.displayName
+    }
 }
 
 /// A conversation together with the database it was read from, so merged lists can say where each row lives.
@@ -47,9 +84,23 @@ public enum AgentChatCatalog {
     public static let readerConversationCap = 100
 
     public static func summarize(_ entries: [AgentDatabaseEntry]) -> [AgentEditorSummary] {
-        var groups: [AgentEditorKind: [AgentDatabaseEntry]] = [:]
-        for e in entries { groups[e.editor, default: []].append(e) }
-        return groups.map { editor, list in
+        struct GroupKey: Hashable {
+            let editor: AgentEditorKind
+            let customName: String?
+            let customAppPath: String?
+        }
+
+        var groups: [GroupKey: [AgentDatabaseEntry]] = [:]
+        for e in entries {
+            let key = GroupKey(
+                editor: e.editor,
+                customName: e.editor == .custom ? e.customEditorName : nil,
+                customAppPath: e.editor == .custom ? e.customAppPath : nil
+            )
+            groups[key, default: []].append(e)
+        }
+
+        return groups.map { key, list in
             var total: UInt64 = 0, ws: UInt64 = 0, glob: UInt64 = 0, cache: UInt64 = 0
             var convs = 0, orphaned = 0
             var latest: Date?
@@ -65,11 +116,20 @@ public enum AgentChatCatalog {
                 if latest.map({ e.lastModified > $0 }) ?? true { latest = e.lastModified }
             }
             return AgentEditorSummary(
-                editor: editor, totalBytes: total, databaseCount: list.count, conversationCount: convs,
-                workspaceBytes: ws, globalBytes: glob, cacheBytes: cache, orphanedCount: orphaned, lastModified: latest
+                editor: key.editor,
+                customEditorName: key.customName,
+                customAppPath: key.customAppPath,
+                totalBytes: total,
+                databaseCount: list.count,
+                conversationCount: convs,
+                workspaceBytes: ws,
+                globalBytes: glob,
+                cacheBytes: cache,
+                orphanedCount: orphaned,
+                lastModified: latest
             )
         }
-        .sorted { $0.totalBytes != $1.totalBytes ? $0.totalBytes > $1.totalBytes : $0.editor.rawValue < $1.editor.rawValue }
+        .sorted { $0.totalBytes != $1.totalBytes ? $0.totalBytes > $1.totalBytes : $0.id < $1.id }
     }
 
     public static func matches(_ entry: AgentDatabaseEntry, query: String) -> Bool {
@@ -100,22 +160,33 @@ public enum AgentChatCatalog {
     }
 
     /// Conversations of one editor across all its databases, newest first; undated rows go last.
-    public static func conversations(for editor: AgentEditorKind, in entries: [AgentDatabaseEntry], query: String = "") -> [AgentConversationRef] {
-        entries.filter { $0.editor == editor }
-            .flatMap { e in
-                e.conversations.filter { matches($0, query: query) }.map {
-                    AgentConversationRef(conversation: $0, entryId: e.id, databaseName: e.workspaceName,
-                                         databasePath: e.filePath, scope: e.scope)
-                }
+    public static func conversations(
+        for editor: AgentEditorKind,
+        in entries: [AgentDatabaseEntry],
+        query: String = "",
+        customName: String? = nil
+    ) -> [AgentConversationRef] {
+        entries.filter { e in
+            guard e.editor == editor else { return false }
+            if editor == .custom, let customName, e.customEditorName != customName {
+                return false
             }
-            .sorted { a, b in
-                switch (a.sortDate, b.sortDate) {
-                case let (x?, y?): return x != y ? x > y : a.id < b.id
-                case (.some, .none): return true
-                case (.none, .some): return false
-                case (.none, .none): return a.id < b.id
-                }
+            return true
+        }
+        .flatMap { e in
+            e.conversations.filter { matches($0, query: query) }.map {
+                AgentConversationRef(conversation: $0, entryId: e.id, databaseName: e.workspaceName,
+                                     databasePath: e.filePath, scope: e.scope)
             }
+        }
+        .sorted { a, b in
+            switch (a.sortDate, b.sortDate) {
+            case let (x?, y?): return x != y ? x > y : a.id < b.id
+            case (.some, .none): return true
+            case (.none, .some): return false
+            case (.none, .none): return a.id < b.id
+            }
+        }
     }
 
     /// Whether some database returned exactly the reader cap, i.e. older sessions were not loaded.
@@ -139,9 +210,7 @@ public enum AgentDeletePolicy {
         case appRunning
     }
 
-    public static func evaluate(_ entry: AgentDatabaseEntry, knownPaths: [AgentKnownPath], appRunning: Bool) -> Verdict {
-        if entry.scope == .global && !entry.isOrphaned { return .globalDatabase }
-
+    public static func evaluate(_ entry: AgentDatabaseEntry, knownPaths: [AgentKnownPath], appRunning: Bool = false) -> Verdict {
         let dirRoots = knownPaths.filter(\.isDirectory).map { normalize($0.fullPath) }
         let fileRoots = Set(knownPaths.filter { !$0.isDirectory }.map { normalize($0.fullPath) })
 
@@ -149,15 +218,16 @@ public enum AgentDeletePolicy {
             let dir = normalize(entry.storageDirectory)
             let parent = (dir as NSString).deletingLastPathComponent
             let wsRoots = knownPaths.filter { $0.isDirectory && $0.scope == .workspace }.map { normalize($0.fullPath) }
-            guard wsRoots.contains(parent), isStrictlyInside(normalize(entry.filePath), dir) else { return .outsideKnownPaths }
+            let isValidParent = wsRoots.contains(parent) || wsRoots.contains { root in
+                (parent as NSString).lastPathComponent == "workspaceStorage" && isStrictlyInside(parent, root)
+            }
+            guard isValidParent, isStrictlyInside(normalize(entry.filePath), dir) else { return .outsideKnownPaths }
             return .allowed(target: dir, isDirectory: true)
         }
 
         let file = normalize(entry.filePath)
         let inside = fileRoots.contains(file) || dirRoots.contains { isStrictlyInside(file, $0) }
         guard inside else { return .outsideKnownPaths }
-        if entry.scope == .global { return .globalDatabase }
-        if appRunning { return .appRunning }
         return .allowed(target: file, isDirectory: false)
     }
 

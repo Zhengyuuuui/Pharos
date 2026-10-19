@@ -12,14 +12,18 @@ struct AgentChatView: View {
     var body: some View {
         Group {
             if let editor = store.selectedEditor {
-                AgentEditorDetailPage(editor: editor)
-                    .id(editor)
+                AgentEditorDetailPage(
+                    editor: editor,
+                    customName: store.selectedCustomName,
+                    customAppPath: store.selectedCustomAppPath
+                )
+                .id(store.selectedCustomName ?? editor.rawValue)
             } else {
                 AgentOverviewPage()
             }
         }
         .onAppear { store.scanIfNeeded() }
-        .onExitCommand { store.selectedEditor = nil }
+        .onExitCommand { store.resetSelection() }
     }
 }
 
@@ -45,9 +49,8 @@ private struct AgentOverviewPage: View {
                 } else {
                     AgentStorageChartView()
                     editorsSection
-                    filterBar
                     if store.isOverviewFiltering {
-                        searchResults
+                        searchResultsSection
                     }
                 }
             }
@@ -64,6 +67,12 @@ private struct AgentOverviewPage: View {
             }
             Spacer()
             HStack(spacing: 8) {
+                Button { store.addCustomApplication() } label: {
+                    Label(l10n.agentAddCustomAppShort, systemImage: "plus.app")
+                }
+                .controlSize(.small)
+                .help(l10n.agentAddCustomAppHelp)
+
                 Button { store.scan() } label: {
                     Label(store.isScanning ? l10n.loading : l10n.refreshNow, systemImage: "arrow.clockwise")
                 }
@@ -130,8 +139,21 @@ private struct AgentOverviewPage: View {
 
     private var editorsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label(l10n.agentEditorsHeader, systemImage: "square.grid.2x2")
-                .font(.system(size: 13, weight: .semibold))
+            HStack(alignment: .center, spacing: 8) {
+                Label(l10n.agentEditorsHeader, systemImage: "square.grid.2x2")
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Button { store.addCustomApplication() } label: {
+                    Label(l10n.agentAddCustomAppShort, systemImage: "plus")
+                        .font(.system(size: 11))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .help(l10n.agentAddCustomAppHelp)
+
+                AgentSearchField(placeholder: l10n.searchDatabasesPlaceholder, text: $store.searchQuery)
+                    .frame(minWidth: 160, maxWidth: 260)
+            }
 
             switch store.editorLayout {
             case .grid: editorGrid
@@ -168,7 +190,7 @@ private struct AgentOverviewPage: View {
     private var editorGrid: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), spacing: 10)], spacing: 10) {
             ForEach(store.summaries) { s in
-                Button { store.selectedEditor = s.editor } label: { AgentEditorGridCard(summary: s) }
+                Button { store.selectEditor(s) } label: { AgentEditorGridCard(summary: s) }
                     .buttonStyle(.plain)
             }
         }
@@ -178,10 +200,10 @@ private struct AgentOverviewPage: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
                 ForEach(store.summaries) { s in
-                    Button { store.selectedEditor = s.editor } label: {
+                    Button { store.selectEditor(s) } label: {
                         HStack(spacing: 5) {
-                            AgentEditorIconView(editor: s.editor, size: 16)
-                            Text(s.editor.displayName).font(.system(size: 11)).lineLimit(1)
+                            AgentEditorIconView(editor: s.editor, customAppPath: s.customAppPath, size: 16)
+                            Text(s.displayName).font(.system(size: 11)).lineLimit(1)
                             Text(ByteFormat.short(s.totalBytes))
                                 .font(.system(size: 9.5).monospacedDigit())
                                 .foregroundStyle(.secondary)
@@ -198,41 +220,43 @@ private struct AgentOverviewPage: View {
                     }
                     .buttonStyle(.plain)
                     .fixedSize()
-                    .help("\(s.editor.displayName) · \(l10n.agentDbCount(s.databaseCount)) · \(s.conversationCount) \(l10n.conversationsCountLabel)")
+                    .help("\(s.displayName) · \(l10n.agentDbCount(s.databaseCount)) · \(s.conversationCount) \(l10n.conversationsCountLabel)")
                 }
             }
             .padding(.vertical, 2)
         }
     }
 
-    // MARK: Cross-editor search
+    // MARK: Cross-editor search results (shown only when searching)
 
-    private var filterBar: some View {
-        HStack(spacing: 10) {
-            AgentSearchField(placeholder: l10n.searchDatabasesPlaceholder, text: $store.searchQuery)
-                .frame(minWidth: 150, maxWidth: 260)
-            AgentScopePicker(selection: $store.selectedScope)
-            Toggle(l10n.onlyOrphaned, isOn: $store.showOnlyOrphaned)
-                .toggleStyle(.checkbox)
-                .font(.system(size: 11))
-                .foregroundStyle(store.showOnlyOrphaned ? Color.red : Color.secondary)
-                .fixedSize()
-            Spacer()
-            if store.isOverviewFiltering { AgentSortPicker(selection: $store.sortOrder) }
-        }
-    }
+    private var searchResultsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 10) {
+                Text("\(l10n.agentSearchResults) (\(store.filteredEntries.count))")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                AgentScopePicker(selection: $store.selectedScope)
+                Toggle(l10n.onlyOrphaned, isOn: $store.showOnlyOrphaned)
+                    .toggleStyle(.checkbox)
+                    .font(.system(size: 11))
+                    .foregroundStyle(store.showOnlyOrphaned ? Color.red : Color.secondary)
+                    .fixedSize()
+                AgentSortPicker(selection: $store.sortOrder)
+            }
 
-    private var searchResults: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("\(l10n.agentSearchResults) (\(store.filteredEntries.count))")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
             if store.filteredEntries.isEmpty {
-                Text(l10n.agentConvNoMatch).font(.system(size: 11)).foregroundStyle(.tertiary)
+                Text(l10n.agentDbNoMatch)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .padding(.vertical, 8)
             } else {
                 AgentDatabaseList(entries: store.filteredEntries, showsEditor: true, query: store.searchQuery)
             }
         }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .controlBackgroundColor)))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.08), lineWidth: 1))
     }
 }
 
@@ -244,9 +268,9 @@ private struct AgentEditorGridCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                AgentEditorIconView(editor: summary.editor, size: 28)
+                AgentEditorIconView(editor: summary.editor, customAppPath: summary.customAppPath, size: 28)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(summary.editor.displayName).font(.system(size: 12.5, weight: .semibold)).lineLimit(1)
+                    Text(summary.displayName).font(.system(size: 12.5, weight: .semibold)).lineLimit(1)
                     Text(ByteFormat.disk(summary.totalBytes))
                         .font(.system(size: 11, weight: .medium).monospacedDigit())
                         .foregroundStyle(summary.editor.themeColor)
@@ -281,10 +305,14 @@ private struct AgentEditorGridCard: View {
 
 private struct AgentEditorDetailPage: View {
     let editor: AgentEditorKind
+    var customName: String? = nil
+    var customAppPath: String? = nil
     @ObservedObject private var store = AgentChatStore.shared
     @ObservedObject private var l10n = L10n.shared
     @State private var tab: Tab = .databases
     @State private var showMissingPaths = false
+    @State private var armedOrphanClean = false
+    @State private var armedRemoveApp = false
 
     enum Tab: Hashable { case databases, conversations }
 
@@ -297,8 +325,8 @@ private struct AgentEditorDetailPage: View {
                     AgentStatusBanner(message: msg, isSuccess: store.isSuccessMessage) { store.statusMessage = nil }
                 }
                 Picker("", selection: $tab) {
-                    Text("\(l10n.agentTabDatabases) (\(store.summary(for: editor)?.databaseCount ?? 0))").tag(Tab.databases)
-                    Text("\(l10n.agentTabConversations) (\(store.summary(for: editor)?.conversationCount ?? 0))").tag(Tab.conversations)
+                    Text("\(l10n.agentTabDatabases) (\(store.summary(for: editor, customName: customName)?.databaseCount ?? 0))").tag(Tab.databases)
+                    Text("\(l10n.agentTabConversations) (\(store.summary(for: editor, customName: customName)?.conversationCount ?? 0))").tag(Tab.conversations)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -315,26 +343,103 @@ private struct AgentEditorDetailPage: View {
     }
 
     private var backBar: some View {
-        Button { store.selectedEditor = nil } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "chevron.left").font(.system(size: 10, weight: .semibold))
-                Text(l10n.agentBackToAll).font(.system(size: 12))
+        HStack {
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    store.resetSelection()
+                }
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "chevron.left").font(.system(size: 11, weight: .semibold))
+                    Text(l10n.agentBackToAll).font(.system(size: 12))
+                }
+                .foregroundStyle(Color.accentColor)
+                .contentShape(Rectangle())
             }
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .keyboardShortcut("[", modifiers: .command)
+
+            Spacer()
+
+            HStack(spacing: 8) {
+                if editor == .custom {
+                    if armedRemoveApp {
+                        HStack(spacing: 4) {
+                            Button(role: .destructive) {
+                                armedRemoveApp = false
+                                store.removeCustomApplication(named: customName, appPath: customAppPath)
+                            } label: {
+                                Text(l10n.delete).font(.system(size: 11, weight: .semibold))
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.red)
+                            .controlSize(.small)
+                            IconButton(systemImage: "xmark", help: l10n.cancel) { armedRemoveApp = false }
+                        }
+                    } else {
+                        Button { armedRemoveApp = true } label: {
+                            Label(l10n.agentRemoveCustomApp, systemImage: "trash")
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.red)
+                        .controlSize(.small)
+                        .help(l10n.agentRemoveCustomAppHelp)
+                    }
+                }
+
+                Button { store.scan() } label: {
+                    Label(store.isScanning ? l10n.loading : l10n.refreshNow, systemImage: "arrow.clockwise")
+                }
+                .controlSize(.small)
+                .disabled(store.isScanning)
+
+                if let s = store.summary(for: editor, customName: customName), s.orphanedCount > 0 {
+                    if armedOrphanClean {
+                        HStack(spacing: 4) {
+                            Button {
+                                armedOrphanClean = false
+                                store.cleanOrphaned(for: editor)
+                            } label: {
+                                Text(l10n.cleanEditorOrphanedConfirm).font(.system(size: 11, weight: .semibold))
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.red)
+                            .controlSize(.small)
+                            IconButton(systemImage: "xmark", help: l10n.cancel) { armedOrphanClean = false }
+                        }
+                    } else {
+                        Button { armedOrphanClean = true } label: {
+                            Label(l10n.cleanEditorOrphaned, systemImage: "trash")
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.red)
+                        .controlSize(.small)
+                        .help(l10n.cleanEditorOrphanedHelp)
+                    }
+                }
+            }
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(Color.accentColor)
-        .keyboardShortcut("[", modifiers: .command)
     }
 
     private var summaryCard: some View {
-        let s = store.summary(for: editor)
-        return HStack(spacing: 12) {
-            AgentEditorIconView(editor: editor, size: 44)
+        let s = store.summary(for: editor, customName: customName)
+        let title = customName ?? editor.displayName
+        return HStack(spacing: 14) {
+            AgentEditorIconView(editor: editor, customAppPath: customAppPath, size: 44)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
-                    Text(editor.displayName).font(.system(size: 16, weight: .bold))
-                    if editor.isAppInstalled {
+                    Text(title).font(.system(size: 16, weight: .bold))
+                    if editor == .custom {
+                        if let path = customAppPath, FileManager.default.fileExists(atPath: path) {
+                            HStack(spacing: 3) {
+                                Circle().fill(Color.green).frame(width: 6, height: 6)
+                                Text(l10n.appInstalled).font(.system(size: 10, weight: .medium))
+                            }
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(Capsule().fill(Color.green.opacity(0.12)))
+                            .foregroundStyle(Color.green)
+                        }
+                    } else if editor.isAppInstalled {
                         HStack(spacing: 3) {
                             Circle().fill(Color.green).frame(width: 6, height: 6)
                             Text(l10n.appInstalled).font(.system(size: 10, weight: .medium))
@@ -348,10 +453,28 @@ private struct AgentEditorDetailPage: View {
                             .background(Capsule().fill(Color.primary.opacity(0.06)))
                             .foregroundStyle(.secondary)
                     }
+                    if let orphaned = s?.orphanedCount, orphaned > 0 {
+                        HStack(spacing: 3) {
+                            Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 9))
+                            Text("\(orphaned) \(l10n.orphanedWorkspaces)").font(.system(size: 10, weight: .semibold))
+                        }
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(Capsule().fill(Color.red.opacity(0.12)))
+                        .foregroundStyle(Color.red)
+                    }
                 }
-                Text("\(s?.databaseCount ?? 0) \(l10n.databasesCountLabel) · \(s?.conversationCount ?? 0) \(l10n.conversationsCountLabel) · \(ByteFormat.disk(s?.totalBytes ?? 0))")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Text("\(s?.databaseCount ?? 0) \(l10n.databasesCountLabel)")
+                    Text("·").foregroundStyle(.tertiary)
+                    Text("\(s?.conversationCount ?? 0) \(l10n.conversationsCountLabel)")
+                    Text("·").foregroundStyle(.tertiary)
+                    Text(ByteFormat.disk(s?.totalBytes ?? 0))
+                        .fontWeight(.semibold)
+                        .foregroundStyle(editor.themeColor)
+                }
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+
                 if let last = s?.lastModified {
                     Text("\(l10n.agentLastActive): \(Format.relativeAge(last))")
                         .font(.system(size: 10))
@@ -374,12 +497,20 @@ private struct AgentEditorDetailPage: View {
                 AgentSearchField(placeholder: l10n.searchDatabasesPlaceholder, text: $store.searchQuery)
                     .frame(minWidth: 150, maxWidth: 260)
                 AgentScopePicker(selection: $store.selectedScope)
+                Toggle(l10n.onlyOrphaned, isOn: $store.showOnlyOrphaned)
+                    .toggleStyle(.checkbox)
+                    .font(.system(size: 11))
+                    .foregroundStyle(store.showOnlyOrphaned ? Color.red : Color.secondary)
+                    .fixedSize()
                 Spacer()
                 AgentSortPicker(selection: $store.sortOrder)
             }
 
             if store.filteredEntries.isEmpty {
-                Text(l10n.agentConvNoMatch).font(.system(size: 11)).foregroundStyle(.tertiary)
+                Text(store.searchQuery.isEmpty && store.selectedScope == nil && !store.showOnlyOrphaned
+                     ? l10n.noAgentDbsFound
+                     : l10n.agentDbNoMatch)
+                    .font(.system(size: 11)).foregroundStyle(.tertiary)
             } else {
                 AgentDatabaseList(entries: store.filteredEntries, showsEditor: false, query: store.searchQuery)
             }
@@ -412,7 +543,7 @@ private struct AgentEditorDetailPage: View {
     // MARK: Conversations tab
 
     private var conversationsTab: some View {
-        let refs = store.conversationRefs(for: editor)
+        let refs = store.conversationRefs(for: editor, customName: customName)
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
                 AgentSearchField(placeholder: l10n.agentSearchConversations, text: $store.detailSearch)
@@ -448,7 +579,6 @@ private struct AgentDatabaseList: View {
     let query: String
     @ObservedObject private var l10n = L10n.shared
     @State private var displayLimit = 60
-    @State private var armedDeleteId: String?
 
     var body: some View {
         LazyVStack(spacing: 8) {
@@ -456,10 +586,7 @@ private struct AgentDatabaseList: View {
                 AgentDatabaseCard(
                     entry: entry,
                     showsEditor: showsEditor,
-                    query: query,
-                    isArmedDelete: armedDeleteId == entry.id,
-                    onArmDelete: { armedDeleteId = entry.id },
-                    onDisarmDelete: { armedDeleteId = nil }
+                    query: query
                 )
             }
             if entries.count > displayLimit {
@@ -480,9 +607,6 @@ private struct AgentDatabaseCard: View {
     let entry: AgentDatabaseEntry
     let showsEditor: Bool
     let query: String
-    let isArmedDelete: Bool
-    let onArmDelete: () -> Void
-    let onDisarmDelete: () -> Void
 
     @ObservedObject private var store = AgentChatStore.shared
     @ObservedObject private var l10n = L10n.shared
@@ -500,7 +624,7 @@ private struct AgentDatabaseCard: View {
                             .foregroundStyle(.secondary)
                             .rotationEffect(.degrees(isExpanded ? 90 : 0))
                             .frame(width: 10)
-                        AgentEditorIconView(editor: entry.editor, size: 24, isOrphaned: entry.isOrphaned)
+                        AgentEditorIconView(editor: entry.editor, customAppPath: entry.customAppPath, size: 24, isOrphaned: entry.isOrphaned)
                         titleBlock
                         Spacer(minLength: 8)
                         stats
@@ -532,11 +656,21 @@ private struct AgentDatabaseCard: View {
             HStack(spacing: 6) {
                 Text(entry.workspaceName).font(.system(size: 12.5, weight: .semibold)).lineLimit(1)
                 if showsEditor {
-                    Text(entry.editor.displayName)
-                        .font(.system(size: 9.5, weight: .medium))
-                        .padding(.horizontal, 5).padding(.vertical, 1)
-                        .background(Capsule().fill(Color.primary.opacity(0.06)))
-                        .foregroundStyle(.secondary)
+                    Button {
+                        if entry.editor == .custom {
+                            store.selectedCustomName = entry.customEditorName
+                            store.selectedCustomAppPath = entry.customAppPath
+                        }
+                        store.selectedEditor = entry.editor
+                    } label: {
+                        Text(entry.customEditorName ?? entry.editor.displayName)
+                            .font(.system(size: 9.5, weight: .medium))
+                            .padding(.horizontal, 5).padding(.vertical, 1)
+                            .background(Capsule().fill(Color.primary.opacity(0.06)))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("\(l10n.agentTabDatabases): \(entry.customEditorName ?? entry.editor.displayName)")
                 }
                 AgentScopeBadge(scope: entry.scope)
                 if entry.isOrphaned {
@@ -555,6 +689,7 @@ private struct AgentDatabaseCard: View {
                 .foregroundStyle(entry.isOrphaned ? Color.red.opacity(0.8) : Color.secondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
+                .textSelection(.enabled)
         }
     }
 
@@ -580,27 +715,27 @@ private struct AgentDatabaseCard: View {
     private var actions: some View {
         let verdict = store.deleteVerdict(entry)
         let deletable: Bool = { if case .allowed = verdict { return true } else { return false } }()
-        return HStack(spacing: 4) {
+        return HStack(spacing: 5) {
             if entry.workspacePath != nil && !entry.isOrphaned {
                 IconButton(systemImage: "terminal", help: l10n.openInTerminal) { store.openProjectInTerminal(entry) }
             }
             IconButton(systemImage: "folder", help: l10n.revealInFinder) { store.revealInFinder(entry) }
             IconButton(systemImage: "arrow.down.doc", help: l10n.backupDatabase) { store.backupEntry(entry) }
-            if isArmedDelete && deletable {
-                HStack(spacing: 2) {
-                    Button {
-                        onDisarmDelete()
-                        store.deleteEntry(entry)
-                    } label: {
-                        Text(l10n.confirmCleanDb).font(.system(size: 10, weight: .bold))
+            if deletable {
+                Button {
+                    store.confirmAndDelete(entry)
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "trash.fill")
+                            .font(.system(size: 9, weight: .bold))
+                        Text(l10n.delete)
+                            .font(.system(size: 10, weight: .bold))
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.red)
-                    .controlSize(.mini)
-                    IconButton(systemImage: "xmark", help: l10n.cancel) { onDisarmDelete() }
                 }
-            } else if deletable {
-                IconButton(systemImage: "trash", help: l10n.cleanDatabase, tint: .red) { onArmDelete() }
+                .buttonStyle(.borderedProminent)
+                .tint(.red)
+                .controlSize(.mini)
+                .help(l10n.cleanDatabase)
             } else {
                 Image(systemName: "lock")
                     .font(.system(size: 10))
@@ -696,37 +831,54 @@ private struct AgentConversationRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Button(action: onToggle) {
-                HStack(spacing: 8) {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 8, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                        .frame(width: 8)
-                    if let mode = c.mode { AgentModeBadge(mode: mode) }
-                    Text(c.title).font(.system(size: 11.5, weight: .medium)).lineLimit(1)
-                    if showsDatabase {
-                        Text(ref.databaseName)
-                            .font(.system(size: 9.5))
-                            .padding(.horizontal, 5).padding(.vertical, 1)
-                            .background(Capsule().fill(Color.primary.opacity(0.06)))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+            HStack(spacing: 0) {
+                Button(action: onToggle) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                            .frame(width: 8)
+                        if let mode = c.mode { AgentModeBadge(mode: mode) }
+                        Text(c.title).font(.system(size: 11.5, weight: .medium)).lineLimit(1)
+                        if showsDatabase {
+                            Text(ref.databaseName)
+                                .font(.system(size: 9.5))
+                                .padding(.horizontal, 5).padding(.vertical, 1)
+                                .background(Capsule().fill(Color.primary.opacity(0.06)))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        Spacer(minLength: 6)
+                        if let n = c.messageCount {
+                            Text(l10n.agentMessages(n)).font(.system(size: 10).monospacedDigit()).foregroundStyle(.secondary)
+                        }
+                        if let d = ref.sortDate {
+                            Text(Format.relativeAge(d)).font(.system(size: 10)).foregroundStyle(.tertiary)
+                                .frame(minWidth: 44, alignment: .trailing)
+                        }
                     }
-                    Spacer(minLength: 6)
-                    if let n = c.messageCount {
-                        Text(l10n.agentMessages(n)).font(.system(size: 10).monospacedDigit()).foregroundStyle(.secondary)
-                    }
-                    if let d = ref.sortDate {
-                        Text(Format.relativeAge(d)).font(.system(size: 10)).foregroundStyle(.tertiary)
-                            .frame(minWidth: 44, alignment: .trailing)
-                    }
+                    .padding(.leading, 8)
+                    .padding(.trailing, 4)
+                    .padding(.vertical, 5)
+                    .contentShape(Rectangle())
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .contentShape(Rectangle())
+                .buttonStyle(.plain)
+
+                if let entry = AgentChatStore.shared.entries.first(where: { $0.id == ref.entryId }) {
+                    Button {
+                        AgentChatStore.shared.confirmAndDelete(entry)
+                    } label: {
+                        Image(systemName: "trash.fill")
+                            .font(.system(size: 8.5, weight: .bold))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
+                    .controlSize(.mini)
+                    .padding(.trailing, 6)
+                    .help(l10n.cleanDatabase)
+                }
             }
-            .buttonStyle(.plain)
 
             if isExpanded { details }
         }
@@ -739,8 +891,33 @@ private struct AgentConversationRow: View {
             if let mode = c.mode { field(l10n.agentConvMode, mode) }
             if let n = c.messageCount { field(l10n.agentConvMessages, "\(n)") }
             if let d = c.createdAt { field(l10n.agentConvCreated, d.formatted(date: .abbreviated, time: .shortened)) }
-            if let d = c.updatedAt { field(l10n.agentConvUpdated, d.formatted(date: .abbreviated, time: .shortened)) }
-            field(l10n.agentConvDatabase, "\(ref.databaseName) — \(ref.databasePath)", mono: true)
+            GridRow {
+                Text(l10n.agentConvDatabase).font(.system(size: 10)).foregroundStyle(.secondary).gridColumnAlignment(.trailing)
+                HStack(spacing: 6) {
+                    Text("\(ref.databaseName) — \(ref.databasePath)")
+                        .font(.system(size: 10.5, design: .monospaced))
+                        .textSelection(.enabled)
+                    IconButton(systemImage: "folder", help: l10n.revealInFinder) {
+                        AgentChatStore.shared.revealPath(ref.databasePath)
+                    }
+                    if let entry = AgentChatStore.shared.entries.first(where: { $0.id == ref.entryId }) {
+                        Button {
+                            AgentChatStore.shared.confirmAndDelete(entry)
+                        } label: {
+                            HStack(spacing: 3) {
+                                Image(systemName: "trash.fill")
+                                    .font(.system(size: 8.5, weight: .bold))
+                                Text(l10n.delete)
+                                    .font(.system(size: 9.5, weight: .bold))
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.red)
+                        .controlSize(.mini)
+                        .help(l10n.cleanDatabase)
+                    }
+                }
+            }
             if let s = c.snippet, !s.isEmpty { field(l10n.agentConvSnippet, s, mono: true) }
             field(l10n.agentConvId, c.id, mono: true)
         }
@@ -960,10 +1137,15 @@ struct AgentStorageChartView: View {
         return GeometryReader { geo in
             HStack(spacing: 2) {
                 ForEach(summaries) { s in
-                    Rectangle()
-                        .fill(s.editor.themeColor.opacity(0.9))
-                        .frame(width: max(3, (geo.size.width - CGFloat(summaries.count - 1) * 2) * (Double(s.totalBytes) / total)))
-                        .help("\(s.editor.displayName): \(ByteFormat.disk(s.totalBytes))")
+                    Button {
+                        store.selectedEditor = s.editor
+                    } label: {
+                        Rectangle()
+                            .fill(s.editor.themeColor.opacity(0.9))
+                    }
+                    .buttonStyle(.plain)
+                    .frame(width: max(4, (geo.size.width - CGFloat(summaries.count - 1) * 2) * (Double(s.totalBytes) / total)))
+                    .help("\(s.editor.displayName): \(ByteFormat.disk(s.totalBytes)) (\(l10n.agentDbCount(s.databaseCount)))")
                 }
             }
         }
@@ -975,13 +1157,22 @@ struct AgentStorageChartView: View {
         let total = Double(max(1, store.totalSize))
         return FlowLayout(spacing: 8) {
             ForEach(summaries) { s in
-                HStack(spacing: 5) {
-                    Circle().fill(s.editor.themeColor).frame(width: 7, height: 7)
-                    Text(s.editor.displayName).font(.system(size: 10.5)).lineLimit(1)
-                    Text("\(ByteFormat.short(s.totalBytes)) (\(Int((Double(s.totalBytes) / total * 100).rounded()))%)")
-                        .font(.system(size: 9.5).monospacedDigit())
-                        .foregroundStyle(.secondary)
+                Button {
+                    store.selectedEditor = s.editor
+                } label: {
+                    HStack(spacing: 5) {
+                        Circle().fill(s.editor.themeColor).frame(width: 7, height: 7)
+                        Text(s.editor.displayName).font(.system(size: 10.5)).lineLimit(1)
+                        Text("\(ByteFormat.short(s.totalBytes)) (\(Int((Double(s.totalBytes) / total * 100).rounded()))%)")
+                            .font(.system(size: 9.5).monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(RoundedRectangle(cornerRadius: 4).fill(Color.primary.opacity(0.04)))
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -1004,6 +1195,20 @@ struct AgentStorageChartView: View {
         .chartXScale(domain: 0 ... max(10.0, maxMB * 1.35))
         .chartXAxis { mbAxis }
         .chartYAxis { editorAxis }
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                Rectangle()
+                    .fill(Color.clear)
+                    .contentShape(Rectangle())
+                    .onTapGesture { location in
+                        if let (_, editorName): (Double, String) = proxy.value(at: location) {
+                            if let s = summaries.first(where: { $0.editor.displayName == editorName }) {
+                                store.selectedEditor = s.editor
+                            }
+                        }
+                    }
+            }
+        }
         .frame(height: max(120, CGFloat(summaries.count) * 28 + 40))
     }
 
@@ -1027,6 +1232,20 @@ struct AgentStorageChartView: View {
         .chartXScale(domain: 0 ... max(10.0, maxMB * 1.15))
         .chartXAxis { mbAxis }
         .chartYAxis { editorAxis }
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                Rectangle()
+                    .fill(Color.clear)
+                    .contentShape(Rectangle())
+                    .onTapGesture { location in
+                        if let (_, editorName): (Double, String) = proxy.value(at: location) {
+                            if let s = summaries.first(where: { $0.editor.displayName == editorName }) {
+                                store.selectedEditor = s.editor
+                            }
+                        }
+                    }
+            }
+        }
         .frame(height: max(130, CGFloat(summaries.count) * 28 + 50))
     }
 
@@ -1085,6 +1304,7 @@ extension AgentEditorKind {
         case .ccSwitch: return Color(red: 0.35, green: 0.65, blue: 0.85)
         case .yDevSphere: return Color(red: 0.45, green: 0.35, blue: 0.85)
         case .devin: return Color(red: 0.25, green: 0.75, blue: 0.65)
+        case .custom: return Color.gray
         }
     }
 }
@@ -1130,6 +1350,10 @@ final class AgentEditorIconProvider {
         return downsampled
     }
 
+    func icon(forFile path: String) -> NSImage {
+        Self.downsample(NSWorkspace.shared.icon(forFile: path))
+    }
+
     func icon(for editor: AgentEditorKind) -> NSImage? {
         if let img = cache[editor] {
             return img
@@ -1170,11 +1394,19 @@ final class AgentEditorIconProvider {
 // MARK: - Native App Icon View
 struct AgentEditorIconView: View {
     let editor: AgentEditorKind
+    var customAppPath: String? = nil
     var size: CGFloat = 20
     var isOrphaned: Bool = false
 
     var body: some View {
-        if let nsImage = AgentEditorIconProvider.shared.icon(for: editor) {
+        let nsImage: NSImage? = {
+            if let customPath = customAppPath, FileManager.default.fileExists(atPath: customPath) {
+                return AgentEditorIconProvider.shared.icon(forFile: customPath)
+            }
+            return AgentEditorIconProvider.shared.icon(for: editor)
+        }()
+
+        if let nsImage {
             Image(nsImage: nsImage)
                 .resizable()
                 .interpolation(.high)

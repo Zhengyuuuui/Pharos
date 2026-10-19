@@ -20,11 +20,11 @@
   <img src="https://img.shields.io/badge/dependencies-none-brightgreen" alt="Dependencies">
   <img src="https://img.shields.io/badge/network-none-lightgrey" alt="No network">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.6-blue" alt="Version 2.6">
-  <img src="https://img.shields.io/badge/updated-2026--10--17-informational" alt="Last updated 2026-10-17">
+  <img src="https://img.shields.io/badge/version-2.7-blue" alt="Version 2.7">
+  <img src="https://img.shields.io/badge/updated-2026--10--19-informational" alt="Last updated 2026-10-19">
 </p>
 
-<p align="center"><sub>Last updated / 最后更新：2026-10-17 15:06 (UTC+8) · v2.6 · Author / 作者：zys · Model / 模型：OpenCode (claude-opus-5.5)</sub></p>
+<p align="center"><sub>Last updated / 最后更新：2026-10-19 09:35 (UTC+8) · v2.7 · Author / 作者：zys · Model / 模型：Antigravity</sub></p>
 
 <p align="center"><a href="#english">English</a> · <a href="#简体中文">简体中文</a> · <a href="#changelog--更新记录">Changelog / 更新记录</a></p>
 
@@ -50,8 +50,8 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 | **Disk cleanup** | Temp folders and dev caches, file by file, with a retention window; the size shown is exactly what gets freed |
 | **Favorite projects** | Save project folders, start commands detected automatically, open in Terminal with one click |
 | **Browser instances** | Chrome, Chrome Beta / Canary, Chromium, Edge and Brave — every profile folder with its debug port, proxy and memory; save favorites that stay listed with their launch command after quitting; start and quit |
-| **AI agent chat databases** | Inspect, clean and backup local chat / session databases from 23+ AI IDEs and editors (Cursor, Trae, Windsurf, VS Code, Antigravity, OpenCode, Claude Code, MiniMax…); detect orphaned workspaces |
-| **Packages & CLI tools** | Global CLI tools (Node, Homebrew, Rust, Python, Go) with terminal run, reveal and uninstall; multi-ecosystem project dependencies and cache inspection (.venv, node_modules, .build, target); language cache repos overview |
+| **AI agent chat databases** | Inspect, clean and backup local chat / session databases from 23+ AI IDEs and editors (Cursor, Trae, Windsurf, VS Code, Antigravity, OpenCode, Claude Code, MiniMax…); detect orphaned workspaces; manually add and scan any custom application under `/Applications` with native icon extraction and custom SQLite parsing |
+| **Packages & CLI tools** | Real Homebrew Cellar formula & Caskroom package scanning, diagnostics (`brew doctor`/`services`) and cache cleanup; global CLI tools (Node, Homebrew, Rust, Python, Go) with terminal run, reveal and uninstall; multi-root project dependency scanning across 10 developer workspace directories (.venv, node_modules, .build, target); language cache repos overview |
 
 ### Features
 
@@ -126,9 +126,14 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 - Database size, conversation counts, last modified date, and storage breakdown chart (by editor and database type)
 - Detects orphaned databases left behind from deleted projects or uninstalled editors
 - Overview with a collapsible storage chart and an editor grid or icon strip (Settings); each editor opens its own detail page with **Databases** and **Conversations** tabs; conversations show metadata only (title, mode, messages, dates, database)
-- Backup to a file you pick (with `-wal`); deletion only inside each editor's known storage folders, never global databases, never while the editor is running — with confirmation
+- **Manual application addition**: click **+ Add App** to select any `.app` bundle from `/Applications` or custom locations; automatically extracts bundle identifiers, names, and native macOS icons via `NSWorkspace`
+- **Targeted custom scanner**: probes associated `~/Library/Application Support`, `~/Library/Containers`, and `~/.<app>` directories for SQLite session tables with universal schema fallback (`chats`, `conversations`, `sessions`, `threads`, `messages`, `ItemTable`); custom applications persist in user preferences and can be rescanned or removed at any time
+- Backup to a file you pick (with `-wal`); deletion only inside each editor's known storage folders with secondary confirmation (prominent red button), never global databases, never while the editor is running
 
 **Packages & dependencies**
+- **Real Homebrew formula & cask management**: deeply scans `/opt/homebrew` and `/usr/local` `Cellar` (reading `INSTALL_RECEIPT.json` metadata, versions, descriptions, and pinned status) and `Caskroom`; quick terminal actions for `brew doctor`, `brew services list`, and `brew outdated`
+- **Homebrew cache cleanup**: detects and frees cached downloads and bottles under `~/Library/Caches/Homebrew` from both Disk Cleaner and Package Manager
+- **Multi-root project discovery**: searches across 10 standard developer workspaces (`~/Projects`, `~/Developer`, `~/Workspace`, `~/Code`, `~/src`, `~/Desktop`, `~/Documents`, `~/Downloads`, `~/dev`, and `~`) for active projects and dependencies
 - **Global CLI software**: automatically identifies all global binaries installed across Node.js (`npm -g`, Bun, pnpm, yarn), Homebrew, Cargo / Rust, Python (`uv tool`, `pip`), and Go (`~/go/bin`)
 - **Featured tools shelf**: prominent cards for core standalone software and AI agents (`claude`, `grok`, `rea`, `aider`, `codebuddy`, `wrangler`, `docker`, `uv`, `bun`, `pnpm`, `cargo-tauri`, `gh`, `rg`), with category badges, descriptions and version tags
 - **Quick actions on every tool**: run `--help` test in Terminal, reveal in Finder, copy command or path, and **uninstall** (generates ecosystem-specific uninstall command and executes in Terminal after secondary confirmation)
@@ -201,21 +206,27 @@ Sources/
 │   ├── SMC / Thermals   #   read fans and temperatures from the SMC
 │   ├── FanPolicy        #   fan safety rules + helper protocol
 │   ├── FanHelperInstall #   helper paths, launchd plist, install script
-│   ├── AgentChats       #   AI agent chat databases & orphan detection
+│   ├── Battery...       #   hardware battery charge limiting & SMC writes
+│   ├── AgentChats       #   AI agent chat databases & custom app scanning
+│   ├── AgentChatCatalog #   cached session summaries & grouping
 │   ├── AgentSQLiteReader#   pure Swift SQLite header & page reader
+│   ├── PackageScanner   #   Homebrew, global CLI, project deps, cache repos
+│   ├── PackageModels    #   packages and language cache data models
 │   └── PopoverLayout    #   which blocks each popover tab shows (customizable)
 ├── Pharos/              # SwiftUI app
 │   ├── ProjectStore     #   polling, state, actions
 │   ├── CleanupStore     #   disk cleanup state
 │   ├── WorkspaceStore   #   favorites: persist, pin, open in Terminal
 │   ├── ChromeStore      #   Chrome presets, start / quit
-│   ├── AgentChatStore   #   agent chat databases state, backup, delete
+│   ├── AgentChatStore   #   agent chat databases state, custom apps, backup, delete
+│   ├── PackageStore     #   package manager & Homebrew state, diagnostics
+│   ├── BatteryStore     #   battery charge limit state, hardware monitoring
 │   ├── Notifier         #   local notifications
 │   ├── MenuBarSettings  #   menu bar text, global shortcut
 │   ├── BackupActions    #   export / import panels
 │   ├── FanStore         #   fan helper install, commands, heartbeat
 │   ├── LegacyDefaults   #   one-time settings migration from UsageBar
-│   └── UI/              #   popover, main window, charts, cleanup, favorites, Chrome, settings, L10n
+│   └── UI/              #   popover, main window, charts, cleanup, favorites, Chrome, packages, settings, L10n
 ├── pharos-fand/         # optional root helper for fan control (installed only on request)
 └── pharos-tests/        # Test suite (`make test`)
 Scripts/make-icon.swift  # draws the app icon in CoreGraphics; `make icon` rebuilds Resources/Pharos.icns
@@ -255,8 +266,8 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 | **磁盘清理** | 临时目录与开发缓存，按单个文件、按保留期判断；显示的体积就是实际能释放的体积 |
 | **常用项目** | 收藏项目文件夹，自动识别启动命令，一键在终端中启动 |
 | **浏览器实例** | 支持 Chrome、Chrome Beta / Canary、Chromium、Edge、Brave，按配置文件夹列出每个实例，显示调试端口、代理、内存；收藏后关闭也能看到端口和启动命令；启动与退出 |
-| **AI 助手会话管理** | 扫描、分析、备份与清理 23+ 种本地 AI 编程助手与编辑器（Cursor、Trae、Windsurf、VS Code、Antigravity、OpenCode、Claude Code、MiniMax 等）的会话数据库，识别孤立/残留工作区 |
-| **依赖与软件包** | 全局命令行软件与核心工具统一管理（Node、Homebrew、Rust、Python、Go 等），一键终端测试、定位与二次确认卸载；全生态项目依赖与缓存目录识别（.venv、node_modules、.build、target 等）；语言缓存仓库概览 |
+| **AI 助手会话管理** | 扫描、分析、备份与清理 23+ 种本地 AI 编程助手与编辑器（Cursor、Trae、Windsurf、VS Code、Antigravity、OpenCode、Claude Code、MiniMax 等）的会话数据库，识别孤立/残留工作区；支持手动添加扫描 `/Applications` 下的任意第三方应用，提取原生高清图标并深度解析 SQLite 对话 |
+| **依赖与软件包** | 真实 Homebrew Cellar 与 Caskroom 软件包深度管理、环境自检与缓存清理；全局命令行软件统一管理（Node、Homebrew、Rust、Python、Go 等），一键终端测试、定位与二次确认卸载；覆盖 10 个常用开发目录的全生态项目依赖识别（.venv、node_modules、.build、target 等）；语言缓存仓库概览 |
 
 ### 功能
 
@@ -331,9 +342,14 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 - 显示各数据库大小、会话条数、修改时间与空间占用可视化图表（按编辑器与按类型构成）
 - 智能检测已被删除或移除工作区的残留孤立数据库（Orphaned）
 - 总览页存储图表可收起，编辑器入口可在设置中选择「卡片网格」或「横向图标条」；点击编辑器进入独立详情页，分「数据库 / 对话」两个标签，对话只显示元数据（标题、模式、消息数、时间、所属库）
-- 备份到你在保存面板中选择的文件（连同 `-wal`）；删除只限各编辑器的已知存储目录，全局库不删、编辑器运行时不删，并需二次确认
+- **手动添加第三方应用**：点击 **+ 手动添加** 可选择 `/Applications` 下的任意应用，自动解析 Bundle 元数据、提取 macOS 原生高清 Retina 图标
+- **定向定制扫描与智能探查**：针对手动添加的应用定向扫描 `~/Library/Application Support`、`~/Library/Containers` 及 `~/.<应用名>` 下的数据库，智能探查通用会话表结构（`chats`、`conversations`、`sessions`、`threads`、`messages`、`ItemTable` 等）；添加的应用持久化保存，支持随时单独重新扫描或移除
+- 备份到你在保存面板中选择的文件（连同 `-wal`）；删除只限各编辑器的已知存储目录，支持醒目的红色二次确认弹窗，全局库不删、编辑器运行时不删
 
 **依赖与软件包**
+- **真实 Homebrew 与 Cask 深度管理**：深度解析 Apple Silicon (`/opt/homebrew`) 及 Intel (`/usr/local`) 下的 `Cellar`（解析 `INSTALL_RECEIPT.json` 获取精确版本、描述与锁定状态）与 `Caskroom`；快捷一键执行 `brew doctor`、`brew services list`、`brew outdated`
+- **Homebrew 缓存清理**：在磁盘清理与依赖管理中支持识别并一键清理 `~/Library/Caches/Homebrew` 下的下载缓存与预编译 Bottle
+- **多工作区项目深度发现**：自动递归扫描本机 10 大标准开发者目录（`~/Projects`、`~/Developer`、`~/Workspace`、`~/Code`、`~/src`、`~/Desktop`、`~/Documents`、`~/Downloads`、`~/dev` 以及主目录），真实发现本地项目及依赖状态
 - **全局 CLI 软件统一管理**：自动扫描 Node.js（`npm -g`、Bun、pnpm、yarn）、Homebrew、Cargo / Rust、Python（`uv tool`、`pip`）及 Go（`~/go/bin`）安装的全部命令行工具
 - **核心软件与 AI 工具展架**：顶部卡片重点收录已安装的核心开发软件与终端 AI 助手（`claude`、`grok`、`rea`、`aider`、`codebuddy`、`wrangler`、`docker`、`uv`、`bun`、`pnpm`、`cargo-tauri`、`gh`、`rg` 等），带有分类标签、简要功能说明与版本号
 - **每张卡片均提供完整快捷操作**：一键在终端执行 `--help` 测试、在 Finder 中定位执行文件、复制路径/指令，以及**安全卸载**（根据包管理生态自动匹配对应卸载命令，在弹出二次确认框后移交终端执行）
@@ -443,6 +459,28 @@ make icon                           # 用 Scripts/make-icon.swift 重新生成 A
 ## Changelog / 更新记录
 
 Times are UTC+8. 时间为北京时间（UTC+8）。
+
+### v2.7 — 2026-10-19 09:35
+
+> Author / 作者：zys · Model / 模型：Antigravity
+
+**English**
+- **Homebrew formula & cask management**: deeply scans `/opt/homebrew` and `/usr/local` `Cellar` (reading `INSTALL_RECEIPT.json` metadata, versions, descriptions, and pinned status) and `Caskroom`; provides quick terminal actions for `brew doctor`, `brew services list`, and `brew outdated`
+- **Homebrew cache cleanup**: detect and clean `~/Library/Caches/Homebrew` (cached formula downloads and bottled binaries) in both Disk Cleaner and Package Manager
+- **Multi-root developer workspace discovery**: dynamically searches for active projects and dependencies across 10 standard developer workspaces (`~/Projects`, `~/Developer`, `~/Workspace`, `~/Code`, `~/src`, `~/Desktop`, `~/Documents`, `~/Downloads`, `~/dev`, and `~`)
+- **AI chats: manual application addition**: click `+ Add App` in the AI Chats overview or editor bar to select any `.app` bundle from `/Applications` or custom directories; automatically parses bundle plists, extracts native Retina macOS icons via `NSWorkspace`, and persists across app restarts
+- **Targeted custom scanner & generic SQLite conversation reader**: dedicated scanning probes `~/Library/Application Support`, `~/Library/Containers`, and `~/.<app>` candidate paths; universal schema reader inspects standard conversation tables (`chats`, `conversations`, `sessions`, `threads`, `messages`, `ItemTable`)
+- **Custom application lifecycle**: dedicated custom app detail page with "Rescan App" and "Remove App" controls, seamless integration into search, filtering, and catalog summaries
+- **Secondary deletion confirmation**: prominent dual-step confirmation modal with red action button for database removal
+
+**简体中文**
+- **真实 Homebrew 与 Cask 深度管理**：原生扫描 Apple Silicon (`/opt/homebrew`) 与 Intel (`/usr/local`) 下的 `Cellar`（解析 `INSTALL_RECEIPT.json` 获取精确版本、描述与锁定状态）与 `Caskroom`；快捷一键执行 `brew doctor`、`brew services list`、`brew outdated` 诊断
+- **Homebrew 缓存清理**：在磁盘清理与依赖管理中支持识别并一键清理 `~/Library/Caches/Homebrew` 下的下载缓存与预编译 Bottle
+- **多工作区项目深度发现**：自动递归扫描本机 10 大标准开发者目录（`~/Projects`、`~/Developer`、`~/Workspace`、`~/Code`、`~/src`、`~/Desktop`、`~/Documents`、`~/Downloads`、`~/dev` 以及主目录），真实发现本地项目及依赖状态
+- **AI 对话管理：手动添加应用**：总览操作栏与编辑器选择区新增「+ 手动添加」按钮，支持从 `/Applications` 或任意路径选取应用，自动解析 Bundle 元数据、通过 `NSWorkspace` 提取原生高清 Retina 图标，配置持久化保存
+- **定向定制扫描与通用 SQLite 会话探测**：为用户手动添加的应用定向扫描 `~/Library/Application Support`、`~/Library/Containers` 及 `~/.<应用名>` 下的候选数据库，通过通用表结构探查（`chats`、`conversations`、`sessions`、`threads`、`messages`、`ItemTable` 等）解析对话列表
+- **自定义应用专属管理页**：支持独立查看自定义应用的会话与数据库、重新扫描与「移除应用」，无缝接入搜索与统计
+- **删除操作醒目二次确认**：数据库删除提供醒目的红色按钮与双重安全确认，防止误操作
 
 ### v2.6 — 2026-10-17 15:06
 

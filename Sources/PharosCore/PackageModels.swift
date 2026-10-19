@@ -122,6 +122,9 @@ public struct LocalPackageItem: Identifiable, Codable, Equatable, Sendable {
                 return "npm uninstall -g \(name)"
             }
         case .homebrew:
+            if categoryTag?.contains("Cask") == true || installPath.contains("/Caskroom/") {
+                return "brew uninstall --cask \(name)"
+            }
             return "brew uninstall \(name)"
         case .rust:
             return "cargo uninstall \(name)"

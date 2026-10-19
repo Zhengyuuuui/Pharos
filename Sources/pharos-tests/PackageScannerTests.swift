@@ -178,6 +178,36 @@ func testGlobalCliScanner() {
     expectEq(foundMock?.summary, "Mock CLI Tool", "Mock tool summary")
     expectEq(foundMock?.license, "Apache-2.0", "Mock tool license")
     expectEq(foundMock?.ecosystem, .node, "Mock tool ecosystem")
+
+    // 3. Mock Homebrew Cellar & Cask test
+    let mockCellar = tempDir + "/opt/homebrew/Cellar/sample-tool/3.1.0"
+    let mockCask = tempDir + "/opt/homebrew/Caskroom/sample-app/2.0.0"
+    try? FileManager.default.createDirectory(atPath: mockCellar, withIntermediateDirectories: true)
+    try? FileManager.default.createDirectory(atPath: mockCask, withIntermediateDirectories: true)
+
+    let receiptJson = """
+    {
+      "desc": "A sample formula tool",
+      "license": "MIT",
+      "installed_on_request": true,
+      "time": 1700000000
+    }
+    """
+    FileManager.default.createFile(atPath: mockCellar + "/INSTALL_RECEIPT.json", contents: Data(receiptJson.utf8))
+
+    let brewItems = PackageScanner.scanGlobalCliTools(home: tempDir)
+    let foundFormula = brewItems.first { $0.name == "sample-tool" }
+    expect(foundFormula != nil, "Found mock formula in Cellar")
+    expectEq(foundFormula?.installedVersion, "3.1.0", "Formula version parsed from directory")
+    expectEq(foundFormula?.summary, "A sample formula tool", "Formula summary from INSTALL_RECEIPT.json")
+    expectEq(foundFormula?.license, "MIT", "Formula license from INSTALL_RECEIPT.json")
+    expectEq(foundFormula?.ecosystem, .homebrew, "Formula ecosystem is homebrew")
+    expectEq(foundFormula?.uninstallCommand, "brew uninstall sample-tool", "Formula uninstall command")
+
+    let foundCask = brewItems.first { $0.name == "sample-app" }
+    expect(foundCask != nil, "Found mock cask in Caskroom")
+    expectEq(foundCask?.installedVersion, "2.0.0", "Cask version parsed")
+    expectEq(foundCask?.uninstallCommand, "brew uninstall --cask sample-app", "Cask uninstall command")
 }
 
 func testProjectDependencyScanner() {
