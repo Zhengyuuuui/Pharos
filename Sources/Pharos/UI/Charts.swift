@@ -47,10 +47,14 @@ struct MemoryCompositionBar: View {
                 HStack(alignment: .firstTextBaseline) {
                     Text("\(l10n.used) \(ByteFormat.short(stats.used))")
                         .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                        .contentTransition(.numericText())
+                        .animation(.easeInOut(duration: 0.2), value: stats.used)
                     Spacer()
                     Text("\(l10n.availableMemory) \(ByteFormat.short(stats.available))")
                         .font(.system(size: 12, weight: .semibold).monospacedDigit())
                         .foregroundStyle(.green)
+                        .contentTransition(.numericText())
+                        .animation(.easeInOut(duration: 0.2), value: stats.available)
                 }
             }
 
@@ -75,6 +79,7 @@ struct MemoryCompositionBar: View {
             .frame(height: height)
             .background(Self.freeColor)
             .clipShape(RoundedRectangle(cornerRadius: height / 3))
+            .animation(.spring(response: 0.45, dampingFraction: 0.82), value: stats.used)
 
             if showLegend {
                 HStack(alignment: .top) {
@@ -94,6 +99,8 @@ struct MemoryCompositionBar: View {
                     Text("\(s.name) \(ByteFormat.short(s.bytes))")
                         .font(.system(size: 10).monospacedDigit())
                         .foregroundStyle(.secondary)
+                        .contentTransition(.numericText())
+                        .animation(.easeInOut(duration: 0.2), value: s.bytes)
                 }
             }
         }
@@ -132,6 +139,7 @@ struct SystemTrendChart: View {
                 AxisValueLabel(format: .dateTime.hour().minute())
             }
         }
+        .animation(.easeInOut(duration: 0.35), value: samples.count)
     }
 }
 
@@ -165,6 +173,7 @@ struct DevTrendChart: View {
             }
         }
         .chartLegend(compact ? .hidden : .visible)
+        .animation(.easeInOut(duration: 0.35), value: points.count)
     }
 
     static func mbLabel(_ mb: Double) -> String {
@@ -199,6 +208,7 @@ struct ProjectMemoryBars: View {
             }
         }
         .frame(height: max(80, CGFloat(sorted.count) * 24 + 24))
+        .animation(.spring(response: 0.45, dampingFraction: 0.82), value: sorted.map(\.memoryBytes))
     }
 }
 
@@ -225,6 +235,7 @@ struct TopAppsChart: View {
             }
         }
         .frame(height: max(80, CGFloat(apps.count) * 24 + 24))
+        .animation(.spring(response: 0.45, dampingFraction: 0.82), value: apps.map(\.memoryBytes))
     }
 }
 
@@ -287,6 +298,7 @@ struct PressureBadge: View {
                 .font(.system(size: 10.5))
                 .foregroundStyle(.secondary)
         }
+        .animation(.easeInOut(duration: 0.2), value: pressure)
     }
 }
 

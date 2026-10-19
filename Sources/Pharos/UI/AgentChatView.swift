@@ -10,7 +10,7 @@ struct AgentChatView: View {
     @ObservedObject private var store = AgentChatStore.shared
 
     var body: some View {
-        Group {
+        ZStack {
             if let editor = store.selectedEditor {
                 AgentEditorDetailPage(
                     editor: editor,
@@ -18,12 +18,25 @@ struct AgentChatView: View {
                     customAppPath: store.selectedCustomAppPath
                 )
                 .id(store.selectedCustomName ?? editor.rawValue)
+                .transition(.asymmetric(
+                    insertion: .opacity.combined(with: .move(edge: .trailing)),
+                    removal: .opacity.combined(with: .move(edge: .trailing))
+                ))
             } else {
                 AgentOverviewPage()
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .move(edge: .leading)),
+                        removal: .opacity.combined(with: .move(edge: .leading))
+                    ))
             }
         }
+        .animation(.easeInOut(duration: 0.22), value: store.selectedEditor)
         .onAppear { store.scanIfNeeded() }
-        .onExitCommand { store.resetSelection() }
+        .onExitCommand {
+            withAnimation(.easeInOut(duration: 0.22)) {
+                store.resetSelection()
+            }
+        }
     }
 }
 
@@ -190,7 +203,11 @@ private struct AgentOverviewPage: View {
     private var editorGrid: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), spacing: 10)], spacing: 10) {
             ForEach(store.summaries) { s in
-                Button { store.selectEditor(s) } label: { AgentEditorGridCard(summary: s) }
+                Button {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        store.selectEditor(s)
+                    }
+                } label: { AgentEditorGridCard(summary: s) }
                     .buttonStyle(.plain)
             }
         }
@@ -200,7 +217,11 @@ private struct AgentOverviewPage: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
                 ForEach(store.summaries) { s in
-                    Button { store.selectEditor(s) } label: {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.22)) {
+                            store.selectEditor(s)
+                        }
+                    } label: {
                         HStack(spacing: 5) {
                             AgentEditorIconView(editor: s.editor, customAppPath: s.customAppPath, size: 16)
                             Text(s.displayName).font(.system(size: 11)).lineLimit(1)
@@ -953,6 +974,8 @@ private struct AgentStatCard: View {
                 .foregroundStyle(color ?? .primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
+                .contentTransition(.numericText())
+                .animation(.easeInOut(duration: 0.25), value: value)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1138,7 +1161,9 @@ struct AgentStorageChartView: View {
             HStack(spacing: 2) {
                 ForEach(summaries) { s in
                     Button {
-                        store.selectedEditor = s.editor
+                        withAnimation(.easeInOut(duration: 0.22)) {
+                            store.selectedEditor = s.editor
+                        }
                     } label: {
                         Rectangle()
                             .fill(s.editor.themeColor.opacity(0.9))
@@ -1151,6 +1176,7 @@ struct AgentStorageChartView: View {
         }
         .frame(height: 10)
         .clipShape(RoundedRectangle(cornerRadius: 3))
+        .animation(.spring(response: 0.45, dampingFraction: 0.82), value: summaries.map(\.totalBytes))
     }
 
     private func legend(_ summaries: [AgentEditorSummary]) -> some View {
@@ -1158,7 +1184,9 @@ struct AgentStorageChartView: View {
         return FlowLayout(spacing: 8) {
             ForEach(summaries) { s in
                 Button {
-                    store.selectedEditor = s.editor
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        store.selectedEditor = s.editor
+                    }
                 } label: {
                     HStack(spacing: 5) {
                         Circle().fill(s.editor.themeColor).frame(width: 7, height: 7)

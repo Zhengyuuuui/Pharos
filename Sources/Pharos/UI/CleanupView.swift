@@ -17,11 +17,23 @@ struct CleanupView: View {
             VStack(alignment: .leading, spacing: 16) {
                 if let targetGroup = selectedGroup {
                     groupFocusedHeader(targetGroup)
-                    if let report = cleanup.report { ReportBanner(report: report) }
+                    if let report = cleanup.report {
+                        ReportBanner(report: report)
+                            .transition(.asymmetric(
+                                insertion: .opacity.combined(with: .move(edge: .top)),
+                                removal: .opacity
+                            ))
+                    }
                     groupFocusedContent(targetGroup)
                 } else {
                     header
-                    if let report = cleanup.report { ReportBanner(report: report) }
+                    if let report = cleanup.report {
+                        ReportBanner(report: report)
+                            .transition(.asymmetric(
+                                insertion: .opacity.combined(with: .move(edge: .top)),
+                                removal: .opacity
+                            ))
+                    }
                     PinnedTempSection(onSelectDetail: { group in
                         withAnimation(.easeInOut(duration: 0.2)) { selectedGroup = group }
                     })
@@ -35,6 +47,7 @@ struct CleanupView: View {
                     }
                 }
             }
+            .animation(.easeInOut(duration: 0.25), value: cleanup.report != nil)
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -154,6 +167,8 @@ struct CleanupView: View {
                     Text(cleanup.rows.isEmpty ? "–" : ByteFormat.short(bytes))
                         .font(.system(size: 22, weight: .bold, design: .monospaced))
                         .foregroundStyle(bytes == 0 ? Color.secondary : Color.primary)
+                        .contentTransition(.numericText())
+                        .animation(.easeInOut(duration: 0.25), value: bytes)
                     Text(l10n.cacheSize)
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
@@ -255,6 +270,8 @@ private struct PinnedTempSection: View {
                 Spacer()
                 Text(cleanup.rows.isEmpty ? "–" : ByteFormat.short(bytes))
                     .font(.system(size: 20, weight: .semibold).monospacedDigit())
+                    .contentTransition(.numericText())
+                    .animation(.easeInOut(duration: 0.25), value: bytes)
             }
 
             HStack(spacing: 10) {
@@ -304,7 +321,7 @@ private struct CacheGroupSection: View {
             HStack(spacing: 8) {
                 // Chevron button for inline expand/collapse
                 Button {
-                    withAnimation(.easeOut(duration: 0.15)) { expanded.toggle() }
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) { expanded.toggle() }
                 } label: {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 10, weight: .semibold))
@@ -335,6 +352,8 @@ private struct CacheGroupSection: View {
                         Text(cleanup.rows.isEmpty ? "–" : ByteFormat.short(bytes))
                             .font(.system(size: 12, weight: .medium).monospacedDigit())
                             .foregroundStyle(bytes == 0 ? Color.secondary : Color.primary)
+                            .contentTransition(.numericText())
+                            .animation(.easeInOut(duration: 0.25), value: bytes)
                     }
                     .contentShape(Rectangle())
                 }
@@ -348,7 +367,10 @@ private struct CacheGroupSection: View {
                 }
                 .frame(width: 120, alignment: .trailing)
             }
-            if expanded { RowList(rows: cleanup.rows(in: group)) }
+            if expanded {
+                RowList(rows: cleanup.rows(in: group))
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
@@ -436,6 +458,8 @@ private struct CleanupRowView: View {
                 .font(.system(size: 11, weight: .medium).monospacedDigit())
                 .foregroundStyle(bytes == 0 ? Color.secondary : Color.primary)
                 .frame(width: 48, alignment: .trailing)
+                .contentTransition(.numericText())
+                .animation(.easeInOut(duration: 0.25), value: bytes)
             ConfirmButton(title: l10n.cleanRow, icon: "trash", small: true,
                           busy: cleanup.cleaning == .row(row.id),
                           disabled: cleanup.isBusy || bytes == 0) {

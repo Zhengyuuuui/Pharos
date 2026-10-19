@@ -171,6 +171,8 @@ struct StatCard: View {
                 .foregroundStyle(tint)
             Text(value)
                 .font(.system(size: 22, weight: .semibold).monospacedDigit())
+                .contentTransition(.numericText())
+                .animation(.easeInOut(duration: 0.25), value: value)
             if let detail {
                 Text(detail)
                     .font(.system(size: 10).monospacedDigit())

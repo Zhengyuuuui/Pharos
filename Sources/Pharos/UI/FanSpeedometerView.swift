@@ -172,6 +172,7 @@ private struct FanSpeedometerNeedle: View {
 public struct FanSpeedometerDialView: View {
     @ObservedObject private var l10n = L10n.shared
     @AppStorage("pharos.gauge3DAcceleration") private var gauge3DAcceleration: Bool = true
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
 
     public let fan: FanReading
     public let count: Int
@@ -189,6 +190,10 @@ public struct FanSpeedometerDialView: View {
         self.targetRPM = targetRPM
     }
 
+    private var is3DActive: Bool {
+        gauge3DAcceleration && !systemReduceMotion
+    }
+
     private var scale: FanGaugeScale {
         FanGaugeScale(minRPM: fan.minRPM, maxRPM: fan.maxRPM)
     }
@@ -198,11 +203,11 @@ public struct FanSpeedometerDialView: View {
     }
 
     private var effectiveRPM: Int {
-        gauge3DAcceleration ? currentRPM : fan.actualRPM
+        is3DActive ? currentRPM : fan.actualRPM
     }
 
     private var effectiveFraction: Double {
-        gauge3DAcceleration ? scale.fraction(for: currentRPM) : fan.fraction
+        is3DActive ? scale.fraction(for: currentRPM) : fan.fraction
     }
 
     private var effectiveRedline: Bool {
@@ -316,9 +321,9 @@ public struct FanSpeedometerDialView: View {
                             x: 0,
                             y: 0
                         )
-                        .blur(radius: gauge3DAcceleration ? motionBlur * 0.65 : 0)
+                        .blur(radius: is3DActive ? motionBlur * 0.65 : 0)
                         .opacity(progress > 0.001 ? 1 : 0)
-                        .animation(gauge3DAcceleration ? nil : .spring(response: 0.50, dampingFraction: 0.82), value: progress)
+                        .animation(is3DActive ? nil : .spring(response: 0.50, dampingFraction: 0.82), value: progress)
 
                     // 5. High-Precision Graduation Tick Marks & Numerals (Polar Coordinate Alignment)
                     dialGraduations(radius: radius * 0.81)
@@ -334,13 +339,13 @@ public struct FanSpeedometerDialView: View {
                         radius: radius * 0.81,
                         isRedline: effectiveRedline,
                         motionBlur: motionBlur,
-                        hardware3D: gauge3DAcceleration
+                        hardware3D: is3DActive
                     )
-                    .animation(gauge3DAcceleration ? nil : .spring(response: 0.50, dampingFraction: 0.82), value: effectiveRPM)
+                    .animation(is3DActive ? nil : .spring(response: 0.50, dampingFraction: 0.82), value: effectiveRPM)
 
                     // 8. Digital HUD Cluster (Shifted downward to eliminate overlap with center hub)
                     VStack(spacing: 2) {
-                        if gauge3DAcceleration {
+                        if is3DActive {
                             Text(effectiveRPM > 0 ? "\(effectiveRPM)" : "0")
                                 .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
                                 .foregroundStyle(effectiveRedline ? Color.red : Color.primary)
@@ -354,7 +359,7 @@ public struct FanSpeedometerDialView: View {
                         }
 
                         HStack(spacing: 4) {
-                            SpinningFanBlade(rpm: effectiveRPM, hardware3D: gauge3DAcceleration)
+                            SpinningFanBlade(rpm: effectiveRPM, hardware3D: is3DActive)
                             Text("RPM")
                                 .font(.system(size: 9.5, weight: .bold))
                                 .foregroundStyle(.secondary)
@@ -405,8 +410,8 @@ public struct FanSpeedometerDialView: View {
                         Capsule()
                             .fill(LinearGradient(colors: speedGradientColors(actualRPM: effectiveRPM), startPoint: .leading, endPoint: .trailing))
                             .frame(width: barGeo.size.width * CGFloat(effectiveFraction))
-                            .blur(radius: gauge3DAcceleration ? motionBlur * 0.4 : 0)
-                            .animation(gauge3DAcceleration ? nil : .spring(response: 0.50, dampingFraction: 0.82), value: effectiveFraction)
+                            .blur(radius: is3DActive ? motionBlur * 0.4 : 0)
+                            .animation(is3DActive ? nil : .spring(response: 0.50, dampingFraction: 0.82), value: effectiveFraction)
                     }
                 }
                 .frame(height: 4)
@@ -431,7 +436,7 @@ public struct FanSpeedometerDialView: View {
             if !hasAppeared {
                 hasAppeared = true
                 let targetVal = Double(fan.actualRPM)
-                if gauge3DAcceleration {
+                if is3DActive {
                     if targetVal > 0 {
                         // Initial spool-up from idle/0 to actual RPM
                         currentDisplayRPM = max(0, targetVal - 1200)
@@ -444,7 +449,7 @@ public struct FanSpeedometerDialView: View {
                     motionBlur = 0
                 }
             } else {
-                if gauge3DAcceleration {
+                if is3DActive {
                     animateToRPM(Double(fan.actualRPM))
                 } else {
                     currentDisplayRPM = Double(fan.actualRPM)
@@ -457,22 +462,29 @@ public struct FanSpeedometerDialView: View {
             animationTask = nil
         }
         .onChange(of: fan.actualRPM) { _, newRPM in
-            if gauge3DAcceleration {
+            if is3DActive {
                 animateToRPM(Double(newRPM))
             } else {
                 currentDisplayRPM = Double(newRPM)
                 motionBlur = 0
             }
         }
-        .onChange(of: gauge3DAcceleration) { _, enabled in
-            if !enabled {
-                animationTask?.cancel()
-                animationTask = nil
-                motionBlur = 0
-                currentDisplayRPM = Double(fan.actualRPM)
-            } else {
-                animateToRPM(Double(fan.actualRPM))
-            }
+        .onChange(of: gauge3DAcceleration) { _, _ in
+            updateMotionState()
+        }
+        .onChange(of: systemReduceMotion) { _, _ in
+            updateMotionState()
+        }
+    }
+
+    private func updateMotionState() {
+        if !is3DActive {
+            animationTask?.cancel()
+            animationTask = nil
+            motionBlur = 0
+            currentDisplayRPM = Double(fan.actualRPM)
+        } else {
+            animateToRPM(Double(fan.actualRPM))
         }
     }
 
@@ -481,7 +493,7 @@ public struct FanSpeedometerDialView: View {
         animationTask?.cancel()
         animationTask = nil
 
-        guard gauge3DAcceleration else {
+        guard is3DActive else {
             currentDisplayRPM = target
             motionBlur = 0
             return
@@ -628,11 +640,16 @@ public struct FanSpeedometerClusterView: View {
     @ObservedObject private var l10n = L10n.shared
     @AppStorage("pharos.fanViewMode") private var viewMode: String = "gauge"
     @AppStorage("pharos.gauge3DAcceleration") private var gauge3DAcceleration: Bool = true
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
 
     // View switching state
     @State private var isSwitchingMode: Bool = false
 
     public init() {}
+
+    private var is3DActive: Bool {
+        gauge3DAcceleration && !systemReduceMotion
+    }
 
     public var body: some View {
         let fans = store.thermals?.fans ?? []
@@ -654,7 +671,7 @@ public struct FanSpeedometerClusterView: View {
                     get: { viewMode },
                     set: { newMode in
                         guard newMode != viewMode else { return }
-                        if gauge3DAcceleration {
+                        if is3DActive {
                             withAnimation(.easeInOut(duration: 0.12)) {
                                 isSwitchingMode = true
                             }
@@ -684,7 +701,25 @@ public struct FanSpeedometerClusterView: View {
 
             // 3D Motion Notice Banner (Prompting GPU performance / energy consumption)
             if viewMode == "gauge" {
-                if gauge3DAcceleration {
+                if systemReduceMotion {
+                    HStack(spacing: 6) {
+                        Image(systemName: "figure.roll")
+                            .font(.system(size: 9.5))
+                            .foregroundStyle(.secondary)
+                        Text(l10n.systemReduceMotionNotice)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.primary.opacity(0.04))
+                    )
+                } else if gauge3DAcceleration {
                     HStack(spacing: 6) {
                         Image(systemName: "bolt.fill")
                             .font(.system(size: 9.5))
@@ -801,8 +836,8 @@ public struct FanSpeedometerClusterView: View {
                     }
                 }
             }
-            .blur(radius: (gauge3DAcceleration && isSwitchingMode) ? 6.5 : 0)
-            .scaleEffect((gauge3DAcceleration && isSwitchingMode) ? 0.985 : 1.0)
+            .blur(radius: (is3DActive && isSwitchingMode) ? 6.5 : 0)
+            .scaleEffect((is3DActive && isSwitchingMode) ? 0.985 : 1.0)
             .animation(.easeInOut(duration: 0.18), value: isSwitchingMode)
         }
     }

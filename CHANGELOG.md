@@ -30,6 +30,11 @@ Times are UTC+8. 时间为北京时间（UTC+8）。
 - **60 FPS mechanical inertia acceleration engine**: authentic fan spool-up and deceleration physics driven by cubic Smoothstep S-curve ($3t^2 - 2t^3$) over 0.45s–1.85s; digital HUD displays frame-by-frame continuous rolling RPM digits with zero discrete jumps
 - **Dynamic Gaussian motion blur & 3D acceleration setting**: velocity-driven Gaussian motion blur on needle trails, ribbons, and HUD digits; added user toggle with an in-app notice banner allowing seamless fallback to lightweight 2D standard spring animation with zero background timers for energy savings
 - **Needle geometry & polar trigonometry alignment**: re-architected needle assembly with exact boundary-to-pivot offset ensuring 100% concentric alignment at `(0, 0)`; dials and tick marks use pure polar trigonometry ($(x = r\sin\theta, y = -r\cos\theta)$); shifted central digital HUD cluster downward to completely eliminate overlap with the center hub cap
+- **Multi-tiered motion architecture & fluid 2D transitions**:
+  - *Tier 1 (3D + Dynamic Motion Blur)*: exclusively on Fans & Thermals tachometer cockpit with GPU-accelerated 60 FPS mechanical simulation and velocity blur
+  - *Tier 2 (Zero-GPU-overhead 2D Fluid Transitions)*: native gear-shift rolling digits (`.contentTransition(.numericText())`) across System Memory, Disk Cleanup, and AI Chat metrics; fluid spring interpolation on memory composition segments and trend charts; collapsible card spring transitions in Disk Cleanup; and macOS Settings-style asymmetric slide/fade page navigation in AI Chats
+  - *Tier 3 (Pure 2D Static)*: Favorite Workspaces, Running Projects, Browser Instances, Packages, and Disk Volumes remain strictly static 2D with zero animation delay or offscreen pass overhead
+  - *Unified Motion Setting & System Accessibility Guard*: integrated `@AppStorage("pharos.gauge3DAcceleration")` with macOS system accessibility `accessibilityReduceMotion` to automatically enforce 2D battery-saving mode when Reduce Motion is enabled in macOS System Settings
 - **SwiftUI Gaussian motion blur reuse guide**: documented pure Swift zero-dependency dynamic velocity blur patterns, crossfading, ghost trails, and Metal rendering best practices in `docs/SWIFTUI_GAUSSIAN_MOTION_BLUR_GUIDE.md`
 
 **简体中文**
@@ -37,6 +42,11 @@ Times are UTC+8. 时间为北京时间（UTC+8）。
 - **60 FPS 物理机械惯性阻尼引擎**：基于三次 Smoothstep S 曲线（$3t^2 - 2t^3$）真实模拟风扇起转与减速物理阻尼，HUD 转速数字与指针逐帧连续滚动跳变，告别阶梯式断层
 - **动态高斯运动模糊与 3D 硬件加速设置**：速度突变时自动触发速度驱动的高斯运动模糊与拖尾残影；座舱顶部新增 3D 动效提示横幅与「减弱动态效果 / 开启 3D 加速」开关，关闭后零后台计时器开销，平滑降级至超低能耗经典弹簧模式
 - **同心转动轴心与极坐标正立排布**：重构同轴心指针装配组件与极坐标刻度定位（$x = r\sin\theta, y = -r\cos\theta$），彻底消除锚点漂移；将中央 HUD 读数集群下移，完美消除数字与中心轴盖的遮挡冲突
+- **分级动效架构与轻量 2D 流体动效落地**：
+  - *第一梯队（3D 加速 + 动态高斯模糊）*：专属于「风扇与温度」机械拟真仪表盘座舱，调用 GPU 核心进行 60FPS 物理平滑阻尼与运动模糊渲染
+  - *第二梯队（零额外 GPU 开销 2D 流体动效）*：在「系统内存」、「磁盘清理」与「AI 对话」中引入原生机械滚轮数字跳变（`.contentTransition(.numericText())`）、物理内存分布图动态弹性伸缩（Spring）、清理完成即时数字归零与折叠展开平滑收缩动画，以及 AI 对话「概览 ↔ 详情」的 macOS 级非对称滑入/淡出转场
+  - *第三梯队（纯静态 2D 零延迟）*：常用项目、运行中项目、浏览器实例、软件包管理与磁盘用量保持极致静态 2D，零动画延迟、零离屏渲染开销
+  - *全局动效控制与系统辅助功能联动*：设置中的「3D 动效加速」开关与系统级「减弱动态效果（Reduce Motion）」无缝联动，检测到系统辅助功能开启时自动降级至 2D 节能模式，符合 Apple 人机交互设计规范
 - **SwiftUI 动态高斯运动模糊复用手册**：在 `docs/SWIFTUI_GAUSSIAN_MOTION_BLUR_GUIDE.md` 沉淀了纯 Swift 零依赖的速度驱动模糊、模式切换模糊、向心旋转残影拖尾等 4 大复用模板与 Metal 性能军规
 
 ---

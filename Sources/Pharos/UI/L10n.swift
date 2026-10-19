@@ -437,6 +437,11 @@ final class L10n: ObservableObject {
             ? "3D gauge motion uses GPU performance cores and increases energy consumption"
             : "已开启 3D 动效加速 · 调用 GPU 核心增加能耗"
     }
+    var systemReduceMotionNotice: String {
+        en
+            ? "System “Reduce Motion” enabled: 3D acceleration and motion blurs disabled"
+            : "系统「减弱动态效果」已开启 · 已自动关闭 3D 渲染与动态模糊"
+    }
     func sensorGroup(_ g: SensorGroup) -> String {
         switch g {
         case .cpu: return "CPU"

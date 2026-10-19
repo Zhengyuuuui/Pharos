@@ -198,6 +198,7 @@ struct SettingsForm: View {
     @EnvironmentObject var store: ProjectStore
     @ObservedObject private var l10n = L10n.shared
     @AppStorage("pharos.gauge3DAcceleration") private var gauge3DAcceleration: Bool = true
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var loginError: String? = nil
 
@@ -229,7 +230,13 @@ struct SettingsForm: View {
             VStack(alignment: .leading, spacing: 4) {
                 Toggle(l10n.gauge3DAcceleration, isOn: $gauge3DAcceleration)
                     .font(.system(size: 12))
-                if gauge3DAcceleration {
+                    .disabled(systemReduceMotion)
+                if systemReduceMotion {
+                    Text(l10n.systemReduceMotionNotice)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if gauge3DAcceleration {
                     Text(l10n.gauge3DAccelerationNotice)
                         .font(.system(size: 10))
                         .foregroundStyle(.orange)
