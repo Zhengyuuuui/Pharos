@@ -445,6 +445,12 @@ final class L10n: ObservableObject {
             ? "System “Reduce Motion” enabled: locked to balanced mode with 3D acceleration and motion blurs disabled"
             : "系统「减弱动态效果」已开启 · 已锁定为均衡能耗模式（自动关闭 3D 与动态模糊）"
     }
+    var popoverGaussianBlur: String { en ? "Menu Bar Gaussian Blur Animation" : "菜单栏高斯动画" }
+    var popoverGaussianBlurHint: String {
+        en
+            ? "Enables smooth Gaussian blur resolves, tab crossfades, and gentle refresh dissolves in the menu bar popover; disable for instant crisp 2D rendering."
+            : "在菜单栏下拉框中启用窗口展开高斯动效、标签页切换模糊混合与数据刷新柔和过渡；关闭后采用即时静态渲染。"
+    }
     func sensorGroup(_ g: SensorGroup) -> String {
         switch g {
         case .cpu: return "CPU"

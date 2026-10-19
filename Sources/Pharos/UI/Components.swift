@@ -132,6 +132,7 @@ struct RowButtonStyle: ButtonStyle {
                 RoundedRectangle(cornerRadius: 5)
                     .fill(hovering ? Color.primary.opacity(0.07) : .clear)
             )
+            .animation(.easeInOut(duration: 0.15), value: hovering)
             .opacity(configuration.isPressed ? 0.6 : 1)
             .onHover { hovering = $0 }
     }

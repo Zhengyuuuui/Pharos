@@ -198,6 +198,7 @@ struct SettingsForm: View {
     @EnvironmentObject var store: ProjectStore
     @ObservedObject private var l10n = L10n.shared
     @AppStorage("pharos.gauge3DAcceleration") private var gauge3DAcceleration: Bool = true
+    @AppStorage("pharos.popoverGaussianBlur") private var popoverGaussianBlur: Bool = true
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var loginError: String? = nil
@@ -258,6 +259,16 @@ struct SettingsForm: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Toggle(l10n.popoverGaussianBlur, isOn: $popoverGaussianBlur)
+                    .font(.system(size: 12))
+                    .disabled(systemReduceMotion)
+                Text(l10n.popoverGaussianBlurHint)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Toggle(l10n.launchAtLogin, isOn: $launchAtLogin)

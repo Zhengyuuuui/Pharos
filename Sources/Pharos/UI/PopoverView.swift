@@ -7,22 +7,60 @@ struct PopoverView: View {
     @ObservedObject private var layoutStore = PopoverLayoutStore.shared
     @State private var showSettings = false
     @AppStorage("popoverTab") private var tab: PopoverTab = .projects
+    @AppStorage("pharos.popoverGaussianBlur") private var popoverGaussianBlur: Bool = true
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+
+    @State private var isAppearing = true
+    @State private var isRefreshingBlur = false
+    @State private var refreshTask: Task<Void, Never>? = nil
+
+    private var isBlurActive: Bool {
+        popoverGaussianBlur && !systemReduceMotion
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             if showSettings {
                 SettingsView(isPresented: $showSettings)
+                    .transition(isBlurActive ? .asymmetric(
+                        insertion: .opacity.combined(with: .scale(scale: 0.98)),
+                        removal: .opacity
+                    ) : .identity)
             } else {
                 header
                 PopoverTabsContent(layout: layoutStore.layout, tab: $tab)
+                    .blur(radius: (isBlurActive && isRefreshingBlur) ? 3.5 : 0)
+                    .animation(isBlurActive ? .easeInOut(duration: 0.25) : nil, value: isRefreshingBlur)
                 Divider()
                 footer
             }
         }
         .padding(14)
         .frame(width: 340)
-        .onAppear { store.viewAppeared() }
-        .onDisappear { store.viewDisappeared() }
+        .blur(radius: (isBlurActive && isAppearing) ? 6.0 : 0)
+        .scaleEffect((isBlurActive && isAppearing) ? 0.985 : 1.0)
+        .opacity((isBlurActive && isAppearing) ? 0.7 : 1.0)
+        .onAppear {
+            store.viewAppeared()
+            if isBlurActive {
+                isAppearing = true
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 15_000_000)
+                    withAnimation(.easeOut(duration: 0.22)) {
+                        isAppearing = false
+                    }
+                }
+            } else {
+                isAppearing = false
+            }
+        }
+        .onDisappear {
+            store.viewDisappeared()
+            refreshTask?.cancel()
+            refreshTask = nil
+            isRefreshingBlur = false
+            isAppearing = true
+        }
     }
 
     private var header: some View {
@@ -41,6 +79,7 @@ struct PopoverView: View {
     private var footer: some View {
         VStack(alignment: .leading, spacing: 2) {
             Button {
+                triggerRefreshBlur()
                 Task { await store.refresh() }
             } label: {
                 HStack {
@@ -81,6 +120,21 @@ struct PopoverView: View {
         }
     }
 
+    private func triggerRefreshBlur() {
+        guard isBlurActive else { return }
+        refreshTask?.cancel()
+        refreshTask = Task { @MainActor in
+            withAnimation(.easeIn(duration: 0.10)) {
+                isRefreshingBlur = true
+            }
+            try? await Task.sleep(nanoseconds: 160_000_000)
+            if Task.isCancelled { return }
+            withAnimation(.easeOut(duration: 0.25)) {
+                isRefreshingBlur = false
+            }
+        }
+    }
+
     private func menuRow(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack {
@@ -103,6 +157,17 @@ struct PopoverTabsContent: View {
     @Binding var tab: PopoverTab
     /// false in the Customize preview: blocks render but don't take clicks.
     var interactive = true
+
+    @AppStorage("pharos.popoverGaussianBlur") private var popoverGaussianBlur: Bool = true
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+
+    @State private var isSwitchingTab = false
+    @State private var switchTask: Task<Void, Never>? = nil
+    @State private var contentHeight: CGFloat = 200
+
+    private var isBlurActive: Bool {
+        interactive && popoverGaussianBlur && !systemReduceMotion
+    }
 
     var body: some View {
         let tabs = layout.visibleTabs
@@ -135,12 +200,31 @@ struct PopoverTabsContent: View {
                 }
                 // Grow with the content, scroll past 520 pt.
                 .frame(height: min(max(contentHeight, 40), 520))
+                .animation(isBlurActive ? .spring(response: 0.28, dampingFraction: 0.85) : nil, value: contentHeight)
+                .blur(radius: (isBlurActive && isSwitchingTab) ? 5.0 : 0)
+                .opacity((isBlurActive && isSwitchingTab) ? 0.75 : 1.0)
+                .scaleEffect((isBlurActive && isSwitchingTab) ? 0.99 : 1.0)
                 .onPreferenceChange(ContentHeightKey.self) { contentHeight = $0 }
             }
         }
+        .onChange(of: current) { _, _ in
+            guard isBlurActive else { return }
+            switchTask?.cancel()
+            switchTask = Task { @MainActor in
+                isSwitchingTab = true
+                try? await Task.sleep(nanoseconds: 25_000_000)
+                if Task.isCancelled { return }
+                withAnimation(.easeOut(duration: 0.20)) {
+                    isSwitchingTab = false
+                }
+            }
+        }
+        .onDisappear {
+            switchTask?.cancel()
+            switchTask = nil
+            isSwitchingTab = false
+        }
     }
-
-    @State private var contentHeight: CGFloat = 200
 }
 
 private struct ContentHeightKey: PreferenceKey {
@@ -192,6 +276,7 @@ struct PopoverProjectRow: View {
             RoundedRectangle(cornerRadius: 6)
                 .fill(hovering ? Color.primary.opacity(0.05) : .clear)
         )
+        .animation(.easeInOut(duration: 0.15), value: hovering)
         .onHover { hovering = $0 }
         .help(project.directory ?? project.name)
     }
