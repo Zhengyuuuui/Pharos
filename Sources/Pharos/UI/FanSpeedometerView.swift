@@ -39,48 +39,67 @@ private struct SpinningFanBlade: View {
     }
 }
 
-// MARK: - Centered Aerodynamic Needle Path
-private struct NeedleShape: Shape {
-    let needleLength: CGFloat
-    let needleTail: CGFloat
+// MARK: - Aerodynamic Racing Needle Blade Shape
+private struct NeedleBlade: Shape {
+    let tipWidth: CGFloat
+    let baseWidth: CGFloat
 
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        let cx = rect.midX
-        let cy = rect.midY
-        let w: CGFloat = 3.6
-        let tipW: CGFloat = 1.2
-        let topY = cy - needleLength
-        let bottomY = cy + needleTail
+        let topY: CGFloat = 0
+        let bottomY: CGFloat = rect.height
+        let midX: CGFloat = rect.midX
 
-        path.move(to: CGPoint(x: cx - w / 2, y: cy))
-        path.addLine(to: CGPoint(x: cx - tipW / 2, y: topY))
-        path.addLine(to: CGPoint(x: cx + tipW / 2, y: topY))
-        path.addLine(to: CGPoint(x: cx + w / 2, y: cy))
-        path.addLine(to: CGPoint(x: cx + w / 2, y: bottomY))
-        path.addLine(to: CGPoint(x: -w / 2, y: bottomY))
+        path.move(to: CGPoint(x: midX - baseWidth / 2, y: bottomY))
+        path.addLine(to: CGPoint(x: midX - tipWidth / 2, y: topY))
+        path.addLine(to: CGPoint(x: midX + tipWidth / 2, y: topY))
+        path.addLine(to: CGPoint(x: midX + baseWidth / 2, y: bottomY))
         path.closeSubpath()
         return path
     }
 }
 
-// MARK: - Needle Center Reflective Highlight Spine
-private struct NeedleSpineShape: Shape {
+// MARK: - Racing Needle Assembly (Pivots at 100% exact (0, 0))
+private struct RacingNeedleAssembly: View {
     let needleLength: CGFloat
+    let needleTail: CGFloat
+    let isRedline: Bool
 
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let cx = rect.midX
-        let cy = rect.midY
-        let topY = cy - needleLength + 4
-        let bottomY = cy - 2
+    var body: some View {
+        VStack(spacing: 0) {
+            // 1. Tapered illuminated blade with center reflective highlight
+            NeedleBlade(tipWidth: 1.2, baseWidth: 3.6)
+                .fill(
+                    LinearGradient(
+                        colors: isRedline
+                            ? [Color(red: 1.0, green: 0.15, blue: 0.1), Color(red: 1.0, green: 0.45, blue: 0.15)]
+                            : [Color.orange, Color(red: 1.0, green: 0.28, blue: 0.2)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: 3.6, height: needleLength)
+                .overlay(
+                    Rectangle()
+                        .fill(Color.white.opacity(0.85))
+                        .frame(width: 0.8, height: needleLength - 4)
+                        .padding(.top, 2),
+                    alignment: .top
+                )
 
-        path.move(to: CGPoint(x: cx - 0.45, y: bottomY))
-        path.addLine(to: CGPoint(x: cx - 0.45, y: topY))
-        path.addLine(to: CGPoint(x: cx + 0.45, y: topY))
-        path.addLine(to: CGPoint(x: cx + 0.45, y: bottomY))
-        path.closeSubpath()
-        return path
+            // 2. Counterweight tail behind pivot
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [Color.primary.opacity(0.7), Color.primary.opacity(0.4)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: 3.6, height: needleTail)
+        }
+        // Offset shifts the junction between blade and tail to the exact center (0, 0)
+        .offset(y: -needleLength / 2 + needleTail / 2)
     }
 }
 
@@ -93,59 +112,36 @@ private struct FanSpeedometerNeedle: View {
     var hardware3D: Bool = true
 
     var body: some View {
-        let needleLength = radius * 0.86
+        let needleLength = radius * 0.85
         let needleTail = radius * 0.16
 
         ZStack {
             // 1. Aerodynamic Motion Blur Ghost Trail (Only in 3D acceleration mode when moving fast)
             if hardware3D && motionBlur > 0.8 {
-                NeedleShape(needleLength: needleLength, needleTail: needleTail)
-                    .fill(
-                        LinearGradient(
-                            colors: isRedline
-                                ? [Color.red.opacity(0.40), Color.orange.opacity(0.12)]
-                                : [Color.orange.opacity(0.40), Color.cyan.opacity(0.12)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
+                RacingNeedleAssembly(needleLength: needleLength, needleTail: needleTail, isRedline: isRedline)
+                    .opacity(0.35)
                     .blur(radius: motionBlur * 1.3)
                     .rotationEffect(.degrees(angle - (angle > 360 ? 3.5 : -3.5)), anchor: .center)
             }
 
             // 2. Co-rotating Drop Shadow (Rotated with angle, cast down-right)
-            NeedleShape(needleLength: needleLength, needleTail: needleTail)
-                .fill(Color.black.opacity(0.38))
+            RacingNeedleAssembly(needleLength: needleLength, needleTail: needleTail, isRedline: isRedline)
+                .colorMultiply(.black)
+                .opacity(0.38)
                 .blur(radius: 2.0)
                 .rotationEffect(.degrees(angle), anchor: .center)
                 .offset(x: 1.5, y: 1.5)
 
             // 3. Dynamic Illuminated Racing Needle
-            ZStack {
-                // Tapered illuminated body
-                NeedleShape(needleLength: needleLength, needleTail: needleTail)
-                    .fill(
-                        LinearGradient(
-                            colors: isRedline
-                                ? [Color(red: 1.0, green: 0.1, blue: 0.1), Color(red: 1.0, green: 0.45, blue: 0.1)]
-                                : [Color.orange, Color(red: 1.0, green: 0.25, blue: 0.2)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .shadow(
-                        color: (isRedline ? Color.red : Color.orange).opacity(0.55),
-                        radius: 4,
-                        x: 0,
-                        y: 0
-                    )
-
-                // Sharp center reflective highlight spine
-                NeedleSpineShape(needleLength: needleLength)
-                    .fill(Color.white.opacity(0.85))
-            }
-            .blur(radius: hardware3D ? motionBlur * 0.7 : 0)
-            .rotationEffect(.degrees(angle), anchor: .center)
+            RacingNeedleAssembly(needleLength: needleLength, needleTail: needleTail, isRedline: isRedline)
+                .shadow(
+                    color: (isRedline ? Color.red : Color.orange).opacity(0.55),
+                    radius: 4,
+                    x: 0,
+                    y: 0
+                )
+                .blur(radius: hardware3D ? motionBlur * 0.7 : 0)
+                .rotationEffect(.degrees(angle), anchor: .center)
 
             // 4. Machined Dual-Concentric Pivot Hub Cap
             Circle()
@@ -319,7 +315,7 @@ public struct FanSpeedometerDialView: View {
                         .blur(radius: gauge3DAcceleration ? motionBlur * 0.65 : 0)
                         .opacity(progress > 0.001 ? 1 : 0)
 
-                    // 5. High-Precision Graduation Tick Marks & Numerals
+                    // 5. High-Precision Graduation Tick Marks & Numerals (Polar Coordinate Alignment)
                     dialGraduations(radius: radius * 0.81)
 
                     // 6. Target RPM Notch Marker (when in Manual Mode)
@@ -327,7 +323,7 @@ public struct FanSpeedometerDialView: View {
                         targetMarker(targetRPM: target, radius: radius * 0.81)
                     }
 
-                    // 7. High-Precision Racing Needle (Co-axial with pivot and tick marks)
+                    // 7. High-Precision Racing Needle (100% Co-axial with pivot and tick marks)
                     FanSpeedometerNeedle(
                         angle: scale.angle(for: currentRPM),
                         radius: radius * 0.81,
@@ -335,7 +331,6 @@ public struct FanSpeedometerDialView: View {
                         motionBlur: motionBlur,
                         hardware3D: gauge3DAcceleration
                     )
-                    .frame(width: side, height: side)
 
                     // 8. Digital HUD Cluster (Frame-by-Frame Continuous Rolling Numbers)
                     VStack(spacing: 2) {
@@ -489,7 +484,7 @@ public struct FanSpeedometerDialView: View {
         }
     }
 
-    // MARK: - Tick Marks & Upright Numerals
+    // MARK: - Tick Marks & Upright Numerals (Polar Coordinate Alignment)
     @ViewBuilder
     private func dialGraduations(radius: CGFloat) -> some View {
         ZStack {
@@ -498,61 +493,68 @@ public struct FanSpeedometerDialView: View {
                 let rpmVal = scale.minorTickRPM(at: idx)
                 let isMinorRed = scale.isRedline(rpm: rpmVal)
                 let angle = scale.angle(for: rpmVal)
+                let rad = angle * .pi / 180.0
+                let tickR = radius - 3.0
 
                 Rectangle()
                     .fill(isMinorRed ? Color.red.opacity(0.55) : Color.primary.opacity(0.20))
                     .frame(width: 1.0, height: 4.5)
-                    .offset(y: -radius + 3)
                     .rotationEffect(.degrees(angle))
+                    .offset(x: tickR * sin(rad), y: -tickR * cos(rad))
             }
 
             // B. Medium ticks at 500 RPM intervals
             ForEach(scale.mediumTicks, id: \.self) { rpmVal in
                 let isMedRed = scale.isRedline(rpm: rpmVal)
                 let angle = scale.angle(for: rpmVal)
+                let rad = angle * .pi / 180.0
+                let tickR = radius - 4.5
 
                 Rectangle()
                     .fill(isMedRed ? Color.red.opacity(0.85) : Color.primary.opacity(0.45))
                     .frame(width: 1.6, height: 7.5)
-                    .offset(y: -radius + 4)
                     .rotationEffect(.degrees(angle))
+                    .offset(x: tickR * sin(rad), y: -tickR * cos(rad))
             }
 
             // C. Major ticks every 1000 RPM + Upright Numerals
             ForEach(scale.majorTicks, id: \.self) { rpmVal in
                 let isMajRed = scale.isRedline(rpm: rpmVal)
                 let angle = scale.angle(for: rpmVal)
+                let rad = angle * .pi / 180.0
                 let thousands = rpmVal / 1000
 
                 // Major Tick Line
+                let tickR = radius - 6.0
                 Rectangle()
                     .fill(isMajRed ? Color.red : Color.primary.opacity(0.88))
                     .frame(width: 2.5, height: 11)
-                    .offset(y: -radius + 6)
                     .rotationEffect(.degrees(angle))
+                    .offset(x: tickR * sin(rad), y: -tickR * cos(rad))
 
                 // Upright Chrono Number (e.g. 0, 1, 2, ... 7)
+                let numR = radius - 20.0
                 Text("\(thousands)")
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(isMajRed ? Color.red : Color.primary.opacity(0.85))
-                    .offset(y: -radius + 22)
-                    .rotationEffect(.degrees(angle))
-                    // Counter-rotate so text stays upright and readable
-                    .rotationEffect(.degrees(-angle))
+                    .offset(x: numR * sin(rad), y: -numR * cos(rad))
             }
         }
     }
 
-    // MARK: - Target RPM Marker
+    // MARK: - Target RPM Marker (Polar Coordinate Alignment)
     @ViewBuilder
     private func targetMarker(targetRPM: Int, radius: CGFloat) -> some View {
         let angle = scale.angle(for: targetRPM)
+        let rad = angle * .pi / 180.0
+        let markerR = radius + 7.0
+
         Image(systemName: "arrowtriangle.down.fill")
             .font(.system(size: 8))
             .foregroundStyle(Color.orange)
             .shadow(color: Color.orange.opacity(0.8), radius: 3)
-            .offset(y: -radius - 7)
             .rotationEffect(.degrees(angle))
+            .offset(x: markerR * sin(rad), y: -markerR * cos(rad))
             .animation(.spring(response: 0.45, dampingFraction: 0.7), value: targetRPM)
     }
 
