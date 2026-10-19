@@ -100,12 +100,16 @@ Swift 通过 **ARC（自动引用计数）** 管理内存：编译器自动插�
   - 唯一来源是 `Scripts/make-icon.swift`（纯 Swift + CoreGraphics，固定随机种子，每次生成结果一致）；
     同一构图（雷达光束扫过点阵、三个捕获目标、左下光源）用两套配色输出，不手绘、不引入外部图片。
   - **深色版** = 现有图标：深海军蓝底，琥珀色光束，点阵被照亮后变暖白、发光。
-  - **浅色版**：背景为白 / 近白；点阵与扫描光点改为**黑色 / 近黑**，被光束扫过的点变大、变深（用加深代替发光），
-    光束与三个捕获目标保留琥珀色作为品牌色；不使用白色光晕、白色颗粒等只在暗底上可见的效果。
+  - **浅色版**：**只用白 / 灰 / 黑，不使用琥珀色或任何彩色**（每个像素 R=G=B）。背景为白 / 近白；
+    点阵与扫描光点为**黑色 / 近黑**，被光束扫过的点变大、变深（用加深代替发光）；光束为半透明中灰，
+    前缘为近黑细线；三个捕获目标为黑环黑芯；不使用白色光晕、白色颗粒等只在暗底上可见的效果。
     16 / 32 px 小尺寸须减少细节，保证白底上仍清晰可辨。
-  - 浅色为默认外观，深色为 Dark 变体。`Resources/Pharos.icns` 打包浅色版；由 `actool` 编译的
-    `Assets.car`（含 Any / Dark 两个外观）一并放进 `Contents/Resources`，`Info.plist` 同时声明
-    `CFBundleIconFile` 与 `CFBundleIconName`，系统按外观选择图标。
+  - 退役的图标草稿（如带琥珀色的浅色初版）存放在 `docs/icon-archive/`，仅供参考，不参与构建。
+  - 浅色为默认外观，深色为 Dark 变体。`Resources/Pharos.icns` 打包浅色版；深浅两版以 Icon Composer
+    格式 `Resources/AppIcon.icon`（`icon.json` + 浅/深两张 1024 px 全出血图层，系统自加圆角与阴影）提交，
+    `make app` 用 `actool` 编译成 `Assets.car`（含 Any / Dark 两个外观）放进 `Contents/Resources`，
+    `Info.plist` 同时声明 `CFBundleIconFile` 与 `CFBundleIconName`，系统按外观选择图标。
+    （传统 `.appiconset` 在 macOS 上不支持 Dark 外观，actool 会丢弃深色图，不要用。）
   - 生成的 `.icns` / 图标资源提交到仓库；改图标只改 `make-icon.swift` 后执行 `make icon` 重新生成，不手改产物。
   - 不在运行时修改 `/Applications/Pharos.app` 包内任何文件（会破坏代码签名）。
 

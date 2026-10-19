@@ -1,0 +1,24 @@
+{
+  "fill" : "automatic",
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "image-name" : "light.png",
+          "image-name-specializations" : [
+            {
+              "appearance" : "dark",
+              "value" : "dark.png"
+            }
+          ],
+          "name" : "Pharos"
+        }
+      ]
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : [
+      "macOS"
+    ]
+  }
+}

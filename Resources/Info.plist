@@ -8,6 +8,7 @@
     <key>CFBundleShortVersionString</key><string>2.2</string>
     <key>CFBundleExecutable</key><string>Pharos</string>
     <key>CFBundleIconFile</key><string>Pharos</string>
+    <key>CFBundleIconName</key><string>AppIcon</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>LSUIElement</key><true/>
