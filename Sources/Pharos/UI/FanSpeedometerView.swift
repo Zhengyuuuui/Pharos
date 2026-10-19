@@ -380,6 +380,10 @@ public struct FanSpeedometerDialView: View {
                 }
                 .frame(width: side, height: side)
                 .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if is3DActive { performGaugeSelfCheckSweep() }
+                }
             }
             .frame(height: 220)
 
@@ -438,11 +442,12 @@ public struct FanSpeedometerDialView: View {
                 let targetVal = Double(fan.actualRPM)
                 if is3DActive {
                     if targetVal > 0 {
-                        // Initial spool-up from idle/0 to actual RPM
-                        currentDisplayRPM = max(0, targetVal - 1200)
+                        // Smooth spool-up from 0 directly to actual RPM
+                        currentDisplayRPM = 0
                         animateToRPM(targetVal)
                     } else {
-                        currentDisplayRPM = 0
+                        // When fans are stopped (0 RPM at idle), perform an authentic racing gauge sweep
+                        performGaugeSelfCheckSweep()
                     }
                 } else {
                     currentDisplayRPM = targetVal
@@ -469,6 +474,11 @@ public struct FanSpeedometerDialView: View {
                 motionBlur = 0
             }
         }
+        .onChange(of: targetRPM) { _, newTarget in
+            if let newTarget, newTarget > 0, fan.mode == .manual, is3DActive {
+                animateToRPM(Double(newTarget))
+            }
+        }
         .onChange(of: gauge3DAcceleration) { _, _ in
             updateMotionState()
         }
@@ -485,6 +495,54 @@ public struct FanSpeedometerDialView: View {
             currentDisplayRPM = Double(fan.actualRPM)
         } else {
             animateToRPM(Double(fan.actualRPM))
+        }
+    }
+
+    // MARK: - Tachometer Power-On / Test Self-Check Sweep
+    private func performGaugeSelfCheckSweep() {
+        animationTask?.cancel()
+        animationTask = nil
+
+        guard is3DActive else {
+            currentDisplayRPM = 0
+            motionBlur = 0
+            return
+        }
+
+        let sweepRPM = Double(min(scale.maxRPM, max(4200, fan.maxRPM - 1200)))
+        let duration = 1.25
+        let startTime = CACurrentMediaTime()
+        let peakBlur: CGFloat = 3.6
+
+        animationTask = Task { @MainActor in
+            while !Task.isCancelled {
+                let now = CACurrentMediaTime()
+                let elapsed = now - startTime
+                let progress = min(1.0, elapsed / duration)
+
+                if progress <= 0.45 {
+                    // Phase 1: 0 -> sweepRPM
+                    let t = progress / 0.45
+                    let eased = t * t * (3.0 - 2.0 * t)
+                    currentDisplayRPM = sweepRPM * eased
+                    motionBlur = peakBlur * CGFloat(4.0 * t * (1.0 - t))
+                } else {
+                    // Phase 2: sweepRPM -> target / 0
+                    let t = (progress - 0.45) / 0.55
+                    let eased = t * t * (3.0 - 2.0 * t)
+                    let finalTarget = Double(fan.actualRPM)
+                    currentDisplayRPM = sweepRPM + (finalTarget - sweepRPM) * eased
+                    motionBlur = peakBlur * CGFloat(4.0 * t * (1.0 - t))
+                }
+
+                if progress >= 1.0 {
+                    currentDisplayRPM = Double(fan.actualRPM)
+                    motionBlur = 0
+                    break
+                }
+
+                try? await Task.sleep(nanoseconds: 16_000_000)
+            }
         }
     }
 
@@ -507,10 +565,10 @@ public struct FanSpeedometerDialView: View {
             return
         }
 
-        // Mechanical fan spool-up duration (0.45s to 1.85s depending on delta)
-        let duration = max(0.45, min(1.85, 0.45 + (diff / 6000.0) * 1.4))
+        // Mechanical fan spool-up duration (0.55s to 1.85s depending on delta)
+        let duration = max(0.55, min(1.85, 0.55 + (diff / 6000.0) * 1.3))
         let startTime = CACurrentMediaTime()
-        let peakBlur = min(4.5, max(1.2, CGFloat(diff) / 500.0))
+        let peakBlur = min(4.5, max(1.5, CGFloat(diff) / 450.0))
 
         animationTask = Task { @MainActor in
             while !Task.isCancelled {
