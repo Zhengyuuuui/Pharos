@@ -197,12 +197,16 @@ public struct FanSpeedometerDialView: View {
         max(0, Int(currentDisplayRPM.rounded()))
     }
 
-    private var isRedline: Bool {
-        scale.isRedline(rpm: currentRPM)
+    private var effectiveRPM: Int {
+        gauge3DAcceleration ? currentRPM : fan.actualRPM
     }
 
-    private var currentFraction: Double {
-        scale.fraction(for: currentRPM)
+    private var effectiveFraction: Double {
+        gauge3DAcceleration ? scale.fraction(for: currentRPM) : fan.fraction
+    }
+
+    private var effectiveRedline: Bool {
+        scale.isRedline(rpm: effectiveRPM)
     }
 
     public var body: some View {
@@ -293,12 +297,12 @@ public struct FanSpeedometerDialView: View {
                         .frame(width: radius * 1.62, height: radius * 1.62)
 
                     // 4. Dynamic Speed Ribbon (Continuous smooth extension + optional Gaussian blur)
-                    let progress = currentFraction * 0.75
+                    let progress = effectiveFraction * 0.75
                     Circle()
                         .trim(from: 0, to: max(0.0001, progress))
                         .stroke(
                             LinearGradient(
-                                colors: speedGradientColors(actualRPM: currentRPM),
+                                colors: speedGradientColors(actualRPM: effectiveRPM),
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
@@ -307,13 +311,14 @@ public struct FanSpeedometerDialView: View {
                         .rotationEffect(.degrees(scale.circleRotationAngle))
                         .frame(width: radius * 1.62, height: radius * 1.62)
                         .shadow(
-                            color: (isRedline ? Color.red : Color.cyan).opacity(0.35),
+                            color: (effectiveRedline ? Color.red : Color.cyan).opacity(0.35),
                             radius: 5,
                             x: 0,
                             y: 0
                         )
                         .blur(radius: gauge3DAcceleration ? motionBlur * 0.65 : 0)
                         .opacity(progress > 0.001 ? 1 : 0)
+                        .animation(gauge3DAcceleration ? nil : .spring(response: 0.50, dampingFraction: 0.82), value: progress)
 
                     // 5. High-Precision Graduation Tick Marks & Numerals (Polar Coordinate Alignment)
                     dialGraduations(radius: radius * 0.81)
@@ -325,29 +330,38 @@ public struct FanSpeedometerDialView: View {
 
                     // 7. High-Precision Racing Needle (100% Co-axial with pivot and tick marks)
                     FanSpeedometerNeedle(
-                        angle: scale.angle(for: currentRPM),
+                        angle: scale.angle(for: effectiveRPM),
                         radius: radius * 0.81,
-                        isRedline: isRedline,
+                        isRedline: effectiveRedline,
                         motionBlur: motionBlur,
                         hardware3D: gauge3DAcceleration
                     )
+                    .animation(gauge3DAcceleration ? nil : .spring(response: 0.50, dampingFraction: 0.82), value: effectiveRPM)
 
-                    // 8. Digital HUD Cluster (Frame-by-Frame Continuous Rolling Numbers)
+                    // 8. Digital HUD Cluster (Shifted downward to eliminate overlap with center hub)
                     VStack(spacing: 2) {
-                        Text(currentRPM > 0 ? "\(currentRPM)" : "0")
-                            .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
-                            .foregroundStyle(isRedline ? Color.red : Color.primary)
-                            .blur(radius: gauge3DAcceleration ? motionBlur * 0.45 : 0)
+                        if gauge3DAcceleration {
+                            Text(effectiveRPM > 0 ? "\(effectiveRPM)" : "0")
+                                .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
+                                .foregroundStyle(effectiveRedline ? Color.red : Color.primary)
+                                .blur(radius: motionBlur * 0.45)
+                        } else {
+                            Text(effectiveRPM > 0 ? "\(effectiveRPM)" : "0")
+                                .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
+                                .foregroundStyle(effectiveRedline ? Color.red : Color.primary)
+                                .contentTransition(.numericText())
+                                .animation(.easeInOut(duration: 0.2), value: effectiveRPM)
+                        }
 
                         HStack(spacing: 4) {
-                            SpinningFanBlade(rpm: currentRPM, hardware3D: gauge3DAcceleration)
+                            SpinningFanBlade(rpm: effectiveRPM, hardware3D: gauge3DAcceleration)
                             Text("RPM")
                                 .font(.system(size: 9.5, weight: .bold))
                                 .foregroundStyle(.secondary)
                         }
 
                         // Duty Cycle & Health Tag
-                        Text(currentRPM == 0 ? l10n.fanStopped : "\(Int(currentFraction * 100))%")
+                        Text(effectiveRPM == 0 ? l10n.fanStopped : "\(Int(effectiveFraction * 100))%")
                             .font(.system(size: 10, weight: .bold).monospacedDigit())
                             .padding(.horizontal, 6)
                             .padding(.vertical, 1.5)
@@ -357,7 +371,7 @@ public struct FanSpeedometerDialView: View {
                             .foregroundStyle(statusColor)
                             .padding(.top, 4)
                     }
-                    .offset(y: radius * 0.28)
+                    .offset(y: radius * 0.48)
                 }
                 .frame(width: side, height: side)
                 .position(x: geo.size.width / 2, y: geo.size.height / 2)
@@ -378,7 +392,7 @@ public struct FanSpeedometerDialView: View {
                             .font(.system(size: 10.5, weight: .medium).monospacedDigit())
                             .foregroundStyle(.orange)
                     } else {
-                        Text("\(l10n.fanDutyCycle): \(String(format: "%.1f%%", currentFraction * 100))")
+                        Text("\(l10n.fanDutyCycle): \(String(format: "%.1f%%", effectiveFraction * 100))")
                             .font(.system(size: 10.5).monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
@@ -389,9 +403,10 @@ public struct FanSpeedometerDialView: View {
                     ZStack(alignment: .leading) {
                         Capsule().fill(Color.primary.opacity(0.08))
                         Capsule()
-                            .fill(LinearGradient(colors: speedGradientColors(actualRPM: currentRPM), startPoint: .leading, endPoint: .trailing))
-                            .frame(width: barGeo.size.width * CGFloat(currentFraction))
+                            .fill(LinearGradient(colors: speedGradientColors(actualRPM: effectiveRPM), startPoint: .leading, endPoint: .trailing))
+                            .frame(width: barGeo.size.width * CGFloat(effectiveFraction))
                             .blur(radius: gauge3DAcceleration ? motionBlur * 0.4 : 0)
+                            .animation(gauge3DAcceleration ? nil : .spring(response: 0.50, dampingFraction: 0.82), value: effectiveFraction)
                     }
                 }
                 .frame(height: 4)
@@ -406,7 +421,7 @@ public struct FanSpeedometerDialView: View {
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(
-                    isRedline
+                    effectiveRedline
                         ? Color.red.opacity(0.35)
                         : Color.primary.opacity(0.06),
                     lineWidth: 1
@@ -416,28 +431,61 @@ public struct FanSpeedometerDialView: View {
             if !hasAppeared {
                 hasAppeared = true
                 let targetVal = Double(fan.actualRPM)
-                if targetVal > 0 {
-                    // Initial spool-up from idle/0 to actual RPM
-                    currentDisplayRPM = max(0, targetVal - 1200)
-                    animateToRPM(targetVal)
+                if gauge3DAcceleration {
+                    if targetVal > 0 {
+                        // Initial spool-up from idle/0 to actual RPM
+                        currentDisplayRPM = max(0, targetVal - 1200)
+                        animateToRPM(targetVal)
+                    } else {
+                        currentDisplayRPM = 0
+                    }
                 } else {
-                    currentDisplayRPM = 0
+                    currentDisplayRPM = targetVal
+                    motionBlur = 0
                 }
             } else {
-                animateToRPM(Double(fan.actualRPM))
+                if gauge3DAcceleration {
+                    animateToRPM(Double(fan.actualRPM))
+                } else {
+                    currentDisplayRPM = Double(fan.actualRPM)
+                    motionBlur = 0
+                }
             }
         }
         .onDisappear {
             animationTask?.cancel()
+            animationTask = nil
         }
         .onChange(of: fan.actualRPM) { _, newRPM in
-            animateToRPM(Double(newRPM))
+            if gauge3DAcceleration {
+                animateToRPM(Double(newRPM))
+            } else {
+                currentDisplayRPM = Double(newRPM)
+                motionBlur = 0
+            }
+        }
+        .onChange(of: gauge3DAcceleration) { _, enabled in
+            if !enabled {
+                animationTask?.cancel()
+                animationTask = nil
+                motionBlur = 0
+                currentDisplayRPM = Double(fan.actualRPM)
+            } else {
+                animateToRPM(Double(fan.actualRPM))
+            }
         }
     }
 
     // MARK: - Authentic Mechanical Fan Acceleration Engine
     private func animateToRPM(_ target: Double) {
         animationTask?.cancel()
+        animationTask = nil
+
+        guard gauge3DAcceleration else {
+            currentDisplayRPM = target
+            motionBlur = 0
+            return
+        }
 
         let startRPM = currentDisplayRPM
         let diff = abs(target - startRPM)
@@ -466,12 +514,8 @@ public struct FanSpeedometerDialView: View {
                 currentDisplayRPM = nextRPM
 
                 // Dynamic Gaussian motion blur: peaks during mid-acceleration, fades out near target
-                if gauge3DAcceleration {
-                    let bellCurve = 4.0 * t * (1.0 - t)
-                    motionBlur = peakBlur * CGFloat(bellCurve)
-                } else {
-                    motionBlur = 0
-                }
+                let bellCurve = 4.0 * t * (1.0 - t)
+                motionBlur = peakBlur * CGFloat(bellCurve)
 
                 if progress >= 1.0 {
                     currentDisplayRPM = target
@@ -560,9 +604,9 @@ public struct FanSpeedometerDialView: View {
 
     // MARK: - Color Calculations
     private func speedGradientColors(actualRPM: Int) -> [Color] {
-        if isRedline {
+        if scale.isRedline(rpm: actualRPM) {
             return [Color(red: 1.0, green: 0.4, blue: 0.1), Color.red, Color(red: 0.9, green: 0.0, blue: 0.2)]
-        } else if currentFraction >= 0.65 {
+        } else if scale.fraction(for: actualRPM) >= 0.65 {
             return [Color.cyan, Color.yellow, Color.orange]
         } else {
             return [Color(red: 0.1, green: 0.85, blue: 0.95), Color.blue, Color(red: 0.3, green: 0.5, blue: 1.0)]
@@ -570,9 +614,9 @@ public struct FanSpeedometerDialView: View {
     }
 
     private var statusColor: Color {
-        if currentRPM == 0 { return .secondary }
-        if isRedline { return .red }
-        if currentFraction >= 0.70 { return .orange }
+        if effectiveRPM == 0 { return .secondary }
+        if effectiveRedline { return .red }
+        if effectiveFraction >= 0.70 { return .orange }
         return .green
     }
 }
