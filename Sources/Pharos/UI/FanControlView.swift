@@ -94,6 +94,10 @@ struct FanControlCard: View {
         case .max: fan.apply(.max)
         case .fixed: fan.apply(.fixed(rpm: fan.fixedRPM))
         }
+        Task {
+            try? await Task.sleep(for: .milliseconds(150))
+            await store.refreshThermals()
+        }
     }
 
     @ViewBuilder

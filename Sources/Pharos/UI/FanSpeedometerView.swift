@@ -39,26 +39,6 @@ private struct SpinningFanBlade: View {
     }
 }
 
-// MARK: - Animatable Rolling RPM HUD Text (Smooth Digits with Optional Gaussian Blur)
-private struct RollingRPMText: View, Animatable {
-    var rpm: Double
-    var isRedline: Bool
-    var blurRadius: CGFloat
-
-    var animatableData: Double {
-        get { rpm }
-        set { rpm = newValue }
-    }
-
-    var body: some View {
-        let displayInt = max(0, Int(rpm.rounded()))
-        Text(displayInt > 0 ? "\(displayInt)" : "0")
-            .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
-            .foregroundStyle(isRedline ? Color.red : Color.primary)
-            .blur(radius: blurRadius)
-    }
-}
-
 // MARK: - Centered Aerodynamic Needle Path
 private struct NeedleShape: Shape {
     let needleLength: CGFloat
@@ -78,7 +58,7 @@ private struct NeedleShape: Shape {
         path.addLine(to: CGPoint(x: cx + tipW / 2, y: topY))
         path.addLine(to: CGPoint(x: cx + w / 2, y: cy))
         path.addLine(to: CGPoint(x: cx + w / 2, y: bottomY))
-        path.addLine(to: CGPoint(x: cx - w / 2, y: bottomY))
+        path.addLine(to: CGPoint(x: -w / 2, y: bottomY))
         path.closeSubpath()
         return path
     }
@@ -192,7 +172,7 @@ private struct FanSpeedometerNeedle: View {
     }
 }
 
-// MARK: - High-Precision Speedometer Dial View
+// MARK: - High-Precision Speedometer Dial View (Continuous 60FPS Mechanical Acceleration Engine)
 public struct FanSpeedometerDialView: View {
     @ObservedObject private var l10n = L10n.shared
     @AppStorage("pharos.gauge3DAcceleration") private var gauge3DAcceleration: Bool = true
@@ -201,10 +181,11 @@ public struct FanSpeedometerDialView: View {
     public let count: Int
     public let targetRPM: Int?
 
-    // Smooth physics & Gaussian blur states
-    @State private var animatedRPM: Double = 0
+    // Smooth mechanical physics & continuous frame states
+    @State private var currentDisplayRPM: Double = 0
     @State private var motionBlur: CGFloat = 0
     @State private var hasAppeared: Bool = false
+    @State private var animationTask: Task<Void, Never>? = nil
 
     public init(fan: FanReading, count: Int, targetRPM: Int? = nil) {
         self.fan = fan
@@ -217,7 +198,7 @@ public struct FanSpeedometerDialView: View {
     }
 
     private var currentRPM: Int {
-        Int(animatedRPM.rounded())
+        max(0, Int(currentDisplayRPM.rounded()))
     }
 
     private var isRedline: Bool {
@@ -315,7 +296,7 @@ public struct FanSpeedometerDialView: View {
                         .rotationEffect(.degrees(scale.circleRotationAngle))
                         .frame(width: radius * 1.62, height: radius * 1.62)
 
-                    // 4. Dynamic Speed Ribbon (Always in tree, smooth trim + optional Gaussian blur)
+                    // 4. Dynamic Speed Ribbon (Continuous smooth extension + optional Gaussian blur)
                     let progress = currentFraction * 0.75
                     Circle()
                         .trim(from: 0, to: max(0.0001, progress))
@@ -356,13 +337,12 @@ public struct FanSpeedometerDialView: View {
                     )
                     .frame(width: side, height: side)
 
-                    // 8. Digital HUD Cluster (Rolling Number + Optional Gaussian Blur)
+                    // 8. Digital HUD Cluster (Frame-by-Frame Continuous Rolling Numbers)
                     VStack(spacing: 2) {
-                        RollingRPMText(
-                            rpm: animatedRPM,
-                            isRedline: isRedline,
-                            blurRadius: gauge3DAcceleration ? motionBlur * 0.45 : 0
-                        )
+                        Text(currentRPM > 0 ? "\(currentRPM)" : "0")
+                            .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
+                            .foregroundStyle(isRedline ? Color.red : Color.primary)
+                            .blur(radius: gauge3DAcceleration ? motionBlur * 0.45 : 0)
 
                         HStack(spacing: 4) {
                             SpinningFanBlade(rpm: currentRPM, hardware3D: gauge3DAcceleration)
@@ -442,53 +422,69 @@ public struct FanSpeedometerDialView: View {
                 hasAppeared = true
                 let targetVal = Double(fan.actualRPM)
                 if targetVal > 0 {
-                    if gauge3DAcceleration {
-                        // Smooth self-check ignition sweep
-                        animatedRPM = max(0, targetVal - 800)
-                        withAnimation(.easeOut(duration: 0.12)) {
-                            motionBlur = 2.0
-                        }
-                        withAnimation(.spring(response: 0.65, dampingFraction: 0.78)) {
-                            animatedRPM = targetVal
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                            withAnimation(.easeOut(duration: 0.3)) {
-                                motionBlur = 0
-                            }
-                        }
-                    } else {
-                        // Reduced motion: lightweight spring without blur
-                        animatedRPM = targetVal
-                    }
+                    // Initial spool-up from idle/0 to actual RPM
+                    currentDisplayRPM = max(0, targetVal - 1200)
+                    animateToRPM(targetVal)
                 } else {
-                    animatedRPM = 0
+                    currentDisplayRPM = 0
                 }
             } else {
-                animatedRPM = Double(fan.actualRPM)
+                animateToRPM(Double(fan.actualRPM))
             }
         }
+        .onDisappear {
+            animationTask?.cancel()
+        }
         .onChange(of: fan.actualRPM) { _, newRPM in
-            let delta = abs(Double(newRPM) - animatedRPM)
-            if gauge3DAcceleration && delta > 75 {
-                // High delta transition with 3D motion blur
-                let blurTarget = min(4.8, max(1.2, CGFloat(delta) / 450.0))
-                withAnimation(.easeOut(duration: 0.10)) {
-                    motionBlur = blurTarget
+            animateToRPM(Double(newRPM))
+        }
+    }
+
+    // MARK: - Authentic Mechanical Fan Acceleration Engine
+    private func animateToRPM(_ target: Double) {
+        animationTask?.cancel()
+
+        let startRPM = currentDisplayRPM
+        let diff = abs(target - startRPM)
+        guard diff > 1.0 else {
+            currentDisplayRPM = target
+            motionBlur = 0
+            return
+        }
+
+        // Mechanical fan spool-up duration (0.45s to 1.85s depending on delta)
+        let duration = max(0.45, min(1.85, 0.45 + (diff / 6000.0) * 1.4))
+        let startTime = CACurrentMediaTime()
+        let peakBlur = min(4.5, max(1.2, CGFloat(diff) / 500.0))
+
+        animationTask = Task { @MainActor in
+            while !Task.isCancelled {
+                let now = CACurrentMediaTime()
+                let elapsed = now - startTime
+                let progress = min(1.0, elapsed / duration)
+
+                // Smoothstep S-curve (cubic acceleration & deceleration): 3*t^2 - 2*t^3
+                let t = progress
+                let eased = t * t * (3.0 - 2.0 * t)
+
+                let nextRPM = startRPM + (target - startRPM) * eased
+                currentDisplayRPM = nextRPM
+
+                // Dynamic Gaussian motion blur: peaks during mid-acceleration, fades out near target
+                if gauge3DAcceleration {
+                    let bellCurve = 4.0 * t * (1.0 - t)
+                    motionBlur = peakBlur * CGFloat(bellCurve)
+                } else {
+                    motionBlur = 0
                 }
-                withAnimation(.spring(response: 0.58, dampingFraction: 0.76)) {
-                    animatedRPM = Double(newRPM)
+
+                if progress >= 1.0 {
+                    currentDisplayRPM = target
+                    motionBlur = 0
+                    break
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
-                    withAnimation(.easeOut(duration: 0.35)) {
-                        motionBlur = 0
-                    }
-                }
-            } else {
-                // Reduced motion / small delta: standard lightweight spring
-                motionBlur = 0
-                withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                    animatedRPM = Double(newRPM)
-                }
+
+                try? await Task.sleep(nanoseconds: 16_000_000) // ~60 FPS
             }
         }
     }
@@ -823,15 +819,27 @@ public struct FanSpeedometerClusterView: View {
     }
 }
 
-// MARK: - Classic Fan Bar Card (Preserved with Smooth Animations)
+// MARK: - Classic Fan Bar Card (Preserved with Continuous Acceleration)
 public struct ClassicFanBarCard: View {
     @ObservedObject private var l10n = L10n.shared
     public let fan: FanReading
     public let count: Int
 
+    @State private var displayRPM: Double = 0
+    @State private var animationTask: Task<Void, Never>? = nil
+
     public init(fan: FanReading, count: Int) {
         self.fan = fan
         self.count = count
+    }
+
+    private var currentRPM: Int {
+        max(0, Int(displayRPM.rounded()))
+    }
+
+    private var currentFraction: Double {
+        guard fan.maxRPM > 0 else { return 0 }
+        return min(1.0, Double(currentRPM) / Double(fan.maxRPM))
     }
 
     public var body: some View {
@@ -847,12 +855,10 @@ public struct ClassicFanBarCard: View {
                     .foregroundStyle(fan.mode == .manual ? .orange : .secondary)
             }
             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(fan.actualRPM > 0 ? "\(fan.actualRPM)" : "0")
+                Text(currentRPM > 0 ? "\(currentRPM)" : "0")
                     .font(.system(size: 22, weight: .semibold).monospacedDigit())
-                    .contentTransition(.numericText())
-                    .animation(.easeInOut(duration: 0.2), value: fan.actualRPM)
                 Text("rpm").font(.system(size: 11)).foregroundStyle(.secondary)
-                if fan.actualRPM == 0 {
+                if currentRPM == 0 {
                     Text(l10n.fanStopped).font(.system(size: 10)).foregroundStyle(.tertiary)
                 }
             }
@@ -860,16 +866,48 @@ public struct ClassicFanBarCard: View {
                 ZStack(alignment: .leading) {
                     Rectangle().fill(Color.primary.opacity(0.08))
                     Rectangle().fill(Color.blue)
-                        .frame(width: geo.size.width * CGFloat(fan.fraction))
-                        .animation(.spring(response: 0.52, dampingFraction: 0.78), value: fan.fraction)
+                        .frame(width: geo.size.width * CGFloat(currentFraction))
                 }
             }
             .frame(height: 6)
             .clipShape(RoundedRectangle(cornerRadius: 2))
-            Text(l10n.fanRange(fan.minRPM, fan.maxRPM)).font(.system(size: 10).monospacedDigit()).foregroundStyle(.secondary)
+            Text(l10n.fanRange(fan.minRPM, fan.maxRPM)).font(.system(size: 10.5).monospacedDigit()).foregroundStyle(.secondary)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
+        .onAppear {
+            let target = Double(fan.actualRPM)
+            displayRPM = max(0, target - 1000)
+            animateTo(target)
+        }
+        .onDisappear {
+            animationTask?.cancel()
+        }
+        .onChange(of: fan.actualRPM) { _, newRPM in
+            animateTo(Double(newRPM))
+        }
+    }
+
+    private func animateTo(_ target: Double) {
+        animationTask?.cancel()
+        let start = displayRPM
+        let diff = abs(target - start)
+        guard diff > 1.0 else { displayRPM = target; return }
+
+        let duration = max(0.45, min(1.85, 0.45 + (diff / 6000.0) * 1.4))
+        let startTime = CACurrentMediaTime()
+
+        animationTask = Task { @MainActor in
+            while !Task.isCancelled {
+                let elapsed = CACurrentMediaTime() - startTime
+                let progress = min(1.0, elapsed / duration)
+                let t = progress
+                let eased = t * t * (3.0 - 2.0 * t)
+                displayRPM = start + (target - start) * eased
+                if progress >= 1.0 { displayRPM = target; break }
+                try? await Task.sleep(nanoseconds: 16_000_000)
+            }
+        }
     }
 }

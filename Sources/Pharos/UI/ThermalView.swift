@@ -127,7 +127,12 @@ struct ThermalView: View {
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .task { await store.refreshThermals() }
+        .task {
+            while !Task.isCancelled {
+                await store.refreshThermals()
+                try? await Task.sleep(for: .milliseconds(800))
+            }
+        }
     }
 }
 
