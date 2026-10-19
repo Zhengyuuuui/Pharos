@@ -227,10 +227,21 @@ struct SettingsForm: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Toggle(l10n.gauge3DAcceleration, isOn: $gauge3DAcceleration)
-                    .font(.system(size: 12))
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .center) {
+                    Text(l10n.motionPerformanceMode)
+                        .font(.system(size: 12))
+                    Spacer()
+                    Picker("", selection: $gauge3DAcceleration) {
+                        Text(l10n.motionModeSmooth).tag(true)
+                        Text(l10n.motionModeBalanced).tag(false)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: 175)
                     .disabled(systemReduceMotion)
+                }
+
                 if systemReduceMotion {
                     Text(l10n.systemReduceMotionNotice)
                         .font(.system(size: 10))

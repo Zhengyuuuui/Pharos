@@ -419,28 +419,31 @@ final class L10n: ObservableObject {
     var fanRedline: String { en ? "Redline Zone" : "高转速赤线区" }
     var fanRPMUnit: String { en ? "RPM x 1000" : "转速 x 1000" }
     var fanNoFansInstalled: String { en ? "Fanless Mac (No physical fans)" : "无物理风扇设计 (静音被动散热)" }
+    var motionPerformanceMode: String { en ? "Motion & Energy Mode" : "动效与能耗模式" }
+    var motionModeSmooth: String { en ? "Smooth Motion" : "流畅动画" }
+    var motionModeBalanced: String { en ? "Balanced Energy" : "均衡能耗" }
     var gauge3DAcceleration: String { en ? "3D Gauge Hardware Acceleration" : "仪表盘 3D 渲染与动效加速" }
     var gauge3DAccelerationNotice: String {
         en
-            ? "⚠️ Hardware 3D motion acceleration is active: uses GPU performance cores for high-framerate anti-aliased rendering and Gaussian motion blur, which increases energy consumption. Turn off to reduce motion for optimal battery life and lower resource overhead."
-            : "⚠️ 当前已开启 3D 动效渲染加速：将调用 GPU 图形性能核心进行高帧率抗锯齿与高斯模糊渲染，会增加电脑能耗；关闭后可减弱动效获得更佳性能与续航。"
+            ? "Smooth motion mode: enables 60 FPS mechanical inertia, dynamic Gaussian motion blur, and 3D rendering acceleration for fluid visuals."
+            : "流畅动画模式：启用 60 FPS 物理阻尼惯性、动态高斯模糊与 3D 渲染加速，呈现最流畅细腻的动效体验。"
     }
     var gaugeReducedMotionNotice: String {
         en
-            ? "Reduced motion active (High Performance): disables dynamic Gaussian blur and 3D trailing ghosts for ultra-low GPU energy consumption."
-            : "已启用减弱动画（高性能模式）：关闭动态高斯模糊与 3D 残影拖尾，以极低 GPU 能耗轻量运行。"
+            ? "Balanced energy mode: disables dynamic Gaussian blur and 3D trailing ghosts for ultra-low GPU overhead and optimal battery life."
+            : "均衡能耗模式：关闭动态高斯模糊与 3D 残影拖尾，采用轻量级 2D 动效，以极低 GPU 能耗兼顾流畅与续航。"
     }
-    var gaugeReduceMotionAction: String { en ? "Reduce Motion" : "切换为减弱动画" }
-    var gaugeEnable3DAction: String { en ? "Enable 3D" : "开启 3D 动效" }
+    var gaugeReduceMotionAction: String { en ? "Switch to Balanced" : "切换为均衡能耗" }
+    var gaugeEnable3DAction: String { en ? "Switch to Smooth" : "切换为流畅动画" }
     var gaugeMotionNoticeBanner: String {
         en
-            ? "3D gauge motion uses GPU performance cores and increases energy consumption"
-            : "已开启 3D 动效加速 · 调用 GPU 核心增加能耗"
+            ? "Smooth 3D gauge motion uses GPU performance cores and increases energy consumption"
+            : "已开启流畅动效加速 · 调用 GPU 核心增加能耗"
     }
     var systemReduceMotionNotice: String {
         en
-            ? "System “Reduce Motion” enabled: 3D acceleration and motion blurs disabled"
-            : "系统「减弱动态效果」已开启 · 已自动关闭 3D 渲染与动态模糊"
+            ? "System “Reduce Motion” enabled: locked to balanced mode with 3D acceleration and motion blurs disabled"
+            : "系统「减弱动态效果」已开启 · 已锁定为均衡能耗模式（自动关闭 3D 与动态模糊）"
     }
     func sensorGroup(_ g: SensorGroup) -> String {
         switch g {
