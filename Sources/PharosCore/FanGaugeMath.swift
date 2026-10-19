@@ -13,7 +13,7 @@ public struct FanGaugeScale: Sendable, Hashable, Equatable {
     public init(
         minRPM: Int,
         maxRPM: Int,
-        startAngle: Double = 135.0,
+        startAngle: Double = 225.0,
         sweepAngle: Double = 270.0
     ) {
         let safeMin = max(0, minRPM)
@@ -58,6 +58,12 @@ public struct FanGaugeScale: Sendable, Hashable, Equatable {
     /// Starting angle of the redline zone.
     public var redlineStartAngle: Double {
         angle(for: redlineRPM)
+    }
+
+    /// Angle to rotate a standard SwiftUI Circle() whose natural 0 is at 3 o'clock
+    /// so that its 0 progress aligns with startAngle (225° clockwise from 12 o'clock).
+    public var circleRotationAngle: Double {
+        startAngle - 90.0
     }
 
     /// Values for major graduation marks (every 1000 RPM, e.g. [0, 1000, 2000, ...]).

@@ -50,8 +50,9 @@ func testFanGaugeScale() {
     let scale = FanGaugeScale(minRPM: 2317, maxRPM: 6800)
     expectEq(scale.maxScale, 7000, "6800 rounded to next 1000 = 7000")
     expectEq(scale.redlineRPM, 5700, "85% of 6800 = 5780 rounded to 5700")
-    expectEq(scale.startAngle, 135.0, "startAngle default 135")
+    expectEq(scale.startAngle, 225.0, "startAngle default 225 (7:30 bottom-left)")
     expectEq(scale.sweepAngle, 270.0, "sweepAngle default 270")
+    expectEq(scale.circleRotationAngle, 135.0, "circleRotationAngle = 225 - 90 = 135")
 
     // Progress fractions
     expectEq(scale.fraction(for: 0), 0.0, "fraction 0 RPM = 0")
@@ -59,10 +60,10 @@ func testFanGaugeScale() {
     expectEq(scale.fraction(for: 7000), 1.0, "fraction 7000 RPM = 1.0")
     expectEq(scale.fraction(for: 8000), 1.0, "fraction over maxScale clamped to 1.0")
 
-    // Angles
-    expectEq(scale.angle(for: 0), 135.0, "angle at 0 RPM = 135 deg")
-    expectEq(scale.angle(for: 3500), 270.0, "angle at 3500 RPM = 270 deg (top dead center)")
-    expectEq(scale.angle(for: 7000), 405.0, "angle at 7000 RPM = 405 deg")
+    // Angles: 225° (7:30 0 RPM) -> 360° (12:00 Top Dead Center) -> 495° (4:30 Max RPM)
+    expectEq(scale.angle(for: 0), 225.0, "angle at 0 RPM = 225 deg (7:30 start)")
+    expectEq(scale.angle(for: 3500), 360.0, "angle at 3500 RPM = 360 deg (top dead center, 12 o'clock)")
+    expectEq(scale.angle(for: 7000), 495.0, "angle at 7000 RPM = 495 deg (4:30 finish)")
 
     // Redline checking
     expect(!scale.isRedline(rpm: 3000), "3000 RPM not redline")

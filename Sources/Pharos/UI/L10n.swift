@@ -419,6 +419,24 @@ final class L10n: ObservableObject {
     var fanRedline: String { en ? "Redline Zone" : "高转速赤线区" }
     var fanRPMUnit: String { en ? "RPM x 1000" : "转速 x 1000" }
     var fanNoFansInstalled: String { en ? "Fanless Mac (No physical fans)" : "无物理风扇设计 (静音被动散热)" }
+    var gauge3DAcceleration: String { en ? "3D Gauge Hardware Acceleration" : "仪表盘 3D 渲染与动效加速" }
+    var gauge3DAccelerationNotice: String {
+        en
+            ? "⚠️ Hardware 3D motion acceleration is active: uses GPU performance cores for high-framerate anti-aliased rendering and Gaussian motion blur, which increases energy consumption. Turn off to reduce motion for optimal battery life and lower resource overhead."
+            : "⚠️ 当前已开启 3D 动效渲染加速：将调用 GPU 图形性能核心进行高帧率抗锯齿与高斯模糊渲染，会增加电脑能耗；关闭后可减弱动效获得更佳性能与续航。"
+    }
+    var gaugeReducedMotionNotice: String {
+        en
+            ? "Reduced motion active (High Performance): disables dynamic Gaussian blur and 3D trailing ghosts for ultra-low GPU energy consumption."
+            : "已启用减弱动画（高性能模式）：关闭动态高斯模糊与 3D 残影拖尾，以极低 GPU 能耗轻量运行。"
+    }
+    var gaugeReduceMotionAction: String { en ? "Reduce Motion" : "切换为减弱动画" }
+    var gaugeEnable3DAction: String { en ? "Enable 3D" : "开启 3D 动效" }
+    var gaugeMotionNoticeBanner: String {
+        en
+            ? "3D gauge motion uses GPU performance cores and increases energy consumption"
+            : "已开启 3D 动效加速 · 调用 GPU 核心增加能耗"
+    }
     func sensorGroup(_ g: SensorGroup) -> String {
         switch g {
         case .cpu: return "CPU"
