@@ -191,7 +191,7 @@ final class ProjectStore: ObservableObject {
         guard !readingThermals else { return }
         readingThermals = true
         defer { readingThermals = false }
-        let snap = await Task.detached(priority: .utility) { Thermals.read() }.value
+        guard let snap = (await Task.detached(priority: .utility) { Thermals.read() }.value) else { return }
         let level = ProcessInfo.processInfo.thermalState
         if snap != state.thermals || level != state.thermalState {
             var next = state

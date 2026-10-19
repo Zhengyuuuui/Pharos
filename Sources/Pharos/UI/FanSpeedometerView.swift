@@ -32,50 +32,94 @@ private struct SpinningFanBlade: View {
 
     private var spinDuration: Double {
         guard rpm > 0 else { return 2.0 }
-        // Scale speed between 1.8s (slow/idle) to 0.25s (max boost)
         let clamped = max(800, min(7000, rpm))
         let factor = 1.0 - (Double(clamped - 800) / 6200.0)
         return max(0.25, 0.25 + factor * 1.55)
     }
 }
 
-// MARK: - Automotive Speedometer Needle
+// MARK: - Animatable Rolling RPM HUD Text (Smooth Digits with Gaussian Blur)
+private struct RollingRPMText: View, Animatable {
+    var rpm: Double
+    var isRedline: Bool
+    var blurRadius: CGFloat
+
+    var animatableData: Double {
+        get { rpm }
+        set { rpm = newValue }
+    }
+
+    var body: some View {
+        let displayInt = max(0, Int(rpm.rounded()))
+        Text(displayInt > 0 ? "\(displayInt)" : "0")
+            .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
+            .foregroundStyle(isRedline ? Color.red : Color.primary)
+            .blur(radius: blurRadius)
+    }
+}
+
+// MARK: - Aerodynamic Needle Path
+private struct NeedleShape: Shape {
+    let needleLength: CGFloat
+    let needleTail: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let w: CGFloat = 3.4
+        let tipW: CGFloat = 1.2
+        let topY = -needleLength
+        let bottomY = needleTail
+
+        path.move(to: CGPoint(x: -w / 2, y: 0))
+        path.addLine(to: CGPoint(x: -tipW / 2, y: topY))
+        path.addLine(to: CGPoint(x: tipW / 2, y: topY))
+        path.addLine(to: CGPoint(x: w / 2, y: 0))
+        path.addLine(to: CGPoint(x: w / 2, y: bottomY))
+        path.addLine(to: CGPoint(x: -w / 2, y: bottomY))
+        path.closeSubpath()
+        return path
+    }
+}
+
+// MARK: - Automotive Speedometer Needle with Motion Blur
 private struct FanSpeedometerNeedle: View {
     let angle: Double
     let radius: CGFloat
     let isRedline: Bool
+    var motionBlur: CGFloat = 0
 
     var body: some View {
         let needleLength = radius * 0.72
         let needleTail = radius * 0.16
 
         ZStack {
-            // Shadow behind the needle
-            VStack(spacing: 0) {
-                Rectangle()
-                    .fill(Color.black.opacity(0.45))
-                    .frame(width: 3.5, height: needleLength)
-                Rectangle()
-                    .fill(Color.black.opacity(0.35))
-                    .frame(width: 4, height: needleTail)
+            // 1. Aerodynamic Motion Blur Ghost Trail (Activated during high-speed swings)
+            if motionBlur > 0.8 {
+                NeedleShape(needleLength: needleLength, needleTail: needleTail)
+                    .fill(
+                        LinearGradient(
+                            colors: isRedline
+                                ? [Color.red.opacity(0.45), Color.orange.opacity(0.15)]
+                                : [Color.orange.opacity(0.45), Color.cyan.opacity(0.15)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .blur(radius: motionBlur * 1.3)
+                    .rotationEffect(.degrees(angle - (angle > 270 ? 3.5 : -3.5)), anchor: .center)
             }
-            .offset(x: 1.5, y: -needleLength / 2 + needleTail / 2 + 1.5)
-            .rotationEffect(.degrees(angle), anchor: .center)
 
-            // Dynamic Racing Needle
-            VStack(spacing: 0) {
-                // Illuminated needle body
-                ZStack(alignment: .top) {
-                    // Needle body with tapered gradient
-                    Path { path in
-                        let w: CGFloat = 3.2
-                        let tipW: CGFloat = 1.2
-                        path.move(to: CGPoint(x: -w / 2, y: needleLength))
-                        path.addLine(to: CGPoint(x: -tipW / 2, y: 0))
-                        path.addLine(to: CGPoint(x: tipW / 2, y: 0))
-                        path.addLine(to: CGPoint(x: w / 2, y: needleLength))
-                        path.closeSubpath()
-                    }
+            // 2. Co-rotating Needle Drop Shadow (100% in sync with needle angle)
+            NeedleShape(needleLength: needleLength, needleTail: needleTail)
+                .fill(Color.black.opacity(0.38))
+                .blur(radius: 2.0)
+                .offset(x: 1.5, y: 1.5)
+                .rotationEffect(.degrees(angle), anchor: .center)
+
+            // 3. Dynamic Illuminated Racing Needle
+            ZStack(alignment: .top) {
+                // Tapered illuminated body
+                NeedleShape(needleLength: needleLength, needleTail: needleTail)
                     .fill(
                         LinearGradient(
                             colors: isRedline
@@ -85,35 +129,27 @@ private struct FanSpeedometerNeedle: View {
                             endPoint: .bottom
                         )
                     )
-                    .frame(width: 4, height: needleLength)
-
-                    // Sharp center reflective highlight
-                    Rectangle()
-                        .fill(Color.white.opacity(0.75))
-                        .frame(width: 0.8, height: needleLength - 4)
-                        .padding(.top, 2)
-                }
-
-                // Counterweight tail behind pivot
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.primary.opacity(0.7), Color.primary.opacity(0.4)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
+                    .shadow(
+                        color: (isRedline ? Color.red : Color.orange).opacity(0.55),
+                        radius: 4,
+                        x: 0,
+                        y: 0
                     )
-                    .frame(width: 3.5, height: needleTail)
-            }
-            .offset(y: -needleLength / 2 + needleTail / 2)
-            .rotationEffect(.degrees(angle), anchor: .center)
-            .animation(.spring(response: 0.52, dampingFraction: 0.74), value: angle)
 
-            // Machined Center Pivot Hub Cap
+                // Sharp center reflective highlight spine
+                Rectangle()
+                    .fill(Color.white.opacity(0.85))
+                    .frame(width: 0.8, height: needleLength - 4)
+                    .offset(y: -needleLength / 2 + 2)
+            }
+            .blur(radius: motionBlur * 0.7)
+            .rotationEffect(.degrees(angle), anchor: .center)
+
+            // 4. Machined Dual-Concentric Pivot Hub Cap
             Circle()
                 .fill(
                     LinearGradient(
-                        colors: [Color.white.opacity(0.35), Color.black.opacity(0.85)],
+                        colors: [Color.white.opacity(0.45), Color.black.opacity(0.88)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -121,11 +157,11 @@ private struct FanSpeedometerNeedle: View {
                 .frame(width: 22, height: 22)
                 .overlay(
                     Circle()
-                        .stroke(Color.primary.opacity(0.3), lineWidth: 1)
+                        .stroke(Color.primary.opacity(0.35), lineWidth: 1)
                 )
-                .shadow(color: Color.black.opacity(0.4), radius: 3, x: 0, y: 1.5)
+                .shadow(color: Color.black.opacity(0.45), radius: 3, x: 0, y: 1.5)
 
-            // Inner Rivet
+            // Inner Rivet Core
             Circle()
                 .fill(isRedline ? Color.red : Color.orange)
                 .frame(width: 7, height: 7)
@@ -141,6 +177,11 @@ public struct FanSpeedometerDialView: View {
     public let count: Int
     public let targetRPM: Int?
 
+    // Smooth physics & Gaussian blur states
+    @State private var animatedRPM: Double = 0
+    @State private var motionBlur: CGFloat = 0
+    @State private var hasAppeared: Bool = false
+
     public init(fan: FanReading, count: Int, targetRPM: Int? = nil) {
         self.fan = fan
         self.count = count
@@ -151,8 +192,16 @@ public struct FanSpeedometerDialView: View {
         FanGaugeScale(minRPM: fan.minRPM, maxRPM: fan.maxRPM)
     }
 
+    private var currentRPM: Int {
+        Int(animatedRPM.rounded())
+    }
+
     private var isRedline: Bool {
-        scale.isRedline(rpm: fan.actualRPM)
+        scale.isRedline(rpm: currentRPM)
+    }
+
+    private var currentFraction: Double {
+        scale.fraction(for: currentRPM)
     }
 
     public var body: some View {
@@ -242,29 +291,28 @@ public struct FanSpeedometerDialView: View {
                         .rotationEffect(.degrees(scale.startAngle))
                         .frame(width: radius * 1.62, height: radius * 1.62)
 
-                    // 4. Dynamic Speed Ribbon (Colored Progressive Active Sweep Arc)
-                    let currentProgress = scale.fraction(for: fan.actualRPM) * 0.75
-                    if currentProgress > 0 {
-                        Circle()
-                            .trim(from: 0, to: currentProgress)
-                            .stroke(
-                                LinearGradient(
-                                    colors: speedGradientColors(actualRPM: fan.actualRPM),
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                style: StrokeStyle(lineWidth: 10, lineCap: .round)
-                            )
-                            .rotationEffect(.degrees(scale.startAngle))
-                            .frame(width: radius * 1.62, height: radius * 1.62)
-                            .shadow(
-                                color: (isRedline ? Color.red : Color.cyan).opacity(0.35),
-                                radius: 5,
-                                x: 0,
-                                y: 0
-                            )
-                            .animation(.spring(response: 0.52, dampingFraction: 0.74), value: fan.actualRPM)
-                    }
+                    // 4. Dynamic Speed Ribbon (Always in tree, smooth trim + Gaussian blur)
+                    let progress = currentFraction * 0.75
+                    Circle()
+                        .trim(from: 0, to: max(0.0001, progress))
+                        .stroke(
+                            LinearGradient(
+                                colors: speedGradientColors(actualRPM: currentRPM),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                        )
+                        .rotationEffect(.degrees(scale.startAngle))
+                        .frame(width: radius * 1.62, height: radius * 1.62)
+                        .shadow(
+                            color: (isRedline ? Color.red : Color.cyan).opacity(0.35),
+                            radius: 5,
+                            x: 0,
+                            y: 0
+                        )
+                        .blur(radius: motionBlur * 0.65)
+                        .opacity(progress > 0.001 ? 1 : 0)
 
                     // 5. High-Precision Graduation Tick Marks & Numerals
                     dialGraduations(radius: radius * 0.81)
@@ -274,30 +322,31 @@ public struct FanSpeedometerDialView: View {
                         targetMarker(targetRPM: target, radius: radius * 0.81)
                     }
 
-                    // 7. High-Precision Racing Needle
+                    // 7. High-Precision Racing Needle with Motion Blur
                     FanSpeedometerNeedle(
-                        angle: scale.angle(for: fan.actualRPM),
+                        angle: scale.angle(for: currentRPM),
                         radius: radius * 0.81,
-                        isRedline: isRedline
+                        isRedline: isRedline,
+                        motionBlur: motionBlur
                     )
 
-                    // 8. Digital HUD Cluster (Center Display)
+                    // 8. Digital HUD Cluster (Rolling Number + Dynamic Gaussian Blur)
                     VStack(spacing: 2) {
-                        Text(fan.actualRPM > 0 ? "\(fan.actualRPM)" : "0")
-                            .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
-                            .foregroundStyle(isRedline ? Color.red : Color.primary)
-                            .contentTransition(.numericText())
-                            .animation(.easeInOut(duration: 0.15), value: fan.actualRPM)
+                        RollingRPMText(
+                            rpm: animatedRPM,
+                            isRedline: isRedline,
+                            blurRadius: motionBlur * 0.45
+                        )
 
                         HStack(spacing: 4) {
-                            SpinningFanBlade(rpm: fan.actualRPM)
+                            SpinningFanBlade(rpm: currentRPM)
                             Text("RPM")
                                 .font(.system(size: 9.5, weight: .bold))
                                 .foregroundStyle(.secondary)
                         }
 
                         // Duty Cycle & Health Tag
-                        Text(fan.actualRPM == 0 ? l10n.fanStopped : "\(Int(fan.fraction * 100))%")
+                        Text(currentRPM == 0 ? l10n.fanStopped : "\(Int(currentFraction * 100))%")
                             .font(.system(size: 10, weight: .bold).monospacedDigit())
                             .padding(.horizontal, 6)
                             .padding(.vertical, 1.5)
@@ -328,19 +377,20 @@ public struct FanSpeedometerDialView: View {
                             .font(.system(size: 10.5, weight: .medium).monospacedDigit())
                             .foregroundStyle(.orange)
                     } else {
-                        Text("\(l10n.fanDutyCycle): \(String(format: "%.1f%%", fan.fraction * 100))")
+                        Text("\(l10n.fanDutyCycle): \(String(format: "%.1f%%", currentFraction * 100))")
                             .font(.system(size: 10.5).monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
                 }
 
-                // Mini horizontal linear progress bar
+                // Mini horizontal linear progress bar (Smooth glide + Gaussian blur)
                 GeometryReader { barGeo in
                     ZStack(alignment: .leading) {
                         Capsule().fill(Color.primary.opacity(0.08))
                         Capsule()
-                            .fill(LinearGradient(colors: speedGradientColors(actualRPM: fan.actualRPM), startPoint: .leading, endPoint: .trailing))
-                            .frame(width: barGeo.size.width * CGFloat(fan.fraction))
+                            .fill(LinearGradient(colors: speedGradientColors(actualRPM: currentRPM), startPoint: .leading, endPoint: .trailing))
+                            .frame(width: barGeo.size.width * CGFloat(currentFraction))
+                            .blur(radius: motionBlur * 0.4)
                     }
                 }
                 .frame(height: 4)
@@ -361,6 +411,53 @@ public struct FanSpeedometerDialView: View {
                     lineWidth: 1
                 )
         )
+        .onAppear {
+            if !hasAppeared {
+                hasAppeared = true
+                let targetVal = Double(fan.actualRPM)
+                if targetVal > 0 {
+                    // Gauge self-check sweep: smoothly sweep up to target RPM
+                    animatedRPM = max(0, targetVal - 800)
+                    withAnimation(.easeOut(duration: 0.12)) {
+                        motionBlur = 2.0
+                    }
+                    withAnimation(.spring(response: 0.65, dampingFraction: 0.78)) {
+                        animatedRPM = targetVal
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            motionBlur = 0
+                        }
+                    }
+                } else {
+                    animatedRPM = 0
+                }
+            } else {
+                animatedRPM = Double(fan.actualRPM)
+            }
+        }
+        .onChange(of: fan.actualRPM) { _, newRPM in
+            let delta = abs(Double(newRPM) - animatedRPM)
+            if delta > 75 {
+                // High delta transition: engage dynamic Gaussian blur & smooth spring sweep
+                let blurTarget = min(4.8, max(1.2, CGFloat(delta) / 450.0))
+                withAnimation(.easeOut(duration: 0.10)) {
+                    motionBlur = blurTarget
+                }
+                withAnimation(.spring(response: 0.58, dampingFraction: 0.76)) {
+                    animatedRPM = Double(newRPM)
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
+                    withAnimation(.easeOut(duration: 0.35)) {
+                        motionBlur = 0
+                    }
+                }
+            } else {
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                    animatedRPM = Double(newRPM)
+                }
+            }
+        }
     }
 
     // MARK: - Tick Marks & Upright Numerals
@@ -434,7 +531,7 @@ public struct FanSpeedometerDialView: View {
     private func speedGradientColors(actualRPM: Int) -> [Color] {
         if isRedline {
             return [Color(red: 1.0, green: 0.4, blue: 0.1), Color.red, Color(red: 0.9, green: 0.0, blue: 0.2)]
-        } else if fan.fraction >= 0.65 {
+        } else if currentFraction >= 0.65 {
             return [Color.cyan, Color.yellow, Color.orange]
         } else {
             return [Color(red: 0.1, green: 0.85, blue: 0.95), Color.blue, Color(red: 0.3, green: 0.5, blue: 1.0)]
@@ -442,9 +539,9 @@ public struct FanSpeedometerDialView: View {
     }
 
     private var statusColor: Color {
-        if fan.actualRPM == 0 { return .secondary }
+        if currentRPM == 0 { return .secondary }
         if isRedline { return .red }
-        if fan.fraction >= 0.70 { return .orange }
+        if currentFraction >= 0.70 { return .orange }
         return .green
     }
 }
@@ -455,6 +552,9 @@ public struct FanSpeedometerClusterView: View {
     @ObservedObject private var fanStore = FanStore.shared
     @ObservedObject private var l10n = L10n.shared
     @AppStorage("pharos.fanViewMode") private var viewMode: String = "gauge"
+
+    // View switching Gaussian blur crossfade state
+    @State private var isSwitchingMode: Bool = false
 
     public init() {}
 
@@ -473,8 +573,24 @@ public struct FanSpeedometerClusterView: View {
 
                 Spacer()
 
-                // View Mode Switcher: Gauge (Speedometer) vs Classic Bars
-                Picker("", selection: $viewMode) {
+                // View Mode Switcher with Gaussian Blur Crossfade
+                Picker("", selection: Binding(
+                    get: { viewMode },
+                    set: { newMode in
+                        guard newMode != viewMode else { return }
+                        withAnimation(.easeInOut(duration: 0.12)) {
+                            isSwitchingMode = true
+                        }
+                        withAnimation(.spring(response: 0.42, dampingFraction: 0.82)) {
+                            viewMode = newMode
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+                            withAnimation(.easeOut(duration: 0.25)) {
+                                isSwitchingMode = false
+                            }
+                        }
+                    }
+                )) {
                     Label(l10n.fanViewModeGauge, systemImage: "gauge.with.needle")
                         .tag("gauge")
                     Label(l10n.fanViewModeBars, systemImage: "chart.bar.fill")
@@ -484,66 +600,71 @@ public struct FanSpeedometerClusterView: View {
                 .frame(width: 200)
             }
 
-            if fans.isEmpty {
-                // Fanless Mac Notification (MacBook Air / passive cooling)
-                HStack(spacing: 12) {
-                    Image(systemName: "wind.snow")
-                        .font(.system(size: 24))
-                        .foregroundStyle(.secondary)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(l10n.fanNoFansInstalled)
-                            .font(.system(size: 12, weight: .medium))
-                        Text(l10n.fanStopped)
-                            .font(.system(size: 10.5))
+            Group {
+                if fans.isEmpty {
+                    // Fanless Mac Notification (MacBook Air / passive cooling)
+                    HStack(spacing: 12) {
+                        Image(systemName: "wind.snow")
+                            .font(.system(size: 24))
                             .foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(l10n.fanNoFansInstalled)
+                                .font(.system(size: 12, weight: .medium))
+                            Text(l10n.fanStopped)
+                                .font(.system(size: 10.5))
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
                     }
-                    Spacer()
-                }
-                .padding(14)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
-            } else if viewMode == "gauge" {
-                // Automotive Speedometer Gauge Cockpit
-                if fans.count == 2 {
-                    // Twin Cockpit Gauge Cluster (Symmetrical Dual Dials)
-                    HStack(spacing: 16) {
-                        FanSpeedometerDialView(
-                            fan: fans[0],
-                            count: 2,
-                            targetRPM: targetRPM(for: fans[0])
-                        )
-                        .frame(maxWidth: .infinity)
+                    .padding(14)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
+                } else if viewMode == "gauge" {
+                    // Automotive Speedometer Gauge Cockpit
+                    if fans.count == 2 {
+                        // Twin Cockpit Gauge Cluster (Symmetrical Dual Dials)
+                        HStack(spacing: 16) {
+                            FanSpeedometerDialView(
+                                fan: fans[0],
+                                count: 2,
+                                targetRPM: targetRPM(for: fans[0])
+                            )
+                            .frame(maxWidth: .infinity)
 
-                        // Central Cockpit Telemetry Bridge
-                        cockpitTelemetryBridge(fan0: fans[0], fan1: fans[1])
-                            .frame(width: 140)
+                            // Central Cockpit Telemetry Bridge
+                            cockpitTelemetryBridge(fan0: fans[0], fan1: fans[1])
+                                .frame(width: 140)
 
-                        FanSpeedometerDialView(
-                            fan: fans[1],
-                            count: 2,
-                            targetRPM: targetRPM(for: fans[1])
-                        )
-                        .frame(maxWidth: .infinity)
+                            FanSpeedometerDialView(
+                                fan: fans[1],
+                                count: 2,
+                                targetRPM: targetRPM(for: fans[1])
+                            )
+                            .frame(maxWidth: .infinity)
+                        }
+                    } else {
+                        // Single Cockpit Speedometer Pod
+                        HStack(spacing: 14) {
+                            ForEach(fans) { f in
+                                FanSpeedometerDialView(
+                                    fan: f,
+                                    count: fans.count,
+                                    targetRPM: targetRPM(for: f)
+                                )
+                            }
+                        }
                     }
                 } else {
-                    // Single Cockpit Speedometer Pod
-                    HStack(spacing: 14) {
+                    // Classic Bar Cards (100% Preserved)
+                    HStack(spacing: 12) {
                         ForEach(fans) { f in
-                            FanSpeedometerDialView(
-                                fan: f,
-                                count: fans.count,
-                                targetRPM: targetRPM(for: f)
-                            )
+                            ClassicFanBarCard(fan: f, count: fans.count)
                         }
                     }
                 }
-            } else {
-                // Classic Bar Cards (100% Preserved)
-                HStack(spacing: 12) {
-                    ForEach(fans) { f in
-                        ClassicFanBarCard(fan: f, count: fans.count)
-                    }
-                }
             }
+            .blur(radius: isSwitchingMode ? 6.5 : 0)
+            .scaleEffect(isSwitchingMode ? 0.985 : 1.0)
+            .animation(.easeInOut(duration: 0.18), value: isSwitchingMode)
         }
     }
 
@@ -605,7 +726,7 @@ public struct FanSpeedometerClusterView: View {
     }
 }
 
-// MARK: - Classic Fan Bar Card (Preserved)
+// MARK: - Classic Fan Bar Card (Preserved with Smooth Animations)
 public struct ClassicFanBarCard: View {
     @ObservedObject private var l10n = L10n.shared
     public let fan: FanReading
@@ -631,6 +752,8 @@ public struct ClassicFanBarCard: View {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(fan.actualRPM > 0 ? "\(fan.actualRPM)" : "0")
                     .font(.system(size: 22, weight: .semibold).monospacedDigit())
+                    .contentTransition(.numericText())
+                    .animation(.easeInOut(duration: 0.2), value: fan.actualRPM)
                 Text("rpm").font(.system(size: 11)).foregroundStyle(.secondary)
                 if fan.actualRPM == 0 {
                     Text(l10n.fanStopped).font(.system(size: 10)).foregroundStyle(.tertiary)
@@ -639,7 +762,9 @@ public struct ClassicFanBarCard: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Rectangle().fill(Color.primary.opacity(0.08))
-                    Rectangle().fill(Color.blue).frame(width: geo.size.width * CGFloat(fan.fraction))
+                    Rectangle().fill(Color.blue)
+                        .frame(width: geo.size.width * CGFloat(fan.fraction))
+                        .animation(.spring(response: 0.52, dampingFraction: 0.78), value: fan.fraction)
                 }
             }
             .frame(height: 6)

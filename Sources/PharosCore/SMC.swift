@@ -32,6 +32,11 @@ public final class SMCClient {
         input.key = SMCCodec.fourCC(key)
         input.keyInfo.dataSize = info.size
         input.data8 = SMCParam.Command.readBytes
+        if let out = call(input), out.result == 0 {
+            return Value(type: SMCCodec.string(info.type), bytes: Array(out.byteArray.prefix(Int(info.size))))
+        }
+        // Transient SMC bus contention retry
+        usleep(2000)
         guard let out = call(input), out.result == 0 else { return nil }
         return Value(type: SMCCodec.string(info.type), bytes: Array(out.byteArray.prefix(Int(info.size))))
     }
