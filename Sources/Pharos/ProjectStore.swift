@@ -101,12 +101,18 @@ final class ProjectStore: ObservableObject {
         if viewers == 1 {
             Task { await refresh() }
             scheduleTimer()
+            BatteryStore.shared.updateVisibility(hasViewers: true)
+            FanStore.shared.updateVisibility(hasViewers: true)
         }
     }
 
     func viewDisappeared() {
         viewers = max(0, viewers - 1)
-        if viewers == 0 { scheduleTimer() }
+        if viewers == 0 {
+            scheduleTimer()
+            BatteryStore.shared.updateVisibility(hasViewers: false)
+            FanStore.shared.updateVisibility(hasViewers: false)
+        }
     }
 
     private func scheduleTimer() {

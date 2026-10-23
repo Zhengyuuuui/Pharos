@@ -46,9 +46,11 @@ public enum BatteryHelperInstall {
         ].joined(separator: "\n")
     }
 
+    public static let statePath = "/Library/PrivilegedHelperTools/local.pharos.battd.state"
+
     /// launchd sends SIGTERM on bootout; the helper hands charging control back before exiting.
     public static let uninstallScript = [
         "/bin/launchctl bootout system/\(label) 2>/dev/null || true",
-        "/bin/rm -f \(plistPath) \(binaryPath) \(BatteryProtocol.socketPath)",
+        "/bin/rm -f \(plistPath) \(binaryPath) \(BatteryProtocol.socketPath) \(statePath)",
     ].joined(separator: "\n")
 }

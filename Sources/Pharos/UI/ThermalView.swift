@@ -127,6 +127,9 @@ struct ThermalView: View {
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .onAppear {
+            FanStore.shared.refreshState()
+        }
         .task {
             while !Task.isCancelled {
                 await store.refreshThermals()

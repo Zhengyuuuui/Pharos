@@ -28,13 +28,40 @@ final class FanStore: ObservableObject {
     }
 
     private var heartbeat: Timer?
+    private var hasViewers: Bool = false
+
+    func updateVisibility(hasViewers: Bool) {
+        guard self.hasViewers != hasViewers else { return }
+        self.hasViewers = hasViewers
+        if hasViewers {
+            refreshState()
+        }
+        scheduleTimer()
+    }
+
+    func viewAppeared() { updateVisibility(hasViewers: true) }
+    func viewDisappeared() { updateVisibility(hasViewers: false) }
+
+    private func scheduleTimer() {
+        heartbeat?.invalidate()
+
+        let interval: TimeInterval
+        if request != .system {
+            // Actively controlling fans: must maintain 5s heartbeat to prevent daemon 15s timeout
+            interval = 5
+        } else {
+            // System mode: downclock to 30s when no windows are open, 5s when visible
+            interval = hasViewers ? 5 : 30
+        }
+
+        heartbeat = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.beat() }
+        }
+    }
 
     private init() {
         refreshState()
-        // The helper hands fans back 15 s after the last ping, so 5 s keeps a margin.
-        heartbeat = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.beat() }
-        }
+        scheduleTimer()
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil,
                                                queue: .main) { _ in
             // Best effort; the heartbeat timeout covers crashes and force quits.
@@ -51,10 +78,12 @@ final class FanStore: ObservableObject {
     func apply(_ r: FanRequest) {
         guard helper == .ready else { return }
         busy = true
+        scheduleTimer()
         Task {
             let reply = await Task.detached { FanStore.send(.set(r)) }.value
             busy = false
             handle(reply, failure: L10n.shared.fanCommandFailed)
+            scheduleTimer()
         }
     }
 
@@ -80,9 +109,13 @@ final class FanStore: ObservableObject {
             return
         }
         helper = .ready
+        let oldRequest = request
         request = reply.request
         overheating = reply.overheating
         unsupported = reply.unsupported
+        if oldRequest != request {
+            scheduleTimer()
+        }
         if !reply.ok, let failure { errorMessage = reply.error ?? failure }
     }
 

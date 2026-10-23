@@ -1201,6 +1201,12 @@ final class L10n: ObservableObject {
         en ? "Like macOS 15 \"Not Charging\": the MagSafe LED stays amber while holding at the limit and is never switched off. Turn off to let the firmware drive the LED."
            : "与 macOS 15 原生「未在充电」一致：限充保持时 MagSafe 指示灯保持黄色/橙色常亮，绝不熄灭。关闭后完全由系统固件控制指示灯。"
     }
+    var batteryPersistentGuard: String { en ? "Persistent Guard (Sleep & Lid-close)" : "合盖与后台持续守护" }
+    var batteryPersistentGuardDesc: String {
+        en ? "Keeps enforcing the hardware charge limit continuously in the background, even when the lid is closed, the Mac enters sleep, or Pharos is closed. Turn off to restore native macOS charging when Pharos is not running."
+           : "合上笔记本屏幕、Mac 进入睡眠或退出 Pharos 时，后台系统守护进程依然持续保持硬件限充（电芯电流 0 mA 直通供电）。关闭后，超时未收到前台心跳将自动恢复 macOS 原生充电。"
+    }
+    var recommendedTag: String { en ? "Recommended" : "推荐" }
     var batteryHealth: String { en ? "Battery Health" : "电池健康度" }
     var batteryCycleCount: String { en ? "Cycle Count" : "循环次数" }
     var batteryDesignCapacity: String { en ? "Design Capacity" : "设计容量" }

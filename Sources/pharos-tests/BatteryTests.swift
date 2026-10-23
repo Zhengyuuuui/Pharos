@@ -88,16 +88,38 @@ func testBatteryPolicyHeartbeatTimeout() {
     let now = Date()
     let staleHeartbeat = now.addingTimeInterval(-20) // 20s ago (> 15s timeout)
 
+    // With persistentGuard = false, timeout returns charging control to macOS
     let d = BatteryPolicy.decide(
         mode: .limit(maxPercent: 80),
         currentPercent: 80,
         isACConnected: true,
+        persistentGuard: false,
         lastHeartbeat: staleHeartbeat,
         now: now,
         state: &state
     )
-    expectEq(d.action, .release, "timeout returns charging control to macOS")
+    expectEq(d.action, .release, "timeout returns charging control to macOS when persistent guard is off")
     expectEq(state.isHolding, false, "holding state cleared on timeout")
+}
+
+func testBatteryPolicyPersistentGuard() {
+    var state = BatteryPolicy.State(isHolding: true, isAdapterBypassed: false)
+    let now = Date()
+    let staleHeartbeat = now.addingTimeInterval(-3600) // 1 hour ago (lid closed / sleep)
+
+    // With persistentGuard = true (default/recommended), stale heartbeat does NOT release hardware lock!
+    let d = BatteryPolicy.decide(
+        mode: .limit(maxPercent: 80),
+        currentPercent: 80,
+        isACConnected: true,
+        persistentGuard: true,
+        lastHeartbeat: staleHeartbeat,
+        now: now,
+        state: &state
+    )
+    expectEq(d.action, .inhibitCharge, "persistent guard maintains inhibitCharge across sleep / stale heartbeat")
+    expectEq(d.sleepDirective, .allowSleep, "charge limit maintained, Mac may sleep")
+    expectEq(state.isHolding, true, "holding state preserved")
 }
 
 func testBatteryPolicyModes() {
@@ -217,6 +239,8 @@ func testBatteryProtocolEncodeDecode() {
         (.setMode(.discharge), "discharge"),
         (.syncMagSafe(true), "magsafe 1"),
         (.syncMagSafe(false), "magsafe 0"),
+        (.setPersistentGuard(true), "persistent 1"),
+        (.setPersistentGuard(false), "persistent 0"),
     ]
 
     for (cmd, str) in commands {
@@ -276,4 +300,42 @@ func testBatteryScannerLive() {
     expect(reading.maxCapacity > 0, "valid max capacity: \(reading.maxCapacity)")
     expect(reading.voltage > 5.0 && reading.voltage < 25.0, "valid voltage: \(reading.voltage) V")
     expect(reading.temperatureCelsius > 0.0 && reading.temperatureCelsius < 80.0, "valid temp: \(reading.temperatureCelsius) °C")
+}
+
+func testLogRotation() {
+    let tmpDir = NSTemporaryDirectory()
+    let testPath = (tmpDir as NSString).appendingPathComponent("pharos-log-rotation-test-\(UUID().uuidString).log")
+    defer { try? FileManager.default.removeItem(atPath: testPath) }
+
+    // 1. Missing file should return false
+    expectEq(rotateLogIfNeeded(path: "/nonexistent/test/log-\(UUID().uuidString).log"), false, "missing file returns false")
+
+    // 2. Small file under maxBytes should not be rotated
+    let smallContent = "line 1\nline 2\nline 3\n"
+    try? smallContent.write(toFile: testPath, atomically: true, encoding: .utf8)
+    let r1 = rotateLogIfNeeded(path: testPath, maxBytes: 500, keepBytes: 200)
+    expectEq(r1, false, "file under maxBytes not rotated")
+    expectEq(try? String(contentsOfFile: testPath), smallContent, "content untouched")
+
+    // 3. File exceeding maxBytes should be rotated and preserve trailing content
+    var largeLines: [String] = []
+    for i in 1...200 {
+        largeLines.append("this is log line number \(i) with some extra padding to consume bytes")
+    }
+    let largeContent = largeLines.joined(separator: "\n") + "\n"
+    try? largeContent.write(toFile: testPath, atomically: true, encoding: .utf8)
+    let origSize = (try? FileManager.default.attributesOfItem(atPath: testPath)[.size] as? UInt64) ?? 0
+    expect(origSize > 1000, "orig size > 1000 bytes (\(origSize))")
+
+    let r2 = rotateLogIfNeeded(path: testPath, maxBytes: 500, keepBytes: 250)
+    expectEq(r2, true, "large file rotated")
+
+    let newSize = (try? FileManager.default.attributesOfItem(atPath: testPath)[.size] as? UInt64) ?? 0
+    expect(newSize <= 250, "new size is truncated to <= keepBytes (\(newSize))")
+    let rotatedContent = (try? String(contentsOfFile: testPath)) ?? ""
+    expect(rotatedContent.hasSuffix("this is log line number 200 with some extra padding to consume bytes\n"), "trailing log entries preserved")
+
+    // 4. Calling again when already rotated should return false (idempotent)
+    let r3 = rotateLogIfNeeded(path: testPath, maxBytes: 500, keepBytes: 250)
+    expectEq(r3, false, "already rotated file not rotated again")
 }

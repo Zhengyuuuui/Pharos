@@ -14,7 +14,20 @@ import PharosCore
 // Unlock sequence from agoodkind/macos-smc-fan research (MIT).
 
 setvbuf(stdout, nil, _IOLBF, 0)
-func log(_ s: String) { print("pharos-fand: \(s)") }
+private let logDateFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+    return f
+}()
+private let logLock = NSLock()
+
+func log(_ s: String) {
+    let ts: String
+    logLock.lock()
+    ts = logDateFormatter.string(from: Date())
+    logLock.unlock()
+    print("[\(ts)] pharos-fand: \(s)")
+}
 
 guard getuid() == 0 else {
     log("must run as root (installed from Pharos → Fans & Temperature → Install Fan Control)")
@@ -27,6 +40,10 @@ guard CommandLine.arguments.count == 2, let ownerUID = uid_t(CommandLine.argumen
 guard let smc = SMCClient() else {
     log("cannot open AppleSMC")
     exit(1)
+}
+
+if rotateLogIfNeeded(path: FanHelperInstall.logPath) {
+    log("rotated log file \(FanHelperInstall.logPath): truncated to last \(LogRotation.defaultKeepBytes / 1024) KB")
 }
 
 final class FanDaemon: @unchecked Sendable {

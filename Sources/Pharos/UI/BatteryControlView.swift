@@ -328,6 +328,26 @@ struct BatteryControlView: View {
             .background(RoundedRectangle(cornerRadius: 8).fill(Color.green.opacity(0.06)))
             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.green.opacity(0.12)))
 
+            // Persistent Guard toggle (Sleep & Lid-close protection)
+            Divider()
+            Toggle(isOn: $battery.persistentGuard) {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(l10n.batteryPersistentGuard).font(.system(size: 12, weight: .medium))
+                        Text(l10n.recommendedTag)
+                            .font(.system(size: 9, weight: .semibold))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Capsule().fill(Color.accentColor.opacity(0.12)))
+                            .foregroundStyle(Color.accentColor)
+                    }
+                    Text(l10n.batteryPersistentGuardDesc).font(.system(size: 10)).foregroundStyle(.secondary)
+                }
+            }
+            .toggleStyle(.switch)
+            .controlSize(.small)
+            .disabled(battery.helper != .ready)
+
             // MagSafe LED toggle
             if battery.capabilities.hasACLC {
                 Divider()

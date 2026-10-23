@@ -78,12 +78,16 @@ public enum BatteryPolicy {
         isACConnected: Bool,
         temperatureCelsius: Double = 25.0,
         syncMagSafe: Bool = true,
+        persistentGuard: Bool = true,
         lastHeartbeat: Date?,
         now: Date,
         state: inout State
     ) -> Decision {
         // 1. Safety check: Pharos quit or crashed. Never leave charging locked or adapter disabled.
-        if mode != .system {
+        // When persistentGuard is FALSE (legacy mode), require heartbeat within heartbeatTimeout.
+        // When persistentGuard is TRUE (default/recommended), the daemon independently enforces
+        // the user's explicit limit even when lid is closed, sleeping, or UI app is not running.
+        if !persistentGuard && mode != .system {
             guard let beat = lastHeartbeat, now.timeIntervalSince(beat) <= heartbeatTimeout else {
                 state.isHolding = false
                 state.isAdapterBypassed = false

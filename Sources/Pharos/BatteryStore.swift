@@ -42,6 +42,18 @@ final class BatteryStore: ObservableObject {
     }
     private var restoredAfterLaunch = false
 
+    /// Whether to persistently maintain the limit even during sleep, lid-close, or when Pharos is closed.
+    @Published var persistentGuard: Bool = UserDefaults.standard.object(forKey: "batteryPersistentGuard") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(persistentGuard, forKey: "batteryPersistentGuard")
+            scheduleTimers()
+            let flag = persistentGuard
+            Task {
+                _ = await Task.detached { BatteryStore.send(.setPersistentGuard(flag)) }.value
+            }
+        }
+    }
+
     /// Whether to synchronize MagSafe LED state with charging limit.
     @Published var syncMagSafe: Bool = UserDefaults.standard.object(forKey: "batterySyncMagSafe") as? Bool ?? true {
         didSet {
@@ -55,29 +67,71 @@ final class BatteryStore: ObservableObject {
 
     private var heartbeatTimer: Timer?
     private var telemetryTimer: Timer?
+    private var hasViewers: Bool = false
+
+    func updateVisibility(hasViewers: Bool) {
+        guard self.hasViewers != hasViewers else { return }
+        self.hasViewers = hasViewers
+        if hasViewers {
+            refreshTelemetry()
+            beat()
+        }
+        scheduleTimers()
+    }
+
+    func viewAppeared() { updateVisibility(hasViewers: true) }
+    func viewDisappeared() { updateVisibility(hasViewers: false) }
+
+    private func scheduleTimers() {
+        telemetryTimer?.invalidate()
+        heartbeatTimer?.invalidate()
+
+        // When UI is showing: telemetry every 3s; when backgrounded with no windows: 30s.
+        let telemetryInterval: TimeInterval = hasViewers ? 3 : 30
+        telemetryTimer = Timer.scheduledTimer(withTimeInterval: telemetryInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.refreshTelemetry() }
+        }
+
+        // Heartbeat interval:
+        // When UI is showing: 5s.
+        // When backgrounded:
+        // - 30s if persistentGuard is active or in system mode;
+        // - 5s only if strict heartbeat mode is active (!persistentGuard && mode != .system).
+        let heartbeatInterval: TimeInterval
+        if hasViewers {
+            heartbeatInterval = 5
+        } else {
+            if persistentGuard || mode == .system {
+                heartbeatInterval = 30
+            } else {
+                heartbeatInterval = 5
+            }
+        }
+
+        heartbeatTimer = Timer.scheduledTimer(withTimeInterval: heartbeatInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.beat() }
+        }
+    }
 
     private init() {
         capabilities = BatteryScanner.probeCapabilities()
         refreshTelemetry()
         refreshHelperState()
-
-        // Heartbeat every 5s keeps margin well within the 15s daemon timeout
-        heartbeatTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.beat() }
-        }
-
-        // Low-frequency telemetry refresh every 3 seconds
-        telemetryTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.refreshTelemetry() }
-        }
+        scheduleTimers()
 
         NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification,
             object: nil,
             queue: .main
-        ) { _ in
-            // Best effort restore to system charging on app exit; single attempt so quitting never stalls.
-            _ = BatteryStore.send(.setMode(.system), attempts: 1)
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                // Only restore to system charging on app exit if persistentGuard is OFF.
+                // When persistentGuard is ON, the user wants the background daemon to continue guarding!
+                if !self.persistentGuard {
+                    _ = BatteryStore.send(.setMode(.system), attempts: 1)
+                }
+            }
         }
     }
 
@@ -103,6 +157,7 @@ final class BatteryStore: ObservableObject {
     func apply(_ newMode: BatteryMode) {
         guard helper == .ready else {
             mode = newMode
+            scheduleTimers()
             return
         }
         busy = true
@@ -111,6 +166,7 @@ final class BatteryStore: ObservableObject {
             busy = false
             handle(reply, failure: L10n.shared.batteryCommandFailed)
             refreshTelemetry()
+            scheduleTimers()
         }
     }
 
@@ -181,10 +237,14 @@ final class BatteryStore: ObservableObject {
             return
         }
         helper = .ready
+        let oldMode = mode
         mode = reply.mode
         isHolding = reply.isHolding
         isAdapterBypassed = reply.isAdapterBypassed
         unsupported = reply.unsupported
+        if oldMode != mode {
+            scheduleTimers()
+        }
         if !reply.ok, let failure {
             errorMessage = reply.error ?? failure
         } else if reply.ok, failure != nil, errorMessage == L10n.shared.batteryCommandFailed {
@@ -192,6 +252,12 @@ final class BatteryStore: ObservableObject {
         }
         if !restoredAfterLaunch {
             restoredAfterLaunch = true
+            let curGuard = persistentGuard
+            let curMagSafe = syncMagSafe
+            Task {
+                _ = await Task.detached { BatteryStore.send(.setPersistentGuard(curGuard)) }.value
+                _ = await Task.detached { BatteryStore.send(.syncMagSafe(curMagSafe)) }.value
+            }
             if limitEnabled, reply.mode == .system, !reply.unsupported {
                 apply(.limit(maxPercent: targetLimit))
             }
@@ -235,6 +301,12 @@ final class BatteryStore: ObservableObject {
                         if restoreLimit {
                             if case .limit = restore { self.limitEnabled = true }
                             self.apply(restore)
+                        }
+                        let curGuard = self.persistentGuard
+                        let curMagSafe = self.syncMagSafe
+                        Task {
+                            _ = await Task.detached { BatteryStore.send(.setPersistentGuard(curGuard)) }.value
+                            _ = await Task.detached { BatteryStore.send(.syncMagSafe(curMagSafe)) }.value
                         }
                         self.refreshHelperState()
                         self.beat()

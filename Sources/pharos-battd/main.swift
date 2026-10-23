@@ -16,7 +16,20 @@ import PharosCore
 //     restores sleep as soon as limit is reached (or on battery).
 
 setvbuf(stdout, nil, _IOLBF, 0)
-func log(_ s: String) { print("pharos-battd: \(s)") }
+private let logDateFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+    return f
+}()
+private let logLock = NSLock()
+
+func log(_ s: String) {
+    let ts: String
+    logLock.lock()
+    ts = logDateFormatter.string(from: Date())
+    logLock.unlock()
+    print("[\(ts)] pharos-battd: \(s)")
+}
 
 guard getuid() == 0 else {
     log("must run as root (installed from Pharos → Battery & Charging)")
@@ -31,15 +44,25 @@ guard let smc = SMCClient() else {
     exit(1)
 }
 
+if rotateLogIfNeeded(path: BatteryHelperInstall.logPath) {
+    log("rotated log file \(BatteryHelperInstall.logPath): truncated to last \(LogRotation.defaultKeepBytes / 1024) KB")
+}
+
 final class BatteryDaemon: @unchecked Sendable {
+    static let statePath = "/Library/PrivilegedHelperTools/local.pharos.battd.state"
+
     private let smc: SMCClient
     private let lock = NSLock()
     private var mode: BatteryMode = .system
     private var syncMagSafe = true
+    private var persistentGuard = true
     private var lastHeartbeat: Date?
     private var policyState = BatteryPolicy.State()
     private var sleepAssertionID: IOPMAssertionID = 0
     private var hardwareEngaged = true
+    private var lastAppliedAction: BatteryPolicy.Action?
+    private var lastAppliedMagSafe: BatteryPolicy.MagSafeColor?
+    private var lastHardwareWriteTime: Date = .distantPast
 
     let hasCHTE: Bool
     let hasCH0C: Bool
@@ -56,7 +79,34 @@ final class BatteryDaemon: @unchecked Sendable {
         hasCH0J = smc.exists("CH0J")
         hasACLC = smc.exists("ACLC")
         unsupported = !(hasCHTE || hasCH0C)
-        log("SMC capabilities: CHTE=\(hasCHTE), CH0C=\(hasCH0C), CHIE=\(hasCHIE), ACLC=\(hasACLC)")
+        loadStateLocked()
+        log("SMC capabilities: CHTE=\(hasCHTE), CH0C=\(hasCH0C), CHIE=\(hasCHIE), ACLC=\(hasACLC), mode=\(BatteryProtocol.encode(.setMode(mode))), persistentGuard=\(persistentGuard)")
+    }
+
+    private func saveStateLocked() {
+        let dict: [String: Any] = [
+            "mode": BatteryProtocol.encode(.setMode(mode)),
+            "syncMagSafe": syncMagSafe,
+            "persistentGuard": persistentGuard
+        ]
+        if let data = try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted]) {
+            try? data.write(to: URL(fileURLWithPath: Self.statePath), options: .atomic)
+        }
+    }
+
+    private func loadStateLocked() {
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: Self.statePath)),
+              let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return }
+        if let modeStr = dict["mode"] as? String, let cmd = BatteryProtocol.decode(modeStr), case .setMode(let m) = cmd {
+            self.mode = m
+            log("restored mode from state: \(modeStr)")
+        }
+        if let sync = dict["syncMagSafe"] as? Bool {
+            self.syncMagSafe = sync
+        }
+        if let guardOn = dict["persistentGuard"] as? Bool {
+            self.persistentGuard = guardOn
+        }
     }
 
     // MARK: - Commands
@@ -73,10 +123,19 @@ final class BatteryDaemon: @unchecked Sendable {
         case .setMode(let m):
             mode = m
             lastHeartbeat = Date()
+            lastHardwareWriteTime = .distantPast
+            saveStateLocked()
             log("mode set to \(BatteryProtocol.encode(.setMode(m)))")
         case .syncMagSafe(let on):
             syncMagSafe = on
             if !on, hasACLC { write("ACLC", [0]) }
+            lastHardwareWriteTime = .distantPast
+            saveStateLocked()
+            DispatchQueue.global().async { self.tick() }
+        case .setPersistentGuard(let on):
+            persistentGuard = on
+            saveStateLocked()
+            log("persistent guard set to \(on)")
         }
 
         let reply = BatteryProtocol.Reply(
@@ -85,9 +144,12 @@ final class BatteryDaemon: @unchecked Sendable {
             isHolding: policyState.isHolding,
             isAdapterBypassed: policyState.isAdapterBypassed,
             magSafeSync: syncMagSafe,
+            persistentGuard: persistentGuard,
             unsupported: unsupported
         )
         if case .setMode = command {
+            DispatchQueue.global().async { self.tick() }
+        } else if case .setPersistentGuard = command {
             DispatchQueue.global().async { self.tick() }
         }
         return reply
@@ -101,6 +163,11 @@ final class BatteryDaemon: @unchecked Sendable {
 
         guard !unsupported else { return }
 
+        // When in system mode and hardware locks are already released, skip reading IOKit
+        if mode == .system && !hardwareEngaged {
+            return
+        }
+
         let reading = BatteryScanner.read() ?? BatteryReading()
         let isAC = (reading.powerSource == .acPower)
         let now = Date()
@@ -111,15 +178,17 @@ final class BatteryDaemon: @unchecked Sendable {
             isACConnected: isAC,
             temperatureCelsius: reading.temperatureCelsius,
             syncMagSafe: syncMagSafe,
+            persistentGuard: persistentGuard,
             lastHeartbeat: lastHeartbeat,
             now: now,
             state: &policyState
         )
 
-        // Heartbeat timeout fallback
-        if mode != .system, let beat = lastHeartbeat, now.timeIntervalSince(beat) > BatteryPolicy.heartbeatTimeout {
+        // Heartbeat timeout fallback only if persistentGuard is explicitly turned off
+        if !persistentGuard && mode != .system, let beat = lastHeartbeat, now.timeIntervalSince(beat) > BatteryPolicy.heartbeatTimeout {
             log("no heartbeat from Pharos — control returned to macOS")
             mode = .system
+            saveStateLocked()
         }
 
         // Apply hardware action. Adapter-bypass keys (CHIE/CH0J) are only ever reset to 0:
@@ -129,16 +198,28 @@ final class BatteryDaemon: @unchecked Sendable {
             releaseHardwareLocked()
 
         case .inhibitCharge, .allowCharge:
-            let inhibit: UInt8 = decision.action == .inhibitCharge ? 1 : 0
-            if hasCHTE {
-                write("CHTE", [inhibit, 0, 0, 0])
-            } else if hasCH0C {
-                write("CH0C", [inhibit])
+            let targetMagSafe: BatteryPolicy.MagSafeColor = syncMagSafe ? decision.magSafeColor : .system
+            let isSameAction = (decision.action == lastAppliedAction)
+            let isSameMagSafe = (targetMagSafe == lastAppliedMagSafe)
+            let isWithin60s = now.timeIntervalSince(lastHardwareWriteTime) < 60
+
+            if isSameAction && isSameMagSafe && isWithin60s {
+                // Deduplicate repetitive SMC writes; keepalive write occurs every 60s
+            } else {
+                let inhibit: UInt8 = decision.action == .inhibitCharge ? 1 : 0
+                if hasCHTE {
+                    write("CHTE", [inhibit, 0, 0, 0])
+                } else if hasCH0C {
+                    write("CH0C", [inhibit])
+                }
+                if hasCHIE { write("CHIE", [0]) }
+                if hasCH0J { write("CH0J", [0]) }
+                if hasACLC { write("ACLC", [targetMagSafe.rawValue]) }
+                hardwareEngaged = true
+                lastAppliedAction = decision.action
+                lastAppliedMagSafe = targetMagSafe
+                lastHardwareWriteTime = now
             }
-            if hasCHIE { write("CHIE", [0]) }
-            if hasCH0J { write("CH0J", [0]) }
-            if hasACLC { write("ACLC", [syncMagSafe ? decision.magSafeColor.rawValue : 0]) }
-            hardwareEngaged = true
         }
 
         // Apply sleep directive
@@ -184,6 +265,9 @@ final class BatteryDaemon: @unchecked Sendable {
         if hasCH0J { write("CH0J", [0]) }
         if hasACLC { write("ACLC", [0]) }
         hardwareEngaged = false
+        lastAppliedAction = .release
+        lastAppliedMagSafe = .system
+        lastHardwareWriteTime = Date()
     }
 
     func releaseAll() {
@@ -193,6 +277,22 @@ final class BatteryDaemon: @unchecked Sendable {
         updateSleepAssertionLocked(.allowSleep)
         mode = .system
         policyState = BatteryPolicy.State()
+        saveStateLocked()
+    }
+
+    func initializeStartup() {
+        lock.lock()
+        defer { lock.unlock() }
+        if persistentGuard && mode != .system {
+            log("startup: restoring persistent mode \(BatteryProtocol.encode(.setMode(mode)))")
+            lastHardwareWriteTime = .distantPast
+            DispatchQueue.global().async { self.tick() }
+        } else {
+            releaseHardwareLocked(force: true)
+            updateSleepAssertionLocked(.allowSleep)
+            mode = .system
+            policyState = BatteryPolicy.State()
+        }
     }
 }
 
@@ -208,6 +308,7 @@ for sig in [SIGTERM, SIGINT, SIGHUP] {
     src.setEventHandler {
         daemon.releaseAll()
         unlink(BatteryProtocol.socketPath)
+        unlink(BatteryDaemon.statePath)
         log("stopped — charging returned to macOS")
         exit(0)
     }
@@ -215,7 +316,7 @@ for sig in [SIGTERM, SIGINT, SIGHUP] {
     signalSources.append(src)
 }
 
-daemon.releaseAll()
+daemon.initializeStartup()
 
 // MARK: - Unix Socket Setup
 
@@ -243,7 +344,7 @@ guard bound == 0,
 log("listening on \(BatteryProtocol.socketPath) for uid \(ownerUID)")
 
 let timer = DispatchSource.makeTimerSource(queue: DispatchQueue(label: "battery-tick"))
-timer.schedule(deadline: .now() + 1, repeating: 1)
+timer.schedule(deadline: .now() + 3, repeating: 3)
 timer.setEventHandler { daemon.tick() }
 timer.resume()
 
