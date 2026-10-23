@@ -1,0 +1,149 @@
+import SwiftUI
+
+/// Content container (DESIGN.md §5). Elevation comes from the surface/background
+/// lightness step; the hairline is only added where that step is too weak.
+struct PharosCard<Content: View>: View {
+    var padding: CGFloat = PharosSpacing.cardPadding
+    @ViewBuilder let content: Content
+
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    private var needsHairline: Bool { scheme == .dark || contrast == .increased }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: PharosRadius.card, style: .continuous)
+        content
+            .padding(padding)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .background(shape.fill(PharosColor.surface))
+            .overlay {
+                if needsHairline { shape.strokeBorder(PharosColor.separator, lineWidth: 0.5) }
+            }
+            .shadow(color: needsHairline ? .clear : PharosShadow.color,
+                    radius: PharosShadow.radius, y: PharosShadow.y)
+    }
+}
+
+/// Group title that sits above (outside) its card.
+struct PharosSectionHeader<Trailing: View>: View {
+    let title: String
+    var systemImage: String? = nil
+    @ViewBuilder var trailing: Trailing
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: PharosSpacing.s) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(PharosColor.textSecondary)
+                    .frame(width: 18)
+            }
+            Text(title).font(PharosFont.sectionTitle)
+            Spacer(minLength: PharosSpacing.s)
+            trailing
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+}
+
+extension PharosSectionHeader where Trailing == EmptyView {
+    init(title: String, systemImage: String? = nil) {
+        self.init(title: title, systemImage: systemImage) { EmptyView() }
+    }
+}
+
+/// Header + card, the standard building block of a page.
+struct PharosSection<Trailing: View, Content: View>: View {
+    let title: String
+    var systemImage: String? = nil
+    @ViewBuilder var trailing: Trailing
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PharosSpacing.titleToCard) {
+            PharosSectionHeader(title: title, systemImage: systemImage) { trailing }
+                .padding(.horizontal, PharosSpacing.xs)
+            PharosCard { content }
+        }
+    }
+}
+
+extension PharosSection where Trailing == EmptyView {
+    init(title: String, systemImage: String? = nil, @ViewBuilder content: () -> Content) {
+        self.init(title: title, systemImage: systemImage, trailing: { EmptyView() }, content: content)
+    }
+}
+
+/// Primary metric: label, prominent value, secondary detail.
+struct PharosMetricValue: View {
+    let title: String
+    let value: String
+    var detail: String? = nil
+    var systemImage: String? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PharosSpacing.xs) {
+            HStack(spacing: PharosSpacing.xs) {
+                if let systemImage { Image(systemName: systemImage) }
+                Text(title).lineLimit(1)
+            }
+            .font(PharosFont.caption)
+            .foregroundStyle(PharosColor.textSecondary)
+
+            Text(value)
+                .font(PharosFont.metricValue)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .contentTransition(.numericText())
+                .animation(.easeInOut(duration: 0.25), value: value)
+
+            if let detail {
+                Text(detail)
+                    .font(PharosFont.captionDigits)
+                    .foregroundStyle(PharosColor.textTertiary)
+                    .lineLimit(1)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Status is never conveyed by color alone: dot color + symbol + text.
+struct PharosStatusIndicator: View {
+    enum Level { case normal, warning, critical }
+
+    let level: Level
+    let text: String
+
+    private var color: Color {
+        switch level {
+        case .normal: return PharosColor.success
+        case .warning: return PharosColor.warning
+        case .critical: return PharosColor.error
+        }
+    }
+
+    private var symbol: String {
+        switch level {
+        case .normal: return "checkmark.circle.fill"
+        case .warning: return "exclamationmark.triangle.fill"
+        case .critical: return "xmark.octagon.fill"
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: PharosSpacing.xs + 1) {
+            Image(systemName: symbol).foregroundStyle(color)
+            Text(text).foregroundStyle(PharosColor.textSecondary)
+        }
+        .font(PharosFont.caption)
+        .padding(.horizontal, PharosSpacing.s + 2)
+        .padding(.vertical, PharosSpacing.xs)
+        .background(Capsule().fill(PharosColor.fill))
+        .animation(.easeInOut(duration: 0.2), value: level)
+        .accessibilityElement(children: .combine)
+    }
+}

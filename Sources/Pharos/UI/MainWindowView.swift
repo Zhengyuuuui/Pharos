@@ -41,7 +41,7 @@ struct MainWindowView: View {
                         Spacer()
                         if let s = store.system {
                             Text("\(Int((s.usedFraction * 100).rounded()))%")
-                                .font(.system(size: 10).monospacedDigit())
+                                .font(PharosFont.captionDigits)
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -51,13 +51,13 @@ struct MainWindowView: View {
                         Spacer()
                         if let s = store.volumes.first(where: { $0.kind == .startup }) {
                             Text("\(Int((s.usedFraction * 100).rounded()))%")
-                                .font(.system(size: 10).monospacedDigit())
+                                .font(PharosFont.captionDigits)
                                 .foregroundStyle(.secondary)
                         }
                         let extra = store.volumes.filter { $0.kind == .external || $0.kind == .network }.count
                         if extra > 0 {
                             Text("+\(extra)")
-                                .font(.system(size: 10).monospacedDigit())
+                                .font(PharosFont.captionDigits)
                                 .foregroundStyle(.secondary)
                                 .help(l10n.diskExternalCount)
                         }
@@ -69,7 +69,7 @@ struct MainWindowView: View {
                         Label(l10n.portsOverview, systemImage: "point.3.connected.trianglepath.dotted")
                         Spacer()
                         Text("\(store.totalPorts)")
-                            .font(.system(size: 10).monospacedDigit())
+                            .font(PharosFont.captionDigits)
                             .foregroundStyle(.secondary)
                     }
                     .tag(SidebarItem.portsOverview)
@@ -77,7 +77,7 @@ struct MainWindowView: View {
                         Label(l10n.diskCleanup, systemImage: "trash")
                         Spacer()
                         Text(ByteFormat.short(cleanup.totalBytes))
-                            .font(.system(size: 10).monospacedDigit())
+                            .font(PharosFont.captionDigits)
                             .foregroundStyle(.secondary)
                     }
                     .tag(SidebarItem.diskCleanup)
@@ -85,7 +85,7 @@ struct MainWindowView: View {
                         Label(l10n.chromeTitle, systemImage: "globe")
                         Spacer()
                         Text("\(store.chrome.filter { ChromeStore.shared.isVisible($0.config.browser) }.count)")
-                            .font(.system(size: 10).monospacedDigit())
+                            .font(PharosFont.captionDigits)
                             .foregroundStyle(.secondary)
                     }
                     .tag(SidebarItem.chrome)
@@ -94,7 +94,7 @@ struct MainWindowView: View {
                         Spacer()
                         if agentStore.totalDatabases > 0 {
                             Text("\(agentStore.totalDatabases)")
-                                .font(.system(size: 10).monospacedDigit())
+                                .font(PharosFont.captionDigits)
                                 .foregroundStyle(.secondary)
                         }
                         if agentStore.orphanedCount > 0 {
@@ -109,7 +109,7 @@ struct MainWindowView: View {
                         Spacer()
                         if packageStore.globalCliCount > 0 {
                             Text("\(packageStore.globalCliCount)")
-                                .font(.system(size: 10).monospacedDigit())
+                                .font(PharosFont.captionDigits)
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -124,7 +124,7 @@ struct MainWindowView: View {
                             Text(s.isRunning
                                  ? s.ports.prefix(2).map { ":\($0.port)" }.joined(separator: " ")
                                  : l10n.stoppedShort)
-                                .font(.system(size: 10).monospacedDigit())
+                                .font(PharosFont.captionDigits)
                                 .foregroundStyle(.secondary)
                         }
                         .tag(SidebarItem.favorite(s.favorite.id))
@@ -156,7 +156,7 @@ struct MainWindowView: View {
                                 .lineLimit(1)
                             Spacer()
                             Text(ByteFormat.short(project.memoryBytes))
-                                .font(.system(size: 10).monospacedDigit())
+                                .font(PharosFont.captionDigits)
                                 .foregroundStyle(.secondary)
                         }
                         .tag(SidebarItem.project(project.id))
@@ -174,7 +174,7 @@ struct MainWindowView: View {
                 VStack(spacing: 4) {
                     if store.lastScan != nil {
                         Text(l10n.summary(projects: store.projects.count, memory: ByteFormat.short(store.totalMemory)))
-                            .font(.system(size: 10).monospacedDigit())
+                            .font(PharosFont.captionDigits)
                             .foregroundStyle(.secondary)
                     }
                     Button {
@@ -190,46 +190,51 @@ struct MainWindowView: View {
                 .padding(.vertical, 8)
             }
         } detail: {
-            switch selection {
-            case .systemMemory:
-                SystemMemoryView()
-            case .diskUsage:
-                DiskUsageView()
-            case .batteryAndThermals:
-                BatteryAndThermalView()
-            case .portsOverview:
-                PortsOverviewView(onSelect: { selection = .project($0.id) },
-                                  onSelectFavorite: { selection = .favorite($0.id) })
-            case .favorite(let id):
-                FavoriteDetailView(favoriteId: id) { selection = .portsOverview }
-            case .diskCleanup:
-                CleanupView()
-            case .chrome:
-                ChromeView()
-            case .agentChats:
-                AgentChatView()
-            case .packages:
-                PackageView()
-            case .project(let id):
-                if let project = store.project(id: id) {
-                    ProjectDetailView(project: project)
-                } else {
-                    ContentUnavailableView(l10n.noProjects, systemImage: "network.slash",
-                                           description: Text(l10n.noProjectsDesc))
-                }
-            case .customize:
-                CustomizePopoverView()
-            case .settings:
-                MainSettingsView()
-            case nil:
-                if store.projects.isEmpty && store.lastScan != nil {
-                    ContentUnavailableView(l10n.noProjects, systemImage: "network.slash",
-                                           description: Text(l10n.noProjectsDesc))
-                } else {
-                    ContentUnavailableView(l10n.selectProject, systemImage: "shippingbox",
-                                           description: Text(l10n.selectProjectDesc))
+            Group {
+                switch selection {
+                case .systemMemory:
+                    SystemMemoryView()
+                case .diskUsage:
+                    DiskUsageView()
+                case .batteryAndThermals:
+                    BatteryAndThermalView()
+                case .portsOverview:
+                    PortsOverviewView(onSelect: { selection = .project($0.id) },
+                                      onSelectFavorite: { selection = .favorite($0.id) })
+                case .favorite(let id):
+                    FavoriteDetailView(favoriteId: id) { selection = .portsOverview }
+                case .diskCleanup:
+                    CleanupView()
+                case .chrome:
+                    ChromeView()
+                case .agentChats:
+                    AgentChatView()
+                case .packages:
+                    PackageView()
+                case .project(let id):
+                    if let project = store.project(id: id) {
+                        ProjectDetailView(project: project)
+                    } else {
+                        ContentUnavailableView(l10n.noProjects, systemImage: "network.slash",
+                                               description: Text(l10n.noProjectsDesc))
+                    }
+                case .customize:
+                    CustomizePopoverView()
+                case .settings:
+                    MainSettingsView()
+                case nil:
+                    if store.projects.isEmpty && store.lastScan != nil {
+                        ContentUnavailableView(l10n.noProjects, systemImage: "network.slash",
+                                               description: Text(l10n.noProjectsDesc))
+                    } else {
+                        ContentUnavailableView(l10n.selectProject, systemImage: "shippingbox",
+                                               description: Text(l10n.selectProjectDesc))
+                    }
                 }
             }
+            .buttonStyle(.pharos)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(PharosColor.background)
         }
         .frame(minWidth: 860, minHeight: 560)
         .onAppear {

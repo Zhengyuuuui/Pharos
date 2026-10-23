@@ -49,7 +49,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             )
             let w = NSWindow(contentViewController: hosting)
             w.title = "Pharos"
-            w.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+            w.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+            w.titlebarAppearsTransparent = true
+            w.titleVisibility = .hidden
             w.setContentSize(NSSize(width: 980, height: 680))
             w.isReleasedWhenClosed = false
             w.center()
