@@ -8,6 +8,7 @@ Times are UTC+8. 时间为北京时间（UTC+8）。
 ---
 
 ## 目录 / Quick Links
+- [v2.9 (2026-10-23)](#v29--2026-10-23-1546) — Persistent Lid-Closed Battery Guard, SMC Write Deduplication, Incremental Scanners & Modular Architecture / 电池合盖持续守护、SMC 写入去重、增量扫描缓存与模块化重构
 - [v2.8 (2026-10-19)](#v28--2026-10-19-1320) — Automotive Cockpit Speedometer & 60FPS Mechanical Inertia Engine / 拟真机车仪表盘风扇座舱与 60FPS 物理惯性引擎
 - [v2.7 (2026-10-19)](#v27--2026-10-19-0935) — Homebrew & Package Discovery, AI Chat Manual App Addition / 真实 Homebrew 管理、多工作区发现与 AI 对话手动添加
 - [v2.6 (2026-10-17)](#v26--2026-10-17-1506) — AI Chat Detail Separation & Safe Delete / AI 对话详情独立与安全删除
@@ -18,6 +19,28 @@ Times are UTC+8. 时间为北京时间（UTC+8）。
 - [v2.1 (2026-10-13)](#v21--2026-10-13-1327) — SMC Fans & Temperature / SMC 风扇与温度监控
 - [v2.0 (2026-10-13)](#v20--2026-10-13-1233) — Multi-Chromium Browser Instances / 多 Chromium 浏览器实例管理
 - [Earlier Versions (2026-10-10 ~ 2026-10-13)](#2026-10-13--disk-usage--browser-favorites--磁盘用量与浏览器收藏)
+
+---
+
+### v2.9 — 2026-10-23 15:46
+
+> Author / 作者：zys · Model / 模型：Gemini 4 Argon
+
+**English**
+- **Persistent Lid-Closed & Background Battery Guard**: added an optional toggle ("Persistent Lid-Closed & Background Guard") in Battery & Charging; when enabled, `pharos-battd` persists `mode`, `targetPercent`, `syncMagSafeLed`, and `persistentGuard` to `/Library/PrivilegedHelperTools/local.pharos.battd.state` (mode `0600`) and continues enforcing the charge limit across lid-close sleep, DarkWake maintenance wakes, app termination, and system reboots without requiring UI heartbeats
+- **Zero-Redundancy SMC Write Deduplication & Log Rotation**: `pharos-battd` tracks `lastAppliedAction`, `lastAppliedMagSafe`, and `lastHardwareWriteTime`, suppressing redundant SMC writes within a 60s window and logging only on actual state transitions; relaxed daemon tick interval to 3s, added fast-return in `.system` mode before opening IOKit/IOPowerSources, and added startup log rotation (`LogRotation.rotateLogIfNeeded`, 512 KB cap / 256 KB tail retention)
+- **Visibility-Driven Background Polling**: `BatteryStore`, `FanStore`, and `ProjectStore` dynamically adjust timer intervals via `updateVisibility(hasViewers:)` — full responsiveness while popover or main window is open, downclocked to 30s silent background heartbeats when all windows are closed
+- **Incremental AI Chat Database Fingerprint Cache**: introduced `AgentDatabaseFingerprint` tracking main SQLite DB and companion `-wal` file sizes and nanosecond-precision `mtime`; unchanged databases (including multi-GB stores like 6.5 GB `opencode.db`) reuse cached entries in $O(1)$ without reopening SQLite pages, while the Refresh button forces a full rescan
+- **Two-Stage Progressive Project Dependency Scanning & Directory Size Cache**: `PackageScanner.scanProjectDependencies(projectPath:includeCacheSize:)` and `PackageStore.scanAll()` now render project dependency manifests and CLI tools immediately in Stage 1 (`includeCacheSize: false`), then progressively compute and cache `node_modules` / `.venv` / `.build` / `target` bundle sizes in Stage 2 (`computeProjectCacheSize(for:)`) keyed by directory and lockfile `mtime`
+- **Modularized Core & UI Codebase**: cleanly split large files into focused modules (`PackageScanner` + `+GlobalCLI` / `+ProjectDeps` / `+CacheRepos`, `AgentChats` + `AgentScanner` + `+CustomApp`, `PackageView` + `PackageSubViews`, `AgentChatView` + `AgentChatSubViews`), expanding unit test coverage to **765 assertions**
+
+**简体中文**
+- **电池合盖与后台持续守护（Persistent Guard）**：「电池与充电」页面新增「合盖与后台持续守护」开关；开启后 `pharos-battd` 将 `mode`、`targetPercent`、`syncMagSafeLed` 与 `persistentGuard` 持久化至 `/Library/PrivilegedHelperTools/local.pharos.battd.state`（权限 `0600`），在 Mac 合盖休眠、夜间 DarkWake 唤醒、Pharos 主程序退出甚至系统重启后，依然由 root 守护进程独立维持 80% 硬件限充，不再因 15 秒无 UI 心跳而回退系统充电
+- **SMC 硬件写入去重与日志自动轮转**：`pharos-battd` 记录上一次生效的硬件动作与时间戳，状态未变时 60 秒内跳过重复 SMC 寄存器写入且仅在状态切换时输出带时间戳日志；守护进程主循环调整为 3 秒，`.system` 模式跳过 IOKit 采样，并在启动时自动执行 `512 KB` 日志截断轮转（保留末尾 `256 KB` 完整行）
+- **窗口可见性驱动的后台轮询降频**：`BatteryStore`、`FanStore` 与 `ProjectStore` 接入 `updateVisibility(hasViewers:)`，主窗口或菜单栏弹窗可见时保持高频实时刷新，窗口全部关闭后自动降频至 30 秒静默心跳
+- **AI 会话数据库纳秒级增量指纹缓存**：新增 `AgentDatabaseFingerprint`（同时校验主库与 `-wal` 文件字节数及纳秒级 `mtime`），未发生写入的超大数据库（如 6.5 GB 的 `opencode.db`）直接 $O(1)$ 复用内存条目，彻底消除二次扫描 I/O 峰值；点击「刷新」支持强制全量重扫
+- **项目依赖两阶段渐进式扫描与目录体积缓存**：`PackageScanner` 与 `PackageStore` 落地两阶段加载——第一阶段秒级解析并渲染所有项目声明清单与 CLI 工具，第二阶段在后台按需回填 `node_modules` / `.venv` / `.build` / `target` 目录体积，并通过目录与锁文件 `mtime` 指纹缓存避免重复递归遍历
+- **核心与视图层无损模块化拆分**：将 `PackageScanner`、`AgentChats`/`AgentScanner`、`PackageView`、`AgentChatView` 按职责拆分为高内聚子模块，全量单测套件扩充至 **765 项断言** 100% 通过
 
 ---
 

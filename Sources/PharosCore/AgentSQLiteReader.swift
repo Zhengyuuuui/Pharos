@@ -646,6 +646,28 @@ public struct AgentSQLiteReader {
         return []
     }
 
+    /// Reads conversations for a specific editor kind from a database path.
+    public static func readConversations(for editor: AgentEditorKind, dbPath: String) -> [AgentConversationSummary] {
+        switch editor {
+        case .cursor:
+            return readCursorConversations(dbPath: dbPath)
+        case .trae, .qoder, .kiro:
+            return readTraeSessions(dbPath: dbPath)
+        case .antigravity:
+            return readAntigravityConversations(dbPath: dbPath)
+        case .cherryStudio:
+            return readCherryStudioConversations(dbPath: dbPath)
+        case .codeBuddy:
+            return readCodeBuddyConversations(dbPath: dbPath)
+        case .openCode, .miniMax:
+            return readOpenCodeSessions(dbPath: dbPath)
+        case .marvis:
+            return readMarvisConversations(dbPath: dbPath)
+        default:
+            return readGenericConversations(dbPath: dbPath)
+        }
+    }
+
     /// Date parsing helper for SQLite date strings (ISO8601 or standard date formats)
     public static func parseDate(_ string: String) -> Date? {
         let isoFormatter = ISO8601DateFormatter()

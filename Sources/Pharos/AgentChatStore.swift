@@ -173,19 +173,22 @@ final class AgentChatStore: ObservableObject {
 
     func scanIfNeeded() {
         if !hasScanned || isHeavyCacheReleased {
+            let wasHeavy = isHeavyCacheReleased
             isHeavyCacheReleased = false
-            scan()
+            scan(forceFull: wasHeavy)
         }
     }
 
-    func scan() {
+    func scan(forceFull: Bool = false) {
         guard !isScanning else { return }
         isScanning = true
         hasScanned = true
         let paths = customAppPaths
+        let previous = (forceFull || isHeavyCacheReleased) ? [] : entries
+        isHeavyCacheReleased = false
         Task.detached(priority: .userInitiated) { [weak self] in
             let results = autoreleasepool {
-                AgentScanner.scan(customAppPaths: paths)
+                AgentScanner.scanAll(customAppPaths: paths, previousEntries: previous)
             }
             await MainActor.run { [weak self] in
                 guard let self else { return }
@@ -221,9 +224,10 @@ final class AgentChatStore: ObservableObject {
         }
 
         isScanning = true
+        let currentEntries = entries
         Task.detached(priority: .userInitiated) { [weak self] in
             let newEntries = autoreleasepool {
-                AgentScanner.scanApplication(at: path)
+                AgentScanner.scanApplication(at: path, previousEntries: currentEntries)
             }
             await MainActor.run { [weak self] in
                 guard let self else { return }
@@ -282,7 +286,8 @@ final class AgentChatStore: ObservableObject {
                 conversationCount: e.conversationCount,
                 conversations: [],
                 customEditorName: e.customEditorName,
-                customAppPath: e.customAppPath
+                customAppPath: e.customAppPath,
+                fingerprint: e.fingerprint
             )
         }
     }

@@ -115,7 +115,8 @@ final class PackageStore: ObservableObject {
         let initialRoots = Array(activeRoots)
 
         Task.detached(priority: .userInitiated) { [weak self] in
-            let (clis, caches, finalSummaries) = autoreleasepool {
+            // 第一阶段：快速扫描 CLI、全局缓存仓与项目声明清单（跳过未命中缓存的依赖目录递归体积计算，保证首屏秒开）
+            let (clis, caches, initialSummaries) = autoreleasepool {
                 let clis = PackageScanner.scanGlobalCliTools()
                 let caches = PackageScanner.scanCacheRepositories()
 
@@ -127,25 +128,56 @@ final class PackageStore: ObservableObject {
 
                 var summaries: [ProjectDependencySummary] = []
                 for path in allRoots {
-                    if let summary = PackageScanner.scanProjectDependencies(projectPath: path) {
+                    if let summary = PackageScanner.scanProjectDependencies(projectPath: path, includeCacheSize: false) {
                         summaries.append(summary)
                     }
                 }
-                return (clis, caches, summaries)
+                return (clis, caches, summaries.sorted { $0.name.lowercased() < $1.name.lowercased() })
             }
 
             await MainActor.run { [weak self] in
                 guard let self else { return }
                 self.globalCliTools = clis
                 self.cacheRepos = caches
-                self.detectedProjects = finalSummaries.sorted { $0.name.lowercased() < $1.name.lowercased() }
+                self.detectedProjects = initialSummaries
                 if self.selectedProjectSummary == nil {
                     self.selectedProjectSummary = self.detectedProjects.first
+                } else if let currentRoot = self.selectedProjectSummary?.rootPath,
+                          let updated = self.detectedProjects.first(where: { $0.rootPath == currentRoot }) {
+                    self.selectedProjectSummary = updated
                 }
                 self.lastScanTime = Date()
                 self.isScanning = false
                 self.recomputeFilteredCli()
                 self.recomputeFilteredProject()
+            }
+
+            // 第二阶段：后台渐进式回填各项目主依赖目录体积（命中 mtime 缓存时 O(1) 返回）
+            for summary in initialSummaries where summary.dependenciesSizeBytes == 0 && summary.cacheDirectoryName != nil {
+                let computedSize = autoreleasepool {
+                    PackageScanner.computeProjectCacheSize(for: summary)
+                }
+                guard computedSize > 0 else { continue }
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
+                    guard let idx = self.detectedProjects.firstIndex(where: { $0.rootPath == summary.rootPath }) else { return }
+                    let current = self.detectedProjects[idx]
+                    let updated = ProjectDependencySummary(
+                        id: current.id,
+                        name: current.name,
+                        rootPath: current.rootPath,
+                        ecosystem: current.ecosystem,
+                        dependenciesSizeBytes: computedSize,
+                        directDependenciesCount: current.directDependenciesCount,
+                        missingDependenciesCount: current.missingDependenciesCount,
+                        packages: current.packages,
+                        cacheDirectoryName: current.cacheDirectoryName
+                    )
+                    self.detectedProjects[idx] = updated
+                    if self.selectedProjectSummary?.rootPath == updated.rootPath {
+                        self.selectedProjectSummary = updated
+                    }
+                }
             }
         }
     }

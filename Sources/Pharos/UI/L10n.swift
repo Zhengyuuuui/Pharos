@@ -869,6 +869,7 @@ final class L10n: ObservableObject {
         en ? "Are you sure you want to remove “\(name)” from the list?"
            : "确定从列表中移除「\(name)」吗？"
     }
+    var agentForceFullScan: String { en ? "Force Full Rescan" : "强制全量重新扫描" }
     var agentEditorsHeader: String { en ? "AI Editors" : "AI 编辑器" }
     func agentInactiveEditorsHeader(_ n: Int) -> String { en ? "Editors without data (\(n))" : "无数据的编辑器（\(n)）" }
     var agentBackToAll: String { en ? "All Editors" : "全部编辑器" }

@@ -15,11 +15,11 @@
   <img src="https://img.shields.io/badge/dependencies-none-brightgreen" alt="Dependencies">
   <img src="https://img.shields.io/badge/network-none-lightgrey" alt="No network">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.8-blue" alt="Version 2.8">
-  <img src="https://img.shields.io/badge/updated-2026--10--19-informational" alt="Last updated 2026-10-19">
+  <img src="https://img.shields.io/badge/version-2.9-blue" alt="Version 2.9">
+  <img src="https://img.shields.io/badge/updated-2026--10--23-informational" alt="Last updated 2026-10-23">
 </p>
 
-<p align="center"><sub>Last updated / 最后更新：2026-10-19 13:20 (UTC+8) · v2.8 · Author / 作者：zys · Model / 模型：Gemini 4 Argon</sub></p>
+<p align="center"><sub>Last updated / 最后更新：2026-10-23 15:46 (UTC+8) · v2.9 · Author / 作者：zys · Model / 模型：Gemini 4 Argon</sub></p>
 
 <p align="center"><b>English</b> · <a href="README_CN.md">简体中文</a> · <a href="CHANGELOG.md">Changelog / 更新记录</a></p>
 
@@ -39,14 +39,14 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 |---|---|
 | **Ports & memory** | Every dev project listening on a TCP port, grouped by folder, with memory incl. child processes; machine-wide memory, pressure and a 1-hour trend |
 | **Disk usage** | Startup disk, external drives, network shares and disk images — used / available like Finder, updated the moment a drive is plugged in |
-| **Battery charge limit** | macOS 15 native-style "Not Charging" plug state: hold the battery at 80 / 85 / 90 / 95 / 100 %, adapter powers the Mac directly (0 mA cell current), never cuts the adapter; one click back to macOS |
+| **Battery charge limit** | macOS 15 native-style "Not Charging" plug state: hold the battery at 80 / 85 / 90 / 95 / 100 %, adapter powers the Mac directly (0 mA cell current), never cuts the adapter; optional **Persistent Lid-Closed & Background Guard** survives lid sleep, app exit, and reboots via state-persisted root daemon; one click back to macOS |
 | **Fans & temperature** | Fan speeds and CPU / GPU / memory / SSD / battery temperatures; automotive cockpit speedometer dials (60 FPS mechanical inertia engine & dynamic motion blur) & classic horizontal bars; optional fan control (fixed speed or max) with built-in safety rules |
 | **Stop processes** | `SIGTERM` first, `SIGKILL` only if it refuses; never system or other users' processes |
 | **Disk cleanup** | Temp folders and dev caches, file by file, with a retention window; the size shown is exactly what gets freed |
 | **Favorite projects** | Save project folders, start commands detected automatically, open in Terminal with one click |
 | **Browser instances** | Chrome, Chrome Beta / Canary, Chromium, Edge and Brave — every profile folder with its debug port, proxy and memory; save favorites that stay listed with their launch command after quitting; start and quit |
-| **AI agent chat databases** | Inspect, clean and backup local chat / session databases from 23+ AI IDEs and editors (Cursor, Trae, Windsurf, VS Code, Antigravity, OpenCode, Claude Code, MiniMax…); detect orphaned workspaces; manually add and scan any custom application under `/Applications` with native icon extraction and custom SQLite parsing |
-| **Packages & CLI tools** | Real Homebrew Cellar formula & Caskroom package scanning, diagnostics (`brew doctor`/`services`) and cache cleanup; global CLI tools (Node, Homebrew, Rust, Python, Go) with terminal run, reveal and uninstall; multi-root project dependency scanning across 10 developer workspace directories (.venv, node_modules, .build, target); language cache repos overview |
+| **AI agent chat databases** | Inspect, clean and backup local chat / session databases from 23+ AI IDEs and editors (Cursor, Trae, Windsurf, VS Code, Antigravity, OpenCode, Claude Code, MiniMax…); nanosecond-precision incremental fingerprint cache (`DB + WAL` size/mtime) skips unchanged databases; detect orphaned workspaces; manually add and scan any custom application under `/Applications` |
+| **Packages & CLI tools** | Real Homebrew Cellar formula & Caskroom package scanning, diagnostics (`brew doctor`/`services`) and cache cleanup; global CLI tools (Node, Homebrew, Rust, Python, Go) with terminal run, reveal and uninstall; two-stage progressive project dependency scanning with `mtime` + lockfile fingerprint cache across 10 developer workspace directories (`.venv`, `node_modules`, `.build`, `target`); language cache repos overview |
 
 ---
 
@@ -255,6 +255,13 @@ make icon                           # regenerate the app icon from Scripts/make-
 ---
 
 ## Recent Updates
+
+### v2.9 (2026-10-23)
+- **Persistent Lid-Closed & Background Battery Guard**: optional toggle in Battery & Charging lets `pharos-battd` persist its target mode/limit to `/Library/PrivilegedHelperTools/local.pharos.battd.state` (mode `0600`) and maintain the hardware charge limit across lid-close sleep, DarkWake, app quits, and reboots without requiring UI heartbeats.
+- **Zero-Redundancy SMC Write Deduplication & Visibility-Driven Polling**: `pharos-battd` deduplicates identical SMC hardware writes (re-asserting at most once per 60s), switches to a 3s tick loop, fast-returns in `.system` mode, and automatically rotates daemon logs (`512 KB` cap); `BatteryStore`, `FanStore`, and `ProjectStore` downclock background timers to 30s when all windows/popovers are closed.
+- **Incremental AI Chat Database Fingerprint Cache**: nanosecond-precision `AgentDatabaseFingerprint` (`DB + -wal` size & `mtime`) skips SQLite parsing on unchanged multi-GB databases (e.g. 6.5 GB `opencode.db`), reducing repeat scans to near-zero latency while supporting one-click forced full rescan.
+- **Two-Stage Progressive Project Dependency Scanning**: Stage 1 instantaneously renders project dependency manifests and CLI tools; Stage 2 progressively computes and caches `node_modules` / `.venv` / `.build` / `target` bundle sizes in the background keyed by directory & lockfile `mtime`.
+- **Modularized Core & UI Architecture**: cleanly split `PackageScanner`, `AgentChats`/`AgentScanner`, `PackageView`, and `AgentChatView` into cohesive, focused Swift modules under ~1,000 lines each with 765 unit test assertions passing.
 
 ### v2.8 (2026-10-19)
 - **Automotive Cockpit Fan Speedometer**: high-precision dual-dial cockpit gauges with 270° sweep, upright polar numerals, redline danger zone, and manual target speed marker.

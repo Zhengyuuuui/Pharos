@@ -15,11 +15,11 @@
   <img src="https://img.shields.io/badge/dependencies-none-brightgreen" alt="Dependencies">
   <img src="https://img.shields.io/badge/network-none-lightgrey" alt="No network">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.8-blue" alt="Version 2.8">
-  <img src="https://img.shields.io/badge/updated-2026--10--19-informational" alt="Last updated 2026-10-19">
+  <img src="https://img.shields.io/badge/version-2.9-blue" alt="Version 2.9">
+  <img src="https://img.shields.io/badge/updated-2026--10--23-informational" alt="Last updated 2026-10-23">
 </p>
 
-<p align="center"><sub>最后更新 / Last updated：2026-10-19 13:20 (UTC+8) · v2.8 · 作者 / Author：zys · 模型 / Model：Gemini 4 Argon</sub></p>
+<p align="center"><sub>最后更新 / Last updated：2026-10-23 15:46 (UTC+8) · v2.9 · 作者 / Author：zys · 模型 / Model：Gemini 4 Argon</sub></p>
 
 <p align="center"><a href="README.md">English</a> · <b>简体中文</b> · <a href="CHANGELOG.md">更新记录 / Changelog</a></p>
 
@@ -39,14 +39,14 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 |---|---|
 | **端口与内存监控** | 列出所有监听 TCP 端口的开发项目，按目录归组，内存含子进程；整机内存、内存压力与近 1 小时趋势 |
 | **磁盘用量** | 启动磁盘、外接硬盘、网络共享和磁盘映像的已用 / 可用，口径与 Finder 一致；接入硬盘后立即显示 |
-| **电池充电上限** | 复刻 macOS 15 原生「未在充电（小插头）」：电量保持在 80 / 85 / 90 / 95 / 100%，外接电源直通主板供电（电芯电流 0 mA），绝不切断适配器；一键交还 macOS 管理 |
+| **电池充电上限** | 复刻 macOS 15 原生「未在充电（小插头）」：电量保持在 80 / 85 / 90 / 95 / 100%，外接电源直通主板供电（电芯电流 0 mA），绝不切断适配器；新增可选「合盖与后台持续守护」，由系统级 `pharos-battd` 状态持久化接管，合盖休眠、退出 App 或重启后持续生效；一键交还 macOS 管理 |
 | **风扇与温度** | 风扇转速以及 CPU / GPU / 内存 / SSD / 电池温度；全新汽车座舱仪表盘表盘（60 FPS 物理惯性阻尼与动态高斯运动模糊）与经典条状卡片随心切换；可选风扇控制（固定转速或满速），内置安全规则 |
 | **结束进程** | 先 `SIGTERM`，拒不退出才 `SIGKILL`；不碰系统进程和其他用户的进程 |
 | **磁盘清理** | 临时目录与开发缓存，按单个文件、按保留期判断；显示的体积就是实际能释放的体积 |
 | **常用项目** | 收藏项目文件夹，自动识别启动命令，一键在终端中启动 |
 | **浏览器实例** | 支持 Chrome、Chrome Beta / Canary、Chromium、Edge、Brave，按配置文件夹列出每个实例，显示调试端口、代理、内存；收藏后关闭也能看到端口和启动命令；启动与退出 |
-| **AI 助手会话管理** | 扫描、分析、备份与清理 23+ 种本地 AI 编程助手与编辑器（Cursor、Trae、Windsurf、VS Code、Antigravity、OpenCode、Claude Code、MiniMax 等）的会话数据库，识别孤立/残留工作区；支持手动添加扫描 `/Applications` 下的任意第三方应用，提取原生高清图标并深度解析 SQLite 对话 |
-| **依赖与软件包** | 真实 Homebrew Cellar 与 Caskroom 软件包深度管理、环境自检与缓存清理；全局命令行软件统一管理（Node、Homebrew、Rust、Python、Go 等），一键终端测试、定位与二次确认卸载；覆盖 10 个常用开发目录的全生态项目依赖识别（.venv、node_modules、.build、target 等）；语言缓存仓库概览 |
+| **AI 助手会话管理** | 扫描、分析、备份与清理 23+ 种本地 AI 编程助手与编辑器（Cursor、Trae、Windsurf、VS Code、Antigravity、OpenCode、Claude Code、MiniMax 等）的会话数据库；内置纳秒级 `DB + WAL` 指纹增量缓存，未变动大库免重复解析；识别孤立工作区，支持手动添加扫描 `/Applications` 下的任意应用 |
+| **依赖与软件包** | 真实 Homebrew Cellar 与 Caskroom 软件包深度管理、环境自检与缓存清理；全局命令行软件统一管理（Node、Homebrew、Rust、Python、Go 等）；支持两阶段渐进式首屏秒开与 `mtime` + 锁文件指纹缓存的全生态项目依赖识别（`.venv`、`node_modules`、`.build`、`target` 等）；语言缓存仓库概览 |
 
 ---
 
@@ -255,6 +255,13 @@ make icon                           # 重新生成浅色/深色 App 图标
 ---
 
 ## 最新版本更新速览
+
+### v2.9 (2026-10-23)
+- **电池合盖与后台持续守护（Persistent Guard）**：「电池与充电」页面新增可选「合盖与后台持续守护」开关，开启后 `pharos-battd` 将限充策略持久化至 `/Library/PrivilegedHelperTools/local.pharos.battd.state`（权限 `0600`），即使合盖休眠、DarkWake 唤醒、退出 Pharos 主程序或重启系统，仍持续守住 80% 充电上限。
+- **SMC 硬件写入去重与窗口可见性自适应降频**：`pharos-battd` 对相同目标状态执行 60s 去重（消除每秒重复写 SMC 与海量日志）、主循环放宽至 3s、`.system` 模式直接轻量短路，并内置 `512 KB` 日志自动轮转；主窗口与菜单栏弹窗关闭时，`BatteryStore`、`FanStore` 与 `ProjectStore` 自动降频至 30s 静默轮询。
+- **AI 会话数据库纳秒级增量指纹缓存**：基于 `AgentDatabaseFingerprint`（主库 + `-wal` 的大小与纳秒级 `mtime`）跳过未变动超大 SQLite 库（如 6.5 GB `opencode.db`）的重复解析，二次扫描近乎零耗时，同时支持手动强制全量重扫。
+- **项目依赖两阶段渐进式扫描与目录体积缓存**：第一阶段毫秒级秒开渲染项目清单与声明状态，第二阶段后台渐进式回填 `node_modules` / `.venv` / `.build` / `target` 体积并按目录及锁文件 `mtime` 缓存复用。
+- **核心与视图层模块化拆分**：将 `PackageScanner`、`AgentChats`/`AgentScanner`、`PackageView`、`AgentChatView` 无损拆分为职责单一的子模块，全套 765 项单测断言 100% 通过。
 
 ### v2.8 (2026-10-19)
 - **拟真机车仪表盘风扇座舱**：高精度汽车座舱速度表风格表盘，270° 动态弧环、红线区警示、手动目标刻度标记与 60 FPS 物理机械惯性阻尼引擎；与经典条状卡片随心切换。

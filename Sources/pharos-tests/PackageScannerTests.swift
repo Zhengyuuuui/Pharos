@@ -430,3 +430,67 @@ func testCacheRepoScanner() {
     expectEq(count, 2, "2 files counted")
     expectEq(size, 1200, "1200 bytes total")
 }
+
+func testProjectDependencyTwoStageAndCache() {
+    PackageScanner.clearDirectorySizeCache()
+
+    let tempDir = NSTemporaryDirectory() + "pharos-proj-twostage-\(UUID().uuidString)"
+    let nodeModules = tempDir + "/node_modules"
+    let reactDir = nodeModules + "/react"
+    try? FileManager.default.createDirectory(atPath: reactDir, withIntermediateDirectories: true)
+    defer {
+        try? FileManager.default.removeItem(atPath: tempDir)
+        PackageScanner.clearDirectorySizeCache()
+    }
+
+    let rootPkgJson = """
+    {
+      "name": "twostage-app",
+      "dependencies": {
+        "react": "^19.0.0"
+      }
+    }
+    """
+    FileManager.default.createFile(atPath: tempDir + "/package.json", contents: Data(rootPkgJson.utf8))
+    FileManager.default.createFile(atPath: reactDir + "/package.json", contents: Data("{\"name\":\"react\",\"version\":\"19.0.0\"}".utf8))
+    FileManager.default.createFile(atPath: reactDir + "/bundle.js", contents: Data(repeating: 0x55, count: 4096))
+
+    // Stage 1: includeCacheSize = false should skip uncached directorySize traversal (returns 0)
+    guard let stage1 = PackageScanner.scanProjectDependencies(projectPath: tempDir, includeCacheSize: false) else {
+        expect(false, "Stage 1 scanProjectDependencies returned nil")
+        return
+    }
+    expectEq(stage1.directDependenciesCount, 1, "Stage 1 parsed direct dependency count")
+    expectEq(stage1.dependenciesSizeBytes, 0, "Stage 1 skipped cold directory size traversal")
+    expectEq(stage1.cacheDirectoryName, "node_modules", "Stage 1 identified cacheDirectoryName")
+
+    // Stage 2: computeProjectCacheSize computes & populates the mtime cache
+    let computedBytes = PackageScanner.computeProjectCacheSize(for: stage1)
+    expect(computedBytes >= 4096, "Stage 2 computed real node_modules size >= 4096")
+
+    // Subsequent Stage 1 scan with includeCacheSize = false hits the mtime cache immediately!
+    if let cachedScan = PackageScanner.scanProjectDependencies(projectPath: tempDir, includeCacheSize: false) {
+        expectEq(cachedScan.dependenciesSizeBytes, computedBytes, "Cached scan with includeCacheSize=false reuses cached bundle size")
+    } else {
+        expect(false, "Cached scan returned nil")
+    }
+
+    // Modifying package.json (lockfileMtime changes) invalidates the cached bundle size
+    usleep(10_000)
+    let updatedPkgJson = """
+    {
+      "name": "twostage-app",
+      "dependencies": {
+        "react": "^19.0.0"
+      },
+      "version": "1.0.1"
+    }
+    """
+    try? updatedPkgJson.write(toFile: tempDir + "/package.json", atomically: true, encoding: .utf8)
+
+    if let invalidatedScan = PackageScanner.scanProjectDependencies(projectPath: tempDir, includeCacheSize: false) {
+        expectEq(invalidatedScan.dependenciesSizeBytes, 0, "Lockfile modification invalidated cache for includeCacheSize=false")
+    } else {
+        expect(false, "Invalidated scan returned nil")
+    }
+}

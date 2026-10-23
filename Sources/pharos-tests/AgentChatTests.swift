@@ -443,3 +443,100 @@ func testCustomApplicationScanner() {
     let allEntries = AgentScanner.scan(homeDirectory: home.path, customAppPaths: [appBundle.path])
     expect(allEntries.contains { $0.customEditorName == "My Custom AI" }, "scan(customAppPaths:) includes custom app")
 }
+
+func testIncrementalAgentScanning() {
+    let tmp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("pharos-inc-\(UUID().uuidString)")
+    let home = tmp.appendingPathComponent("fake-home")
+    let wsDir = home.appendingPathComponent("Library/Application Support/Cursor/User/workspaceStorage/test-ws-hash")
+    let liveProject = tmp.appendingPathComponent("my-live-project")
+
+    try? FileManager.default.createDirectory(at: wsDir, withIntermediateDirectories: true)
+    try? FileManager.default.createDirectory(at: liveProject, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tmp) }
+
+    // 1. Create workspace.json
+    let wsJson: [String: Any] = ["folder": "file://\(liveProject.path)"]
+    if let d = try? JSONSerialization.data(withJSONObject: wsJson) {
+        try? d.write(to: wsDir.appendingPathComponent("workspace.json"))
+    }
+
+    // 2. Create state.vscdb with 1 initial session
+    let dbPath = wsDir.appendingPathComponent("state.vscdb").path
+    var db: OpaquePointer?
+    if sqlite3_open(dbPath, &db) == SQLITE_OK {
+        sqlite3_exec(db, "CREATE TABLE composerHeaders (composerId TEXT, createdAt INT, lastUpdatedAt INT, value TEXT);", nil, nil, nil)
+        let jsonVal = "{\"name\":\"Initial First Session\",\"unifiedMode\":\"agent\"}"
+        sqlite3_exec(db, "INSERT INTO composerHeaders VALUES ('c1', 1780000000000, 1780000000000, '\(jsonVal)');", nil, nil, nil)
+        sqlite3_close(db)
+    }
+
+    // Initial Scan (cold scan)
+    let initialEntries = AgentScanner.scan(homeDirectory: home.path)
+    expectEq(initialEntries.count, 1, "Cold scan found exactly 1 database")
+    guard let firstEntry = initialEntries.first else {
+        expect(false, "Expected firstEntry to exist")
+        return
+    }
+    expectEq(firstEntry.conversationCount, 1, "First scan parsed 1 conversation")
+    expectEq(firstEntry.conversations.first?.title, "Initial First Session", "Conversation title matches")
+    expectEq(firstEntry.isOrphaned, false, "Live workspace is not orphaned")
+    expect(firstEntry.fingerprint != nil, "Database entry contains valid fingerprint")
+
+    // Second Scan (Cache HIT - unchanged database)
+    let cachedEntries = AgentScanner.scanAll(homeDirectory: home.path, previousEntries: initialEntries)
+    expectEq(cachedEntries.count, 1, "Cached scan returned 1 database")
+    guard let cachedEntry = cachedEntries.first else {
+        expect(false, "Expected cachedEntry to exist")
+        return
+    }
+    expectEq(cachedEntry.conversationCount, 1, "Cached scan preserved conversation count")
+    expectEq(cachedEntry.conversations.first?.title, "Initial First Session", "Cached conversation title preserved")
+    expect(cachedEntry.fingerprint?.matchesPrevious(entry: firstEntry) == true, "Fingerprint matches previous entry")
+
+    // Dynamic Orphan Update on Cache Hit
+    // Remove the project directory without modifying the database
+    try? FileManager.default.removeItem(at: liveProject)
+    let orphanEntries = AgentScanner.scanAll(homeDirectory: home.path, previousEntries: cachedEntries)
+    expectEq(orphanEntries.count, 1, "Orphan scan returned 1 database")
+    guard let orphanEntry = orphanEntries.first else {
+        expect(false, "Expected orphanEntry to exist")
+        return
+    }
+    expectEq(orphanEntry.isOrphaned, true, "Workspace dynamically marked as orphaned")
+    expectEq(orphanEntry.conversationCount, 1, "Conversations preserved from cache on orphan state change")
+
+    // Modification Detection (Cache MISS - write new conversation into SQLite)
+    if sqlite3_open(dbPath, &db) == SQLITE_OK {
+        let jsonVal2 = "{\"name\":\"Second Added Session\",\"unifiedMode\":\"chat\"}"
+        sqlite3_exec(db, "INSERT INTO composerHeaders VALUES ('c2', 1780000005000, 1780000005000, '\(jsonVal2)');", nil, nil, nil)
+        sqlite3_close(db)
+    }
+    // Update mtime to ensure filesystem reflects change
+    let futureDate = Date().addingTimeInterval(5)
+    try? FileManager.default.setAttributes([.modificationDate: futureDate], ofItemAtPath: dbPath)
+
+    let updatedEntries = AgentScanner.scanAll(homeDirectory: home.path, previousEntries: orphanEntries)
+    expectEq(updatedEntries.count, 1, "Updated scan returned 1 database")
+    guard let updatedEntry = updatedEntries.first else {
+        expect(false, "Expected updatedEntry to exist")
+        return
+    }
+    expectEq(updatedEntry.conversationCount, 2, "Detected modified database and read 2 conversations")
+    expect(updatedEntry.conversations.contains { $0.title == "Second Added Session" }, "New conversation loaded on cache miss")
+
+    // WAL Companion File Detection
+    let walPath = dbPath + "-wal"
+    try? "dummy-wal-journal-data".write(toFile: walPath, atomically: true, encoding: .utf8)
+    let walEntries = AgentScanner.scanAll(homeDirectory: home.path, previousEntries: updatedEntries)
+    guard let walEntry = walEntries.first else {
+        expect(false, "Expected walEntry to exist")
+        return
+    }
+    expect(walEntry.fingerprint?.walSizeBytes ?? 0 > 0, "Fingerprint captured WAL file size")
+    expect(walEntry.fileSizeBytes > updatedEntry.fileSizeBytes, "Total size includes WAL journal size")
+
+    // Force Full Scan (previousEntries: [])
+    let fullEntries = AgentScanner.scanAll(homeDirectory: home.path, previousEntries: [])
+    expectEq(fullEntries.count, 1, "Full scan returned 1 database")
+    expectEq(fullEntries.first?.conversationCount, 2, "Full scan parsed all conversations without cache")
+}
