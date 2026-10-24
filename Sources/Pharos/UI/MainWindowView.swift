@@ -33,25 +33,38 @@ struct MainWindowView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            sidebarView
-                .frame(width: 236)
-                .background(PharosColor.surface)
-                .overlay(alignment: .trailing) {
-                    Rectangle()
-                        .fill(PharosColor.separator.opacity(0.35))
-                        .frame(width: 0.5)
-                }
-                .shadow(color: Color.black.opacity(0.04), radius: 3, x: 1, y: 0)
-                .shadow(color: Color.black.opacity(0.06), radius: 12, x: 4, y: 0)
-                .zIndex(1)
+        VStack(spacing: 0) {
+            // Window Titlebar & Drag Clearance: Traffic lights sit at top-left
+            Color.clear
+                .frame(height: 44)
+                .contentShape(Rectangle())
 
-            detailView
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(PharosColor.background)
+            HStack(alignment: .top, spacing: 14) {
+                // 1. Floating Sidebar Island (圆角矩形悬浮浮岛)
+                sidebarIsland
+                    .frame(width: 236)
+                    .frame(maxHeight: .infinity)
+                    .background(PharosColor.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(PharosColor.separator.opacity(0.35), lineWidth: 0.5)
+                    )
+                    .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
+                    .shadow(color: Color.black.opacity(0.07), radius: 14, x: 0, y: 6)
+                    .padding(.leading, 14)
+                    .padding(.bottom, 14)
+
+                // 2. Detail Canvas
+                detailView
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.trailing, 14)
+                    .padding(.bottom, 14)
+            }
         }
+        .background(PharosColor.background)
         .ignoresSafeArea()
-        .frame(minWidth: 920, minHeight: 600)
+        .frame(minWidth: 940, minHeight: 620)
         .onAppear {
             store.viewAppeared()
             if selection == nil { selection = initialSelection ?? .portsOverview }
@@ -67,12 +80,8 @@ struct MainWindowView: View {
         }
     }
 
-    private var sidebarView: some View {
+    private var sidebarIsland: some View {
         VStack(spacing: 0) {
-            // macOS traffic lights area clearance
-            Color.clear
-                .frame(height: 42)
-
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 2) {
                     // Top: Dashboard Hero Item
@@ -240,7 +249,7 @@ struct MainWindowView: View {
                     }
                 }
                 .padding(.horizontal, 8)
-                .padding(.top, 4)
+                .padding(.top, 10)
                 .padding(.bottom, 12)
             }
 
@@ -249,55 +258,50 @@ struct MainWindowView: View {
     }
 
     private var detailView: some View {
-        VStack(spacing: 0) {
-            Color.clear
-                .frame(height: 28)
-
-            Group {
-                switch selection {
-                case .systemMemory:
-                    SystemMemoryView()
-                case .diskUsage:
-                    DiskUsageView()
-                case .batteryAndThermals:
-                    BatteryAndThermalView()
-                case .portsOverview:
-                    PortsOverviewView(onSelect: { selection = .project($0.id) },
-                                      onSelectFavorite: { selection = .favorite($0.id) })
-                case .favorite(let id):
-                    FavoriteDetailView(favoriteId: id) { selection = .portsOverview }
-                case .diskCleanup:
-                    CleanupView()
-                case .chrome:
-                    ChromeView()
-                case .agentChats:
-                    AgentChatView()
-                case .packages:
-                    PackageView()
-                case .project(let id):
-                    if let project = store.project(id: id) {
-                        ProjectDetailView(project: project)
-                    } else {
-                        ContentUnavailableView(l10n.noProjects, systemImage: "network.slash",
-                                               description: Text(l10n.noProjectsDesc))
-                    }
-                case .customize:
-                    CustomizePopoverView()
-                case .settings:
-                    MainSettingsView()
-                case nil:
-                    if store.projects.isEmpty && store.lastScan != nil {
-                        ContentUnavailableView(l10n.noProjects, systemImage: "network.slash",
-                                               description: Text(l10n.noProjectsDesc))
-                    } else {
-                        ContentUnavailableView(l10n.selectProject, systemImage: "shippingbox",
-                                               description: Text(l10n.selectProjectDesc))
-                    }
+        Group {
+            switch selection {
+            case .systemMemory:
+                SystemMemoryView()
+            case .diskUsage:
+                DiskUsageView()
+            case .batteryAndThermals:
+                BatteryAndThermalView()
+            case .portsOverview:
+                PortsOverviewView(onSelect: { selection = .project($0.id) },
+                                  onSelectFavorite: { selection = .favorite($0.id) })
+            case .favorite(let id):
+                FavoriteDetailView(favoriteId: id) { selection = .portsOverview }
+            case .diskCleanup:
+                CleanupView()
+            case .chrome:
+                ChromeView()
+            case .agentChats:
+                AgentChatView()
+            case .packages:
+                PackageView()
+            case .project(let id):
+                if let project = store.project(id: id) {
+                    ProjectDetailView(project: project)
+                } else {
+                    ContentUnavailableView(l10n.noProjects, systemImage: "network.slash",
+                                           description: Text(l10n.noProjectsDesc))
+                }
+            case .customize:
+                CustomizePopoverView()
+            case .settings:
+                MainSettingsView()
+            case nil:
+                if store.projects.isEmpty && store.lastScan != nil {
+                    ContentUnavailableView(l10n.noProjects, systemImage: "network.slash",
+                                           description: Text(l10n.noProjectsDesc))
+                } else {
+                    ContentUnavailableView(l10n.selectProject, systemImage: "shippingbox",
+                                           description: Text(l10n.selectProjectDesc))
                 }
             }
-            .buttonStyle(.pharos)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .buttonStyle(.pharos)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var sidebarBottomIsland: some View {
@@ -363,7 +367,8 @@ struct MainWindowView: View {
             .help(l10n.summary(projects: store.projects.count, memory: ByteFormat.short(store.totalMemory)))
         }
         .padding(.horizontal, PharosSpacing.m)
-        .padding(.vertical, PharosSpacing.s)
+        .padding(.top, PharosSpacing.s)
+        .padding(.bottom, PharosSpacing.s + 4)
         .background(
             VStack(spacing: 0) {
                 PharosListDivider()

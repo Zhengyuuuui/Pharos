@@ -168,11 +168,15 @@ SF Symbols 统一使用线框、单色、与文字同色或次级色。
 
 ### 6.1 侧边栏规范（参考现代纯净分层与清晰领域分类）
 
-1. **纯净背景与浮起分层（Floating Elevated Surface）**：
-   - 侧边栏不再受系统原生 `NavigationSplitView` 的 AppKit 裁剪与生硬分割条限制，采用无缝 `HStack(spacing: 0)` 的自适应浮动架构，侧边栏以 `.zIndex(1)` 浮动于主窗口内容画布之上。
-   - 浅色模式下侧边栏采用纯白表面（`PharosColor.surface` / `#FFFFFF`），右侧边缘向主画布（`PharosColor.background` / `#F2F3F5`）投射双层柔和弥散阴影（`radius: 3, x: 1, opacity: 0.04` + `radius: 12, x: 4, opacity: 0.06`）及极淡发丝线（0.5pt `separator.opacity(0.35)`），形成清晰且优雅的悬浮抬升感（Floating Island Effect）。
-   - 深色模式采用深沉石墨黑表面，与背景画布形成细腻明度差与边缘微光，杜绝强烈的毛玻璃杂乱透色。
-   - 窗口启用透明标题栏（`titlebarAppearsTransparent`）与内容全屏（`fullSizeContentView`），侧边栏顶部为系统红黄绿交通灯自然留出 42pt 空白，支持窗口自由拖拽。
+1. **圆角矩形悬浮浮岛（Floating Island Sidebar）**：
+   - 侧边栏整体为完全独立的圆角矩形卡片容器（`RoundedRectangle(cornerRadius: 16, style: .continuous)`）；
+   - **上下左右均与父窗口留有明确的 Margin 呼吸间距**：
+     - **左侧 (Leading)**：14pt 边距，与窗口左边缘分离；
+     - **顶部 (Top)**：44pt 顶部标题栏边距，macOS 红黄绿交通灯在窗口背景上轻盈悬浮，侧边栏卡片位于交通灯下方；
+     - **底侧 (Bottom)**：14pt 边距，与窗口底边缘分离；
+     - **右侧 (Trailing)**：14pt 间距，与右侧内容画布保持通透的间隔；
+   - 侧边栏纯白表面（`PharosColor.surface`）拥有全周 360° 柔和立体弥散阴影（`radius: 4, y: 2, opacity: 0.04` + `radius: 14, y: 6, opacity: 0.07`）与 0.5pt 精细发丝边框（`separator.opacity(0.35)`），真正形成悬浮于温润浅灰窗口底画布（`PharosColor.background`）之上的独立浮岛（Floating Island）；
+   - 内部纵向滚动仅在卡片内部进行，底部控制岛与顶部项目均收纳于该圆角矩形内，卡片内容被整体剪裁，底部圆角与侧边栏外壳完全同心。
 2. **顶部仪表盘英雄项（Dashboard Hero）**：
    - 顶部首项设立独立的「总览 / 仪表盘 (Dashboard)」，配备单色线框图标（`square.grid.2x2`），作为全局状态的核心入口。
    - 英雄项与下方子领域之间使用一条微妙发丝线（`PharosListDivider`）优雅分隔，形成稳定的锚点。
