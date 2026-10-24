@@ -8,47 +8,37 @@ extension PackageView {
         let tools = store.featuredShelfTools
         return Group {
             if !tools.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(alignment: .center, spacing: 8) {
-                        Image(systemName: "sparkles.rectangle.stack.fill")
-                            .font(.system(size: 14))
-                            .foregroundStyle(Color.yellow)
+                VStack(alignment: .leading, spacing: PharosSpacing.titleToCard) {
+                    PharosSectionHeader(title: l10n.featuredToolsTitle, systemImage: "sparkles.rectangle.stack") {
+                        HStack(spacing: PharosSpacing.s) {
+                            PharosTag(l10n.readyToolsCount(tools.count), tint: PharosColor.warning)
 
-                        Text(l10n.featuredToolsTitle)
-                            .font(.system(size: 13, weight: .bold))
-
-                        Text(l10n.readyToolsCount(tools.count))
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Color.yellow)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Capsule().fill(Color.yellow.opacity(0.15)))
-
-                        Spacer()
-
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                isFeaturedShelfExpanded.toggle()
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    isFeaturedShelfExpanded.toggle()
+                                }
+                            } label: {
+                                HStack(spacing: PharosSpacing.xxs) {
+                                    Text(isFeaturedShelfExpanded ? l10n.collapseSection : l10n.expandSection)
+                                    Image(systemName: isFeaturedShelfExpanded ? "chevron.up" : "chevron.down")
+                                }
+                                .font(PharosFont.caption)
+                                .foregroundStyle(PharosColor.textSecondary)
                             }
-                        } label: {
-                            HStack(spacing: 4) {
-                                Text(isFeaturedShelfExpanded ? l10n.collapseSection : l10n.expandSection)
-                                Image(systemName: isFeaturedShelfExpanded ? "chevron.up" : "chevron.down")
-                            }
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
+                    .padding(.horizontal, PharosSpacing.xs)
 
                     if isFeaturedShelfExpanded {
                         Text(l10n.featuredToolsSubtitle)
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
+                            .font(PharosFont.caption)
+                            .foregroundStyle(PharosColor.textSecondary)
+                            .padding(.horizontal, PharosSpacing.xs)
 
                         LazyVGrid(
-                            columns: [GridItem(.adaptive(minimum: 280, maximum: 380), spacing: 12)],
-                            spacing: 12
+                            columns: [GridItem(.adaptive(minimum: 280, maximum: 380), spacing: PharosSpacing.m)],
+                            spacing: PharosSpacing.m
                         ) {
                             ForEach(tools) { item in
                                 featuredToolCard(item)
@@ -56,146 +46,125 @@ extension PackageView {
                         }
                     }
                 }
-                .padding(14)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.primary.opacity(0.025))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.yellow.opacity(0.2), lineWidth: 1)
-                )
             }
         }
     }
 
     func featuredToolCard(_ item: LocalPackageItem) -> some View {
         let color = featuredColor(for: item)
-        return VStack(alignment: .leading, spacing: 8) {
-            // Header: Icon, Name, Category Tag, Version, Ecosystem
-            HStack(alignment: .center, spacing: 8) {
-                Image(systemName: featuredIcon(for: item))
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(color)
-                    .frame(width: 24, height: 24)
-                    .background(color.opacity(0.15), in: RoundedRectangle(cornerRadius: 6))
+        return PharosCard {
+            VStack(alignment: .leading, spacing: PharosSpacing.s) {
+                // Header: Icon, Name, Category Tag, Version, Ecosystem
+                HStack(alignment: .center, spacing: PharosSpacing.s) {
+                    Image(systemName: featuredIcon(for: item))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(color)
+                        .frame(width: 24, height: 24)
+                        .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: PharosRadius.small, style: .continuous))
 
-                VStack(alignment: .leading, spacing: 1) {
-                    HStack(spacing: 6) {
-                        Text(item.name)
-                            .font(.system(size: 13, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.primary)
+                    VStack(alignment: .leading, spacing: 1) {
+                        HStack(spacing: PharosSpacing.xs) {
+                            Text(item.name)
+                                .font(PharosFont.rowLabel)
+                                .fontWeight(.semibold)
 
-                        if let tag = item.categoryTag {
-                            Text(tag)
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(color)
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 1.5)
-                                .background(Capsule().fill(color.opacity(0.12)))
+                            if let tag = item.categoryTag {
+                                PharosTag(tag, tint: color)
+                            }
+                        }
+
+                        if let v = item.installedVersion {
+                            Text(v.hasPrefix("v") ? v : "v\(v)")
+                                .font(PharosFont.captionDigits)
+                                .foregroundStyle(PharosColor.textSecondary)
                         }
                     }
 
-                    if let v = item.installedVersion {
-                        Text(v.hasPrefix("v") ? v : "v\(v)")
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            .foregroundStyle(.secondary)
+                    Spacer()
+
+                    Text(item.ecosystem.displayName)
+                        .font(PharosFont.caption)
+                        .foregroundStyle(PharosColor.textSecondary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: PharosRadius.small, style: .continuous)
+                                .fill(PharosColor.fill)
+                        )
+                }
+
+                // Description
+                if let sum = item.summary, !sum.isEmpty {
+                    Text(sum)
+                        .font(PharosFont.caption)
+                        .foregroundStyle(PharosColor.textSecondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(minHeight: 26, alignment: .topLeading)
+                } else {
+                    Spacer().frame(height: 26)
+                }
+
+                // Path hint
+                if let exec = item.executablePath ?? Optional(item.installPath) {
+                    Text(exec)
+                        .font(PharosFont.technical)
+                        .foregroundStyle(PharosColor.textTertiary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+
+                PharosListDivider()
+
+                // Quick Action Buttons
+                HStack(spacing: PharosSpacing.xs) {
+                    Button {
+                        store.testInTerminal(command: item.name)
+                    } label: {
+                        Label(l10n.runInTerminal, systemImage: "terminal")
                     }
-                }
+                    .buttonStyle(.pharos)
+                    .controlSize(.small)
+                    .help(l10n.runCommandTest)
 
-                Spacer()
-
-                Text(item.ecosystem.displayName)
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(RoundedRectangle(cornerRadius: 4).fill(Color.primary.opacity(0.05)))
-            }
-
-            // Description
-            if let sum = item.summary, !sum.isEmpty {
-                Text(sum)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(minHeight: 26, alignment: .topLeading)
-            } else {
-                Spacer().frame(height: 26)
-            }
-
-            // Path hint
-            if let exec = item.executablePath ?? Optional(item.installPath) {
-                Text(exec)
-                    .font(.system(size: 9, design: .monospaced))
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-
-            Divider().opacity(0.4)
-
-            // Quick Action Buttons
-            HStack(spacing: 6) {
-                Button {
-                    store.testInTerminal(command: item.name)
-                } label: {
-                    Label(l10n.runInTerminal, systemImage: "terminal.fill")
-                        .font(.system(size: 10, weight: .medium))
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
-                .help(l10n.runCommandTest)
-
-                Button(role: .destructive) {
-                    itemToUninstall = item
-                    showUninstallAlert = true
-                } label: {
-                    Label(l10n.uninstall, systemImage: "trash")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(Color.red.opacity(0.85))
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
-                .help(l10n.uninstallHelp(item.name))
-
-                if let exec = item.executablePath {
-                    IconButton(systemImage: "folder", help: l10n.revealInFinder) {
-                        store.revealInFinder(path: exec)
+                    Button(role: .destructive) {
+                        itemToUninstall = item
+                        showUninstallAlert = true
+                    } label: {
+                        Label(l10n.uninstall, systemImage: "trash")
                     }
-                }
+                    .buttonStyle(.pharosDestructive)
+                    .controlSize(.small)
+                    .help(l10n.uninstallHelp(item.name))
 
-                Spacer()
+                    if let exec = item.executablePath {
+                        IconButton(systemImage: "folder", help: l10n.revealInFinder) {
+                            store.revealInFinder(path: exec)
+                        }
+                    }
 
-                Button {
-                    let textToCopy = item.executablePath ?? item.name
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(textToCopy, forType: .string)
-                    copiedFeedbackId = item.id
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                        if copiedFeedbackId == item.id { copiedFeedbackId = nil }
+                    Spacer()
+
+                    Button {
+                        let textToCopy = item.executablePath ?? item.name
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(textToCopy, forType: .string)
+                        copiedFeedbackId = item.id
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                            if copiedFeedbackId == item.id { copiedFeedbackId = nil }
+                        }
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: copiedFeedbackId == item.id ? "checkmark" : "doc.on.doc")
+                            Text(copiedFeedbackId == item.id ? l10n.commandCopied : l10n.copyPath)
+                        }
+                        .font(PharosFont.caption)
                     }
-                } label: {
-                    HStack(spacing: 3) {
-                        Image(systemName: copiedFeedbackId == item.id ? "checkmark" : "doc.on.doc")
-                        Text(copiedFeedbackId == item.id ? l10n.commandCopied : l10n.copyPath)
-                    }
-                    .font(.system(size: 10))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(copiedFeedbackId == item.id ? PharosColor.success : PharosColor.textSecondary)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(copiedFeedbackId == item.id ? Color.green : Color.secondary)
             }
         }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.primary.opacity(0.03))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(color.opacity(0.25), lineWidth: 1)
-        )
     }
 
     func featuredColor(for item: LocalPackageItem) -> Color {
@@ -222,56 +191,54 @@ extension PackageView {
 
     func cliRow(_ item: LocalPackageItem) -> some View {
         let isSelected = (store.selectedCliId == item.id)
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .center, spacing: 10) {
+        return VStack(alignment: .leading, spacing: PharosSpacing.xs) {
+            HStack(alignment: .center, spacing: PharosSpacing.s) {
                 Image(systemName: item.ecosystem.iconName)
                     .font(.system(size: 14))
                     .foregroundStyle(ecosystemColor(item.ecosystem))
                     .frame(width: 20)
 
                 Text(item.name)
-                    .font(.system(size: 13, weight: .bold, design: .monospaced))
+                    .font(PharosFont.rowLabel)
+                    .fontWeight(.semibold)
 
                 if item.isFeatured {
-                    HStack(spacing: 3) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 8))
-                        Text(item.categoryTag ?? l10n.coreSoftwareBadge)
-                            .font(.system(size: 9, weight: .semibold))
-                    }
-                    .foregroundStyle(Color.yellow)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1.5)
-                    .background(Capsule().fill(Color.yellow.opacity(0.15)))
+                    PharosTag(item.categoryTag ?? l10n.coreSoftwareBadge, systemImage: "sparkles", tint: PharosColor.warning)
                 }
 
                 if let v = item.installedVersion {
                     Text(v.hasPrefix("v") ? v : "v\(v)")
-                        .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                        .font(PharosFont.captionDigits)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Capsule().fill(Color.primary.opacity(0.08)))
+                        .background(Capsule().fill(PharosColor.fill))
                 }
 
                 Text(item.ecosystem.displayName)
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .font(PharosFont.caption)
+                    .foregroundStyle(PharosColor.textSecondary)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1)
-                    .background(RoundedRectangle(cornerRadius: 4).fill(Color.primary.opacity(0.04)))
+                    .background(
+                        RoundedRectangle(cornerRadius: PharosRadius.small, style: .continuous)
+                            .fill(PharosColor.fill)
+                    )
 
                 if let lic = item.license {
                     Text(lic)
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
+                        .font(PharosFont.caption)
+                        .foregroundStyle(PharosColor.textTertiary)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 1)
-                        .background(RoundedRectangle(cornerRadius: 3).fill(Color.primary.opacity(0.05)))
+                        .background(
+                            RoundedRectangle(cornerRadius: PharosRadius.small, style: .continuous)
+                                .fill(PharosColor.fill)
+                        )
                 }
 
                 Spacer()
 
-                HStack(spacing: 6) {
+                HStack(spacing: PharosSpacing.xs) {
                     Button(role: .destructive) {
                         itemToUninstall = item
                         showUninstallAlert = true
@@ -280,11 +247,9 @@ extension PackageView {
                             Image(systemName: "trash")
                             Text(l10n.uninstall)
                         }
-                        .font(.system(size: 10))
-                        .foregroundStyle(Color.red.opacity(0.85))
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
+                    .buttonStyle(.pharosDestructive)
+                    .controlSize(.small)
                     .help(l10n.uninstallHelp(item.name))
 
                     if let exec = item.executablePath {
@@ -312,43 +277,43 @@ extension PackageView {
                             Image(systemName: copiedFeedbackId == item.id ? "checkmark" : "doc.on.doc")
                             Text(copiedFeedbackId == item.id ? l10n.commandCopied : l10n.copyCliCommand)
                         }
-                        .font(.system(size: 10))
+                        .font(PharosFont.caption)
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
+                    .buttonStyle(.pharos)
+                    .controlSize(.small)
                 }
             }
 
             if let summary = item.summary, !summary.isEmpty {
                 Text(summary)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    .font(PharosFont.caption)
+                    .foregroundStyle(PharosColor.textSecondary)
                     .lineLimit(2)
             }
 
-            HStack(spacing: 8) {
+            HStack(spacing: PharosSpacing.s) {
                 if let exec = item.executablePath {
                     Text(exec)
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(.tertiary)
+                        .font(PharosFont.technical)
+                        .foregroundStyle(PharosColor.textTertiary)
                         .lineLimit(1)
                 }
                 Spacer()
                 if item.fileSizeBytes > 0 {
                     Text(ByteFormat.short(item.fileSizeBytes))
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                        .font(PharosFont.captionDigits)
+                        .foregroundStyle(PharosColor.textSecondary)
                 }
             }
         }
-        .padding(10)
+        .padding(PharosSpacing.s)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(isSelected ? Color.accentColor.opacity(0.12) : (item.isFeatured ? Color.yellow.opacity(0.04) : Color.primary.opacity(0.03)))
+            RoundedRectangle(cornerRadius: PharosRadius.control, style: .continuous)
+                .fill(isSelected ? PharosColor.accent.opacity(0.12) : PharosColor.surface)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(isSelected ? Color.accentColor.opacity(0.4) : (item.isFeatured ? Color.yellow.opacity(0.25) : Color.primary.opacity(0.06)), lineWidth: 1)
+            RoundedRectangle(cornerRadius: PharosRadius.control, style: .continuous)
+                .stroke(isSelected ? PharosColor.accent.opacity(0.4) : PharosColor.separator.opacity(0.25), lineWidth: 0.5)
         )
         .contentShape(Rectangle())
         .onTapGesture {
@@ -365,268 +330,203 @@ extension PackageView {
         let color = ecosystemColor(summary.ecosystem)
         let isExpanded = isPackagesBreakdownExpanded
 
-        return VStack(alignment: .leading, spacing: 14) {
-            // 1. Top row: Bundle Icon, Name, Ecosystem, Subtitle & Ready status
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "shippingbox.fill")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(color)
-                    .frame(width: 42, height: 42)
-                    .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+        return PharosCard {
+            VStack(alignment: .leading, spacing: PharosSpacing.m) {
+                // 1. Top row: Bundle Icon, Name, Ecosystem, Subtitle & Ready status
+                HStack(alignment: .top, spacing: PharosSpacing.m) {
+                    Image(systemName: "shippingbox.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(color)
+                        .frame(width: 42, height: 42)
+                        .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: PharosRadius.control, style: .continuous))
 
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        Text(bundleName)
-                            .font(.system(size: 16, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.primary)
+                    VStack(alignment: .leading, spacing: PharosSpacing.xxs) {
+                        HStack(spacing: PharosSpacing.s) {
+                            Text(bundleName)
+                                .font(PharosFont.sectionTitle)
+                                .foregroundStyle(PharosColor.textPrimary)
 
-                        Text(summary.ecosystem.displayName)
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(color)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Capsule().fill(color.opacity(0.12)))
+                            Text(summary.ecosystem.displayName)
+                                .font(PharosFont.caption)
+                                .foregroundStyle(color)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(color.opacity(0.12)))
 
-                        Spacer()
+                            Spacer()
 
-                        // Status Badge
-                        if exists && summary.missingDependenciesCount == 0 {
-                            HStack(spacing: 4) {
-                                Image(systemName: "checkmark.circle.fill")
-                                Text(l10n.bundleInstalledReady)
-                            }
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.green)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Capsule().fill(Color.green.opacity(0.12)))
-                        } else if summary.missingDependenciesCount > 0 {
-                            HStack(spacing: 4) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                Text("\(summary.missingDependenciesCount) \(l10n.statusMissing)")
-                            }
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.red)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Capsule().fill(Color.red.opacity(0.12)))
-                        } else {
-                            HStack(spacing: 4) {
-                                Image(systemName: "info.circle.fill")
-                                Text(l10n.bundleNotInstalled)
-                            }
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.orange)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Capsule().fill(Color.orange.opacity(0.12)))
-                        }
-                    }
-
-                    Text(l10n.bundleSubtitle(for: summary.ecosystem, bundleName: bundleName))
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            // 2. Middle Row: Prominent Disk Size & Stats Pills
-            HStack(alignment: .firstTextBaseline, spacing: 16) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(l10n.bundleTotalSize)
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    Text(summary.dependenciesSizeBytes > 0 ? ByteFormat.short(summary.dependenciesSizeBytes) : (exists ? "0 B" : l10n.noCacheYet))
-                        .font(.system(size: 22, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.primary)
-                }
-
-                Spacer()
-
-                // Stat Pills
-                HStack(spacing: 8) {
-                    statPill(label: l10n.totalPackagesCountLabel, value: "\(summary.packages.count)", icon: "shippingbox")
-                    statPill(label: l10n.declaredCountLabel, value: "\(summary.directDependenciesCount)", icon: "checkmark.seal")
-                    statPill(label: l10n.devDepsCountLabel, value: "\(summary.packages.filter(\.isDevDependency).count)", icon: "hammer")
-                    if summary.missingDependenciesCount > 0 {
-                        statPill(label: l10n.missingDepsCountLabel, value: "\(summary.missingDependenciesCount)", icon: "exclamationmark.triangle.fill", color: .red)
-                    }
-                }
-            }
-
-            // 3. Bundle Path & Quick Actions
-            HStack(spacing: 8) {
-                Image(systemName: "folder")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-
-                Text(bundlePath.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-
-                Spacer()
-
-                if exists {
-                    Button {
-                        store.revealInFinder(path: bundlePath)
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.forward.circle")
-                            Text(l10n.revealInFinder)
-                        }
-                        .font(.system(size: 11))
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                }
-
-                Button {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(bundlePath, forType: .string)
-                    copiedFeedbackId = bundlePath
-                    Task {
-                        try? await Task.sleep(nanoseconds: 1_500_000_000)
-                        await MainActor.run {
-                            if copiedFeedbackId == bundlePath { copiedFeedbackId = nil }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: copiedFeedbackId == bundlePath ? "checkmark" : "doc.on.doc")
-                        Text(copiedFeedbackId == bundlePath ? l10n.commandCopied : l10n.copyPath)
-                    }
-                    .font(.system(size: 11))
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-
-                if exists {
-                    Button {
-                        bundleToDelete = summary
-                        showDeleteBundleAlert = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            if store.isDeletingBundle {
-                                ProgressView()
-                                    .controlSize(.mini)
+                            // Status Badge
+                            if exists && summary.missingDependenciesCount == 0 {
+                                PharosTag(l10n.bundleInstalledReady, systemImage: "checkmark.circle.fill", tint: PharosColor.success)
+                            } else if summary.missingDependenciesCount > 0 {
+                                PharosTag("\(summary.missingDependenciesCount) \(l10n.statusMissing)", systemImage: "exclamationmark.triangle.fill", tint: PharosColor.error)
                             } else {
-                                Image(systemName: "trash")
+                                PharosTag(l10n.bundleNotInstalled, systemImage: "info.circle.fill", tint: PharosColor.warning)
                             }
-                            Text(l10n.deleteDependencyBundle)
                         }
-                        .font(.system(size: 11))
-                        .foregroundStyle(.red)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(store.isDeletingBundle)
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.035)))
 
-            if let successName = store.deleteBundleSuccess {
-                HStack(spacing: 6) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                    Text(l10n.deleteBundleSuccessNotice(successName))
-                        .font(.system(size: 11))
-                        .foregroundStyle(.green)
-                    Spacer()
-                    IconButton(systemImage: "xmark", help: l10n.cancel) {
-                        store.deleteBundleSuccess = nil
+                        Text(l10n.bundleSubtitle(for: summary.ecosystem, bundleName: bundleName))
+                            .font(PharosFont.caption)
+                            .foregroundStyle(PharosColor.textSecondary)
                     }
                 }
-                .padding(8)
-                .background(RoundedRectangle(cornerRadius: 6).fill(Color.green.opacity(0.08)))
-            }
 
-            if let err = store.deleteBundleError {
-                HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                    Text(err)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.red)
-                    Spacer()
-                    IconButton(systemImage: "xmark", help: l10n.cancel) {
-                        store.deleteBundleError = nil
-                    }
-                }
-                .padding(8)
-                .background(RoundedRectangle(cornerRadius: 6).fill(Color.red.opacity(0.08)))
-            }
-
-            // 4. Missing warning / install tip (if any)
-            if summary.missingDependenciesCount > 0 || !exists {
-                let installCmd = l10n.missingInstallCommand(for: summary.ecosystem)
-                HStack(spacing: 10) {
-                    Image(systemName: "terminal")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.accentColor)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(l10n.missingDependenciesWarn)
-                            .font(.system(size: 11, weight: .semibold))
-                        Text(installCmd)
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(.secondary)
+                // 2. Middle Row: Prominent Disk Size & Stats Pills
+                HStack(alignment: .firstTextBaseline, spacing: PharosSpacing.l) {
+                    VStack(alignment: .leading, spacing: PharosSpacing.xxs) {
+                        Text(l10n.bundleTotalSize)
+                            .font(PharosFont.caption)
+                            .foregroundStyle(PharosColor.textSecondary)
+                        Text(summary.dependenciesSizeBytes > 0 ? ByteFormat.short(summary.dependenciesSizeBytes) : (exists ? "0 B" : l10n.noCacheYet))
+                            .font(PharosFont.metricValue)
+                            .foregroundStyle(PharosColor.textPrimary)
                     }
 
                     Spacer()
+
+                    // Stat Pills
+                    HStack(spacing: PharosSpacing.s) {
+                        statPill(label: l10n.totalPackagesCountLabel, value: "\(summary.packages.count)", icon: "shippingbox")
+                        statPill(label: l10n.declaredCountLabel, value: "\(summary.directDependenciesCount)", icon: "checkmark.seal")
+                        statPill(label: l10n.devDepsCountLabel, value: "\(summary.packages.filter(\.isDevDependency).count)", icon: "hammer")
+                        if summary.missingDependenciesCount > 0 {
+                            statPill(label: l10n.missingDepsCountLabel, value: "\(summary.missingDependenciesCount)", icon: "exclamationmark.triangle.fill", color: PharosColor.error)
+                        }
+                    }
+                }
+
+                // 3. Bundle Path & Quick Actions
+                HStack(spacing: PharosSpacing.s) {
+                    Image(systemName: "folder")
+                        .font(.system(size: 11))
+                        .foregroundStyle(PharosColor.textSecondary)
+
+                    Text(bundlePath.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                        .font(PharosFont.technical)
+                        .foregroundStyle(PharosColor.textSecondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
+                    Spacer()
+
+                    if exists {
+                        Button {
+                            store.revealInFinder(path: bundlePath)
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.forward.circle")
+                                Text(l10n.revealInFinder)
+                            }
+                        }
+                        .buttonStyle(.pharos)
+                        .controlSize(.small)
+                    }
 
                     Button {
                         NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(installCmd, forType: .string)
+                        NSPasteboard.general.setString(bundlePath, forType: .string)
+                        copiedFeedbackId = bundlePath
+                        Task {
+                            try? await Task.sleep(nanoseconds: 1_500_000_000)
+                            await MainActor.run {
+                                if copiedFeedbackId == bundlePath { copiedFeedbackId = nil }
+                            }
+                        }
                     } label: {
-                        Text(l10n.copyCliCommand)
+                        HStack(spacing: 4) {
+                            Image(systemName: copiedFeedbackId == bundlePath ? "checkmark" : "doc.on.doc")
+                            Text(copiedFeedbackId == bundlePath ? l10n.commandCopied : l10n.copyPath)
+                        }
                     }
+                    .buttonStyle(.pharos)
                     .controlSize(.small)
+
+                    if exists {
+                        Button {
+                            bundleToDelete = summary
+                            showDeleteBundleAlert = true
+                        } label: {
+                            HStack(spacing: 4) {
+                                if store.isDeletingBundle {
+                                    ProgressView().controlSize(.mini)
+                                } else {
+                                    Image(systemName: "trash")
+                                }
+                                Text(l10n.deleteDependencyBundle)
+                            }
+                        }
+                        .buttonStyle(.pharosDestructive)
+                        .controlSize(.small)
+                        .disabled(store.isDeletingBundle)
+                    }
                 }
-                .padding(9)
-                .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.06)))
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.accentColor.opacity(0.2), lineWidth: 1))
+                .padding(.horizontal, PharosSpacing.s)
+                .padding(.vertical, PharosSpacing.xs)
+                .background(
+                    RoundedRectangle(cornerRadius: PharosRadius.small, style: .continuous)
+                        .fill(PharosColor.fill)
+                )
+
+                if let successName = store.deleteBundleSuccess {
+                    PharosBanner(kind: .info, text: l10n.deleteBundleSuccessNotice(successName)) {
+                        IconButton(systemImage: "xmark", help: l10n.cancel) {
+                            store.deleteBundleSuccess = nil
+                        }
+                    }
+                }
+
+                if let err = store.deleteBundleError {
+                    PharosBanner(kind: .error, text: err) {
+                        IconButton(systemImage: "xmark", help: l10n.cancel) {
+                            store.deleteBundleError = nil
+                        }
+                    }
+                }
+
+                // 4. Missing warning / install tip (if any)
+                if summary.missingDependenciesCount > 0 || !exists {
+                    let installCmd = l10n.missingInstallCommand(for: summary.ecosystem)
+                    PharosBanner(kind: .warning, text: "\(l10n.missingDependenciesWarn): \(installCmd)") {
+                        Button {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(installCmd, forType: .string)
+                        } label: {
+                            Text(l10n.copyCliCommand)
+                        }
+                        .buttonStyle(.pharos)
+                        .controlSize(.small)
+                    }
+                }
+
+                PharosListDivider()
+
+                // 5. Expand / Collapse Trigger Bar
+                Button {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        isDetailedExpanded = !isExpanded
+                    }
+                } label: {
+                    HStack(spacing: PharosSpacing.s) {
+                        Image(systemName: isExpanded ? "chevron.up.circle.fill" : "chevron.down.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(PharosColor.accent)
+
+                        Text(isExpanded ? l10n.collapseDetailedDependencies : l10n.expandDetailedDependencies(summary.packages.count))
+                            .font(PharosFont.rowLabel)
+                            .foregroundStyle(PharosColor.textPrimary)
+
+                        Spacer()
+
+                        Text(l10n.modeConfigNotice)
+                            .font(PharosFont.caption)
+                            .foregroundStyle(PharosColor.textTertiary)
+                    }
+                    .contentShape(Rectangle())
+                    .padding(.vertical, 2)
+                }
+                .buttonStyle(.plain)
             }
-
-            Divider()
-
-            // 5. Expand / Collapse Trigger Bar
-            Button {
-                withAnimation(.easeInOut(duration: 0.22)) {
-                    isDetailedExpanded = !isExpanded
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: isExpanded ? "chevron.up.circle.fill" : "chevron.down.circle.fill")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Color.accentColor)
-
-                    Text(isExpanded ? l10n.collapseDetailedDependencies : l10n.expandDetailedDependencies(summary.packages.count))
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.primary)
-
-                    Spacer()
-
-                    Text(l10n.modeConfigNotice)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
-                }
-                .contentShape(Rectangle())
-                .padding(.vertical, 2)
-            }
-            .buttonStyle(.plain)
         }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.primary.opacity(0.025))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(color.opacity(0.2), lineWidth: 1)
-        )
         .alert(isPresented: $showDeleteBundleAlert) {
             let s = bundleToDelete ?? summary
             let name = s.primaryBundleName
@@ -646,74 +546,87 @@ extension PackageView {
 
 
     func statPill(label: String, value: String, icon: String, color: Color = .primary) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: PharosSpacing.xs) {
             Image(systemName: icon)
                 .font(.system(size: 10))
-                .foregroundStyle(color == .primary ? Color.secondary : color)
+                .foregroundStyle(color == .primary ? PharosColor.textSecondary : color)
             Text(label + ":")
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
+                .font(PharosFont.caption)
+                .foregroundStyle(PharosColor.textSecondary)
             Text(value)
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .font(PharosFont.captionDigits)
+                .fontWeight(.bold)
                 .foregroundStyle(color)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.04)))
+        .padding(.horizontal, PharosSpacing.s)
+        .padding(.vertical, PharosSpacing.xs)
+        .background(
+            RoundedRectangle(cornerRadius: PharosRadius.small, style: .continuous)
+                .fill(PharosColor.fill)
+        )
     }
 
     func projectPackageRow(_ pkg: LocalPackageItem) -> some View {
-        HStack(alignment: .center, spacing: 12) {
+        HStack(alignment: .center, spacing: PharosSpacing.m) {
             // Status Icon & Badge
             healthBadge(pkg.healthStatus)
 
             VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 8) {
+                HStack(spacing: PharosSpacing.s) {
                     Text(pkg.name)
-                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .font(PharosFont.rowLabel)
+                        .fontWeight(.semibold)
 
                     if pkg.isDevDependency {
                         Text("dev")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(.secondary)
+                            .font(PharosFont.caption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(PharosColor.textSecondary)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
-                            .background(RoundedRectangle(cornerRadius: 3).fill(Color.primary.opacity(0.06)))
+                            .background(
+                                RoundedRectangle(cornerRadius: PharosRadius.small, style: .continuous)
+                                    .fill(PharosColor.fill)
+                            )
                     }
 
                     if let lic = pkg.license {
                         Text(lic)
-                            .font(.system(size: 9))
-                            .foregroundStyle(.secondary)
+                            .font(PharosFont.caption)
+                            .foregroundStyle(PharosColor.textSecondary)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
-                            .background(RoundedRectangle(cornerRadius: 3).fill(Color.primary.opacity(0.04)))
+                            .background(
+                                RoundedRectangle(cornerRadius: PharosRadius.small, style: .continuous)
+                                    .fill(PharosColor.fill)
+                            )
                     }
 
                     Spacer()
 
                     // Versions Comparison
-                    HStack(spacing: 6) {
+                    HStack(spacing: PharosSpacing.xs) {
                         if let dec = pkg.declaredVersion {
                             Text("\(l10n.declaredVersion): \(dec)")
-                                .font(.system(size: 10, design: .monospaced))
-                                .foregroundStyle(.secondary)
+                                .font(PharosFont.technical)
+                                .foregroundStyle(PharosColor.textSecondary)
                         }
                         if let inst = pkg.installedVersion {
                             Text("→")
-                                .font(.system(size: 10))
-                                .foregroundStyle(.secondary)
+                                .font(PharosFont.caption)
+                                .foregroundStyle(PharosColor.textSecondary)
                             Text("\(l10n.installedVersion): \(inst)")
-                                .font(.system(size: 10, weight: .medium, design: .monospaced))
-                                .foregroundStyle(pkg.healthStatus == .mismatched ? Color.orange : Color.primary)
+                                .font(PharosFont.technical)
+                                .fontWeight(.medium)
+                                .foregroundStyle(pkg.healthStatus == .mismatched ? PharosColor.warning : PharosColor.textPrimary)
                         }
                     }
                 }
 
                 if let summary = pkg.summary, !summary.isEmpty {
                     Text(summary)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                        .font(PharosFont.caption)
+                        .foregroundStyle(PharosColor.textSecondary)
                         .lineLimit(1)
                 }
             }
@@ -722,138 +635,124 @@ extension PackageView {
 
             if pkg.fileSizeBytes > 0 {
                 Text(ByteFormat.short(pkg.fileSizeBytes))
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                    .font(PharosFont.captionDigits)
+                    .foregroundStyle(PharosColor.textSecondary)
             }
 
             IconButton(systemImage: "folder", help: l10n.revealInFinder) {
                 store.revealInFinder(path: pkg.installPath)
             }
         }
-        .padding(10)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.03)))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.06), lineWidth: 1))
+        .padding(PharosSpacing.s)
+        .background(
+            RoundedRectangle(cornerRadius: PharosRadius.control, style: .continuous)
+                .fill(PharosColor.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: PharosRadius.control, style: .continuous)
+                .stroke(PharosColor.separator.opacity(0.25), lineWidth: 0.5)
+        )
     }
 
     func healthBadge(_ status: DependencyHealthStatus) -> some View {
         switch status {
         case .normal:
-            return Text(l10n.statusNormal)
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(.green)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Capsule().fill(Color.green.opacity(0.12)))
+            return PharosTag(l10n.statusNormal, tint: PharosColor.success)
         case .missing:
-            return Text(l10n.statusMissing)
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(.red)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Capsule().fill(Color.red.opacity(0.15)))
+            return PharosTag(l10n.statusMissing, tint: PharosColor.error)
         case .symlinkedWorkspace:
-            return Text(l10n.statusWorkspace)
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(.blue)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Capsule().fill(Color.blue.opacity(0.12)))
+            return PharosTag(l10n.statusWorkspace, tint: PharosColor.accent)
         case .mismatched:
-            return Text(l10n.statusMismatched)
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(.orange)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Capsule().fill(Color.orange.opacity(0.15)))
+            return PharosTag(l10n.statusMismatched, tint: PharosColor.warning)
         }
     }
 
 
     func cacheCard(_ repo: PackageCacheRepoSummary) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center, spacing: 8) {
-                Image(systemName: repo.ecosystem.iconName)
-                    .font(.system(size: 16))
-                    .foregroundStyle(ecosystemColor(repo.ecosystem))
+        PharosCard {
+            VStack(alignment: .leading, spacing: PharosSpacing.s) {
+                HStack(alignment: .center, spacing: PharosSpacing.s) {
+                    Image(systemName: repo.ecosystem.iconName)
+                        .font(.system(size: 16))
+                        .foregroundStyle(ecosystemColor(repo.ecosystem))
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(repo.name)
-                        .font(.system(size: 13, weight: .semibold))
-                    Text(repo.ecosystem.displayName)
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-
-                HStack(spacing: 6) {
-                    if repo.id == "homebrew-cache" {
-                        Button {
-                            store.runHomebrewCleanup()
-                        } label: {
-                            Label("brew cleanup", systemImage: "sparkles")
-                        }
-                        .controlSize(.mini)
-                        .buttonStyle(.bordered)
-                        .help(l10n.homebrewCleanCacheHelp)
-
-                        Button {
-                            store.cleanHomebrewCacheDirectly()
-                        } label: {
-                            Label(l10n.cleanRow, systemImage: "trash")
-                        }
-                        .controlSize(.mini)
-                        .buttonStyle(.bordered)
-                        .help(l10n.homebrewCleanDirectlyBtn)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(repo.name)
+                            .font(PharosFont.rowLabel)
+                            .fontWeight(.semibold)
+                        Text(repo.ecosystem.displayName)
+                            .font(PharosFont.caption)
+                            .foregroundStyle(PharosColor.textSecondary)
                     }
+                    Spacer()
 
-                    IconButton(systemImage: "folder", help: l10n.revealInFinder) {
-                        store.revealInFinder(path: repo.rootPath)
+                    HStack(spacing: PharosSpacing.xs) {
+                        if repo.id == "homebrew-cache" {
+                            Button {
+                                store.runHomebrewCleanup()
+                            } label: {
+                                Label("brew cleanup", systemImage: "sparkles")
+                            }
+                            .controlSize(.small)
+                            .buttonStyle(.pharos)
+                            .help(l10n.homebrewCleanCacheHelp)
+
+                            Button {
+                                store.cleanHomebrewCacheDirectly()
+                            } label: {
+                                Label(l10n.cleanRow, systemImage: "trash")
+                            }
+                            .controlSize(.small)
+                            .buttonStyle(.pharosDestructive)
+                            .help(l10n.homebrewCleanDirectlyBtn)
+                        }
+
+                        IconButton(systemImage: "folder", help: l10n.revealInFinder) {
+                            store.revealInFinder(path: repo.rootPath)
+                        }
                     }
                 }
+
+                HStack(alignment: .firstTextBaseline) {
+                    Text(ByteFormat.disk(repo.fileSizeBytes))
+                        .font(PharosFont.metricValue)
+                    Spacer()
+                    Text("\(repo.itemCount) \(l10n.fileCount.lowercased())")
+                        .font(PharosFont.captionDigits)
+                        .foregroundStyle(PharosColor.textSecondary)
+                }
+
+                Text(repo.description)
+                    .font(PharosFont.caption)
+                    .foregroundStyle(PharosColor.textSecondary)
+                    .lineLimit(2)
+
+                Text(repo.rootPath)
+                    .font(PharosFont.technical)
+                    .foregroundStyle(PharosColor.textTertiary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
-
-
-            HStack(alignment: .firstTextBaseline) {
-                Text(ByteFormat.disk(repo.fileSizeBytes))
-                    .font(.system(size: 22, weight: .bold).monospacedDigit())
-                Spacer()
-                Text("\(repo.itemCount) \(l10n.fileCount.lowercased())")
-                    .font(.system(size: 11).monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
-
-            Text(repo.description)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-
-            Text(repo.rootPath)
-                .font(.system(size: 9, design: .monospaced))
-                .foregroundStyle(.tertiary)
-                .lineLimit(1)
-                .truncationMode(.middle)
         }
-        .padding(14)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.03)))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.primary.opacity(0.08), lineWidth: 1))
     }
 
 
     // MARK: - Helper Views
     func totalCliFilterCard() -> some View {
         let isSelected = (store.selectedEcosystem == nil && !store.onlyFeatured)
-        let activeColor = Color.accentColor
+        let activeColor = PharosColor.accent
         return Button {
             withAnimation(.easeInOut(duration: 0.15)) {
                 store.selectedEcosystem = nil
                 store.onlyFeatured = false
             }
         } label: {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: PharosSpacing.xs) {
                 HStack {
                     Label(l10n.totalCliToolsCount, systemImage: "terminal.fill")
-                        .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
-                        .foregroundStyle(isSelected ? activeColor : .secondary)
+                        .font(PharosFont.caption)
+                        .fontWeight(isSelected ? .semibold : .regular)
+                        .foregroundStyle(isSelected ? activeColor : PharosColor.textSecondary)
                         .lineLimit(1)
                     Spacer()
                     if isSelected {
@@ -863,20 +762,20 @@ extension PackageView {
                     }
                 }
                 Text("\(store.globalCliCount)")
-                    .font(.system(size: 18, weight: .bold).monospacedDigit())
-                    .foregroundStyle(isSelected ? activeColor : .primary)
+                    .font(Font.system(size: 18, weight: .bold).monospacedDigit())
+                    .foregroundStyle(isSelected ? activeColor : PharosColor.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
             }
-            .padding(10)
+            .padding(PharosSpacing.s)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? activeColor.opacity(0.12) : Color.primary.opacity(0.04))
+                RoundedRectangle(cornerRadius: PharosRadius.control, style: .continuous)
+                    .fill(isSelected ? activeColor.opacity(0.12) : PharosColor.surface)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(isSelected ? activeColor.opacity(0.8) : Color.primary.opacity(0.08), lineWidth: isSelected ? 1.5 : 1)
+                RoundedRectangle(cornerRadius: PharosRadius.control, style: .continuous)
+                    .stroke(isSelected ? activeColor.opacity(0.8) : PharosColor.separator.opacity(0.3), lineWidth: isSelected ? 1.5 : 0.5)
             )
             .contentShape(Rectangle())
         }
@@ -886,17 +785,18 @@ extension PackageView {
 
     func featuredCliFilterCard() -> some View {
         let isSelected = store.onlyFeatured
-        let activeColor = Color.yellow
+        let activeColor = PharosColor.warning
         return Button {
             withAnimation(.easeInOut(duration: 0.15)) {
                 store.onlyFeatured.toggle()
             }
         } label: {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: PharosSpacing.xs) {
                 HStack {
                     Label(l10n.featuredSoftwareCard, systemImage: "sparkles")
-                        .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
-                        .foregroundStyle(isSelected ? activeColor : .secondary)
+                        .font(PharosFont.caption)
+                        .fontWeight(isSelected ? .semibold : .regular)
+                        .foregroundStyle(isSelected ? activeColor : PharosColor.textSecondary)
                         .lineLimit(1)
                     Spacer()
                     if isSelected {
@@ -906,20 +806,20 @@ extension PackageView {
                     }
                 }
                 Text("\(store.featuredCliCount)")
-                    .font(.system(size: 18, weight: .bold).monospacedDigit())
-                    .foregroundStyle(isSelected ? activeColor : .primary)
+                    .font(Font.system(size: 18, weight: .bold).monospacedDigit())
+                    .foregroundStyle(isSelected ? activeColor : PharosColor.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
             }
-            .padding(10)
+            .padding(PharosSpacing.s)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? activeColor.opacity(0.14) : Color.primary.opacity(0.04))
+                RoundedRectangle(cornerRadius: PharosRadius.control, style: .continuous)
+                    .fill(isSelected ? activeColor.opacity(0.14) : PharosColor.surface)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(isSelected ? activeColor.opacity(0.8) : Color.primary.opacity(0.08), lineWidth: isSelected ? 1.5 : 1)
+                RoundedRectangle(cornerRadius: PharosRadius.control, style: .continuous)
+                    .stroke(isSelected ? activeColor.opacity(0.8) : PharosColor.separator.opacity(0.3), lineWidth: isSelected ? 1.5 : 0.5)
             )
             .contentShape(Rectangle())
         }
@@ -944,11 +844,12 @@ extension PackageView {
                 }
             }
         } label: {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: PharosSpacing.xs) {
                 HStack {
                     Label(title, systemImage: icon)
-                        .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
-                        .foregroundStyle(isSelected ? color : .secondary)
+                        .font(PharosFont.caption)
+                        .fontWeight(isSelected ? .semibold : .regular)
+                        .foregroundStyle(isSelected ? color : PharosColor.textSecondary)
                         .lineLimit(1)
                     Spacer()
                     if isSelected {
@@ -958,20 +859,20 @@ extension PackageView {
                     }
                 }
                 Text("\(count)")
-                    .font(.system(size: 18, weight: .bold).monospacedDigit())
-                    .foregroundStyle(isSelected ? color : .primary)
+                    .font(Font.system(size: 18, weight: .bold).monospacedDigit())
+                    .foregroundStyle(isSelected ? color : PharosColor.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
             }
-            .padding(10)
+            .padding(PharosSpacing.s)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? color.opacity(0.14) : Color.primary.opacity(0.04))
+                RoundedRectangle(cornerRadius: PharosRadius.control, style: .continuous)
+                    .fill(isSelected ? color.opacity(0.14) : PharosColor.surface)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(isSelected ? color.opacity(0.85) : color.opacity(0.18), lineWidth: isSelected ? 1.5 : 1)
+                RoundedRectangle(cornerRadius: PharosRadius.control, style: .continuous)
+                    .stroke(isSelected ? color.opacity(0.85) : PharosColor.separator.opacity(0.3), lineWidth: isSelected ? 1.5 : 0.5)
             )
             .contentShape(Rectangle())
         }
@@ -980,24 +881,9 @@ extension PackageView {
     }
 
     func statCard(_ title: String, _ value: String, icon: String, color: Color? = nil) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Label(title, systemImage: icon)
-                .font(.system(size: 11))
-                .foregroundStyle(color ?? .secondary)
-                .lineLimit(1)
-            Text(value)
-                .font(.system(size: 18, weight: .semibold).monospacedDigit())
-                .foregroundStyle(color ?? .primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
+        PharosCard {
+            PharosMetricValue(title: title, value: value, systemImage: icon)
         }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(color?.opacity(0.25) ?? Color.clear, lineWidth: 1)
-        )
     }
 
     var loadingPlaceholder: some View {

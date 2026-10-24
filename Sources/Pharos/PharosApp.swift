@@ -51,8 +51,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             w.title = "Pharos"
             w.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
             w.titlebarAppearsTransparent = true
-            w.titleVisibility = .hidden
-            w.setContentSize(NSSize(width: 980, height: 680))
+            w.toolbarStyle = .unified
+            w.setContentSize(NSSize(width: 1040, height: 700))
             w.isReleasedWhenClosed = false
             w.center()
             w.delegate = self

@@ -159,12 +159,38 @@ SF Symbols 统一使用线框、单色、与文字同色或次级色。
 
 ## 6. 布局规则
 
-- **导航稳定**：侧边栏结构在所有模块一致；侧边栏使用 `surfaceSecondary`，与内容区形成明度层级。
+- **导航稳定**：侧边栏结构在所有模块一致；侧边栏使用高纯度表面底色，与主内容区形成明度层级。
 - **页面骨架**统一为：页面标题 → 若干「分组标题 + 卡片」→ 可选页脚。
 - **对齐**：同一卡片内标签左对齐、数值与控件右对齐，形成清晰的两列阅读线。
 - **主次分明**：每页最重要的 1–3 个指标用 `PharosMetricValue` 放在最上方；技术细节下沉、降级为 `caption`/`technical`。
 - **自适应宽度**：内容设最大可读宽度；窗口变宽时指标卡可从单列变多列（`ViewThatFits` / `Grid`），不无限拉伸单行。
 - **可缩放**：窗口缩到最小尺寸时不截断关键操作，长文本 `lineLimit` + `help` 显示全文。
+
+### 6.1 侧边栏规范（参考现代纯净分层与清晰领域分类）
+
+1. **纯净背景与窗口融合**：
+   - 浅色模式下侧边栏采用纯白/极淡无色杂质表面（`PharosColor.surface` / `surfaceSecondary`），与右侧内容区的温润浅灰底色（`PharosColor.background`）形成轻柔对比。
+   - 深色模式采用深沉石墨黑灰，杜绝强烈的毛玻璃杂乱透色。
+   - 窗口启用透明标题栏（`titlebarAppearsTransparent`），红黄绿交通灯自然留白，顶部不堆砌多余横条。
+2. **顶部仪表盘英雄项（Dashboard Hero）**：
+   - 顶部首项设立独立的「总览 / 仪表盘 (Dashboard)」，配备单色线框图标（`square.grid.2x2`），作为全局状态的核心入口。
+   - 英雄项与下方子领域之间使用一条微妙发丝线（`PharosListDivider`）优雅分隔，形成稳定的锚点。
+3. **领域化子窗口分类（Domain Categorization）**：
+   - 避免将所有功能扁平堆砌在单一概览列表中，按 Pharos 系统工具的职责清晰划分领域：
+     - **系统与硬件 (System & Hardware)**：系统内存（`memorychip`）、磁盘卷（`internaldrive`）、电池与温度（`bolt.badge.clock`）。
+     - **环境与运行时 (Runtime & Services)**：服务与端口（`point.3.connected.trianglepath.dotted`）、开发包与工具（`shippingbox.fill`）、浏览器实例（`globe`）、AI 对话库（`bubble.left.and.text.bubble.right`）。
+     - **系统维护 (Maintenance)**：磁盘清理（`trash`）。
+     - **工作区 (Workspaces)**：常用收藏（`star`）、运行中项目（`play.circle`）。
+     - **外观与扩展 (Appearance)**：自定义菜单栏（`slider.horizontal.3`）。
+   - 分组标题：采用精巧淡灰小字（`caption` / `textTertiary`），左对齐，并留出宽松舒适的上下外边距（呼吸感）。
+4. **舒适行项与清晰高对比度选中态**：
+   - 舒适行高（32–36pt），单色线框 SF Symbols，图标与文字间距固定为 `PharosSpacing.s`。
+   - 选中态：杜绝系统原生 `NSTableView` 粗暴的蓝色高亮背景；采用柔和无色差圆角底（`PharosColor.fill`），**文字保持清晰高对比度的主文本色（`PharosColor.textPrimary`）**，仅图标呈现精致的琥珀色（`PharosColor.accent`），保证任何主题外观下文字均具备极致可读性；未选中态平滑无框，悬停时呈现半透明中性浅底（`PharosColor.fill.opacity(0.4)`）。
+   - 辅助信息：右侧提供等宽微型标签、数量徽标或状态指示点，不喧宾夺主。
+5. **底部控制岛（Bottom Control Island）**：
+   - 底部固定区域集成快捷动作：
+     - 独立圆形按钮（Circle Button）：立即刷新（`arrow.clockwise`）、偏好设置（`gearshape`）。
+     - 状态药丸胶囊（Status Pill）：显示当前项目运行统计与内存占用汇总，简洁而不占纵向高度。
 
 ---
 

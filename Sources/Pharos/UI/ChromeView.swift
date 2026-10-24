@@ -12,87 +12,90 @@ struct ChromeView: View {
     /// nil = all browsers.
     @State private var filter: ChromiumBrowser?
 
+    private let metricColumns = [GridItem(.adaptive(minimum: 150), spacing: PharosSpacing.l, alignment: .top)]
+
     var body: some View {
         let browsers = chrome.browsersInUse(store.chrome)
         let active = filter.flatMap { browsers.contains($0) ? $0 : nil }
         let entries = chrome.entries(store.chrome, browser: active)
         let running = entries.compactMap(\.running)
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(l10n.chromeTitle).font(.system(size: 20, weight: .bold))
-                    Spacer()
-                    Button {
+
+        PharosPage {
+            PharosPageHeader(title: l10n.chromeTitle) {
+                HStack(spacing: PharosSpacing.s) {
+                    PharosActionButton(chrome.sizing ? l10n.measuring : l10n.measureFolders, systemImage: "internaldrive", role: .standard) {
                         chrome.measureSizes(Array(Set(entries.map(\.config.profileKey))))
-                    } label: {
-                        Label(chrome.sizing ? l10n.measuring : l10n.measureFolders, systemImage: "internaldrive")
                     }
                     .controlSize(.small)
                     .disabled(chrome.sizing)
                     newInstanceButton(active)
                 }
-
-                if browsers.count > 1 {
-                    Picker("", selection: $filter) {
-                        Text(l10n.allBrowsers).tag(ChromiumBrowser?.none)
-                        ForEach(browsers, id: \.self) { b in
-                            Text(b.appName).tag(ChromiumBrowser?.some(b))
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                }
-
-                HStack(spacing: 12) {
-                    StatCard(title: l10n.chromeRunning, value: "\(running.count)", icon: "globe")
-                    StatCard(title: l10n.chromePresets, value: "\(entries.filter { $0.preset != nil }.count)", icon: "star")
-                    StatCard(title: l10n.memory,
-                             value: ByteFormat.short(running.reduce(0) { $0 + $1.memoryBytes }),
-                             icon: "memorychip")
-                }
-
-                if let message = chrome.errorMessage {
-                    HStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
-                        Text(message).font(.system(size: 11)).textSelection(.enabled)
-                        Spacer()
-                        IconButton(systemImage: "xmark", help: l10n.dismiss) { chrome.errorMessage = nil }
-                    }
-                    .padding(10)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.red.opacity(0.1)))
-                }
-
-                if !chrome.chromeInstalled {
-                    Label(l10n.chromeNotInstalled, systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.orange)
-                } else if entries.isEmpty {
-                    ContentUnavailableView(l10n.chromeEmpty, systemImage: "globe",
-                                           description: Text(l10n.chromeEmptyDesc))
-                        .frame(height: 180)
-                }
-
-                if active == nil && browsers.count > 1 {
-                    // "All": one group per browser so the work environments stay apart.
+            }
+        } content: {
+            if browsers.count > 1 {
+                Picker("", selection: $filter) {
+                    Text(l10n.allBrowsers).tag(ChromiumBrowser?.none)
                     ForEach(browsers, id: \.self) { b in
-                        let group = entries.filter { $0.config.browser == b }
-                        if !group.isEmpty {
+                        Text(b.appName).tag(ChromiumBrowser?.some(b))
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            }
+
+            PharosSection(title: l10n.overview, systemImage: "globe") {
+                LazyVGrid(columns: metricColumns, alignment: .leading, spacing: PharosSpacing.l) {
+                    PharosMetricValue(title: l10n.chromeRunning,
+                                      value: "\(running.count)",
+                                      systemImage: "globe")
+                    PharosMetricValue(title: l10n.chromePresets,
+                                      value: "\(entries.filter { $0.preset != nil }.count)",
+                                      systemImage: "star")
+                    PharosMetricValue(title: l10n.memory,
+                                      value: ByteFormat.short(running.reduce(0) { $0 + $1.memoryBytes }),
+                                      systemImage: "memorychip")
+                }
+            }
+
+            if let message = chrome.errorMessage {
+                PharosBanner(kind: .error, text: message) {
+                    IconButton(systemImage: "xmark", help: l10n.dismiss) { chrome.errorMessage = nil }
+                }
+            }
+
+            if !chrome.chromeInstalled {
+                PharosBanner(kind: .warning, text: l10n.chromeNotInstalled)
+            } else if entries.isEmpty {
+                PharosCard {
+                    PharosEmptyState(
+                        title: l10n.chromeEmpty,
+                        systemImage: "globe",
+                        message: l10n.chromeEmptyDesc
+                    )
+                }
+            }
+
+            if active == nil && browsers.count > 1 {
+                ForEach(browsers, id: \.self) { b in
+                    let group = entries.filter { $0.config.browser == b }
+                    if !group.isEmpty {
+                        VStack(alignment: .leading, spacing: PharosSpacing.titleToCard) {
                             BrowserGroupHeader(browser: b, entries: group)
-                            ForEach(group) { ChromeCard(entry: $0, editing: $editing) }
+                            VStack(spacing: PharosSpacing.m) {
+                                ForEach(group) { ChromeCard(entry: $0, editing: $editing) }
+                            }
                         }
                     }
-                } else {
+                }
+            } else {
+                VStack(spacing: PharosSpacing.m) {
                     ForEach(entries) { entry in
                         ChromeCard(entry: entry, editing: $editing)
                     }
                 }
-
-                Text(l10n.chromeNotice)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
+
+            PharosBanner(kind: .info, text: l10n.chromeNotice)
         }
         .onAppear { chrome.loadProfileNames(entries.map(\.config.profileKey)) }
         .onChange(of: store.lastScan) { _, _ in chrome.loadProfileNames(entries.map(\.config.profileKey)) }
@@ -159,68 +162,69 @@ private struct ChromeCard: View {
 
     var body: some View {
         let c = entry.config
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center, spacing: 8) {
-                RunDot(running: entry.isRunning)
-                Text(entry.preset?.name ?? defaultName(c))
-                    .font(.system(size: 14, weight: .semibold))
-                    .lineLimit(1)
-                if let port = c.debugPort {
-                    Text(":\(String(port))")
-                        .font(.system(size: 11, weight: .medium).monospacedDigit())
-                        .padding(.horizontal, 6).padding(.vertical, 1)
-                        .background(Capsule().fill(Color.accentColor.opacity(0.13)))
-                        .foregroundStyle(Color.accentColor)
+        PharosCard {
+            VStack(alignment: .leading, spacing: PharosSpacing.m) {
+                HStack(alignment: .center, spacing: PharosSpacing.s) {
+                    RunDot(running: entry.isRunning)
+                    Text(entry.preset?.name ?? defaultName(c))
+                        .font(PharosFont.rowLabel)
+                        .lineLimit(1)
+                    if let port = c.debugPort {
+                        Text(":\(String(port))")
+                            .font(PharosFont.captionDigits)
+                            .padding(.horizontal, 6).padding(.vertical, 1)
+                            .background(Capsule().fill(PharosColor.accent.opacity(0.13)))
+                            .foregroundStyle(PharosColor.accent)
+                    }
+                    if entry.preset == nil {
+                        Text(l10n.notSaved).font(PharosFont.caption).foregroundStyle(PharosColor.textTertiary)
+                    } else if !entry.isRunning {
+                        Text(l10n.savedStopped).font(PharosFont.caption).foregroundStyle(PharosColor.textTertiary)
+                    }
+                    Spacer()
+                    if let r = entry.running {
+                        Text("\(ByteFormat.short(r.memoryBytes)) · \(l10n.processCount(r.processCount))")
+                            .font(PharosFont.captionDigits)
+                            .foregroundStyle(PharosColor.textSecondary)
+                    }
+                    actions
                 }
-                if entry.preset == nil {
-                    Text(l10n.notSaved).font(.system(size: 10)).foregroundStyle(.tertiary)
-                } else if !entry.isRunning {
-                    Text(l10n.savedStopped).font(.system(size: 10)).foregroundStyle(.tertiary)
+
+                Grid(alignment: .leading, horizontalSpacing: PharosSpacing.m, verticalSpacing: PharosSpacing.xs) {
+                    if c.browser != .chrome { row(l10n.browserTitle, c.browser.appName, mono: false) }
+                    row(l10n.profileFolder, c.isDefaultProfile ? l10n.defaultProfile : c.profileKey, mono: !c.isDefaultProfile)
+                    if let proxy = c.proxyServer { row(l10n.proxy, proxy, mono: true) }
+                    if let url = c.startURL { row(l10n.startURL, url, mono: true) }
+                    let accounts = chrome.profileNames[c.profileKey] ?? []
+                    if !accounts.isEmpty { row(l10n.chromeAccounts, accounts.joined(separator: ", "), mono: false) }
+                    if let size = chrome.folderSizes[c.profileKey] {
+                        row(l10n.folderSize, ByteFormat.short(size), mono: false)
+                    }
+                    if !c.extraFlags.isEmpty { row(l10n.extraFlags, c.extraFlags.joined(separator: " "), mono: true) }
                 }
-                Spacer()
-                if let r = entry.running {
-                    Text("\(ByteFormat.short(r.memoryBytes)) · \(l10n.processCount(r.processCount))")
-                        .font(.system(size: 11).monospacedDigit())
-                        .foregroundStyle(.secondary)
+
+                LaunchCommandRow(config: entry.preset?.config ?? c)
+
+                if let preset = entry.preset, let r = entry.running, r.config != preset.config {
+                    HStack(spacing: PharosSpacing.xs + 2) {
+                        Label(l10n.presetDiffers, systemImage: "arrow.triangle.2.circlepath")
+                            .font(PharosFont.caption).foregroundStyle(PharosColor.warning)
+                        Button(l10n.updatePreset) { chrome.adopt(r, into: preset.id) }
+                            .controlSize(.mini)
+                    }
                 }
-                actions
-            }
 
-            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
-                if c.browser != .chrome { row(l10n.browserTitle, c.browser.appName, mono: false) }
-                row(l10n.profileFolder, c.isDefaultProfile ? l10n.defaultProfile : c.profileKey, mono: !c.isDefaultProfile)
-                if let proxy = c.proxyServer { row(l10n.proxy, proxy, mono: true) }
-                if let url = c.startURL { row(l10n.startURL, url, mono: true) }
-                let accounts = chrome.profileNames[c.profileKey] ?? []
-                if !accounts.isEmpty { row(l10n.chromeAccounts, accounts.joined(separator: ", "), mono: false) }
-                if let size = chrome.folderSizes[c.profileKey] {
-                    row(l10n.folderSize, ByteFormat.short(size), mono: false)
+                ForEach(warnings(c), id: \.self) { w in
+                    Label(w, systemImage: "exclamationmark.triangle")
+                        .font(PharosFont.caption)
+                        .foregroundStyle(PharosColor.warning)
                 }
-                if !c.extraFlags.isEmpty { row(l10n.extraFlags, c.extraFlags.joined(separator: " "), mono: true) }
-            }
 
-            LaunchCommandRow(config: entry.preset?.config ?? c)
-
-            if let preset = entry.preset, let r = entry.running, r.config != preset.config {
-                HStack(spacing: 6) {
-                    Label(l10n.presetDiffers, systemImage: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 10)).foregroundStyle(.orange)
-                    Button(l10n.updatePreset) { chrome.adopt(r, into: preset.id) }
-                        .controlSize(.mini)
+                if let preset = entry.preset, editing == preset.id {
+                    ChromePresetEditor(preset: preset) { editing = nil }
                 }
-            }
-
-            ForEach(warnings(c), id: \.self) { w in
-                Label(w, systemImage: "exclamationmark.triangle").font(.system(size: 10)).foregroundStyle(.orange)
-            }
-
-            if let preset = entry.preset, editing == preset.id {
-                ChromePresetEditor(preset: preset) { editing = nil }
             }
         }
-        .padding(12)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(entry.isRunning ? 0.05 : 0.025)))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.06)))
     }
 
     @ViewBuilder
@@ -246,7 +250,7 @@ private struct ChromeCard: View {
                 }
                 if armedRemove {
                     Button(l10n.removeFavorite) { chrome.remove(id: preset.id) }
-                        .buttonStyle(.borderedProminent).tint(.red).controlSize(.small)
+                        .buttonStyle(.pharosDestructive).controlSize(.small)
                     IconButton(systemImage: "xmark", help: l10n.cancel) { armedRemove = false }
                 } else {
                     IconButton(systemImage: "trash", help: l10n.removeFavorite) { armedRemove = true }
@@ -270,14 +274,14 @@ private struct ChromeCard: View {
     private func quitButton(_ r: ChromeInstance) -> some View {
         if chrome.stubborn.contains(r.id) {
             Button(l10n.forceKill) { chrome.forceQuit(r) { await store.refresh() } }
-                .buttonStyle(.borderedProminent).tint(.red).controlSize(.small)
+                .buttonStyle(.pharosDestructive).controlSize(.small)
                 .help(l10n.stillRunning)
         } else if armedQuit {
             Button(l10n.quitChrome) {
                 armedQuit = false
                 chrome.quit(r) { await store.refresh() }
             }
-            .buttonStyle(.borderedProminent).tint(.red).controlSize(.small)
+            .buttonStyle(.pharosDestructive).controlSize(.small)
             IconButton(systemImage: "xmark", help: l10n.cancel) { armedQuit = false }
                 .task {
                     try? await Task.sleep(for: .seconds(4))
@@ -287,6 +291,7 @@ private struct ChromeCard: View {
             Button(role: .destructive) { armedQuit = true } label: {
                 Label(l10n.quitChrome, systemImage: "power")
             }
+            .buttonStyle(.pharosDestructive)
             .controlSize(.small)
         }
     }

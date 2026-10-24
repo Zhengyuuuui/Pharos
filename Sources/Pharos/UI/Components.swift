@@ -109,9 +109,9 @@ struct MemoryBar: View {
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                Capsule().fill(Color.primary.opacity(0.08))
-                Capsule()
-                    .fill(Color.accentColor.opacity(0.7))
+                Capsule(style: .continuous).fill(PharosColor.fill)
+                Capsule(style: .continuous)
+                    .fill(PharosColor.accent.opacity(0.85))
                     .frame(width: max(3, geo.size.width * min(1, max(0, fraction))))
             }
         }
@@ -125,12 +125,12 @@ struct RowButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 12))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
+            .font(PharosFont.body)
+            .padding(.horizontal, PharosSpacing.s)
+            .padding(.vertical, PharosSpacing.xs + 1)
             .background(
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(hovering ? Color.primary.opacity(0.07) : .clear)
+                RoundedRectangle(cornerRadius: PharosRadius.small, style: .continuous)
+                    .fill(hovering ? PharosColor.fill : .clear)
             )
             .animation(.easeInOut(duration: 0.15), value: hovering)
             .opacity(configuration.isPressed ? 0.6 : 1)
@@ -142,18 +142,18 @@ struct RowButtonStyle: ButtonStyle {
 struct IconButton: View {
     let systemImage: String
     let help: String
-    var tint: Color = .secondary
+    var tint: Color = PharosColor.textSecondary
     let action: () -> Void
     @State private var hovering = false
 
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 11))
-                .frame(width: 20, height: 20)
+                .font(.system(size: 11, weight: .regular))
+                .frame(width: 22, height: 22)
                 .background(
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(hovering ? Color.primary.opacity(0.08) : .clear)
+                    RoundedRectangle(cornerRadius: PharosRadius.small, style: .continuous)
+                        .fill(hovering ? PharosColor.fill : .clear)
                 )
                 .foregroundStyle(tint)
         }

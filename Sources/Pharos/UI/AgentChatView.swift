@@ -49,39 +49,31 @@ private struct AgentOverviewPage: View {
     @State private var showInactive = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                header
-                metricsCards
-                if let msg = store.statusMessage {
-                    AgentStatusBanner(message: msg, isSuccess: store.isSuccessMessage) { store.statusMessage = nil }
-                }
+        PharosPage {
+            header
+        } content: {
+            metricsCards
+            if let msg = store.statusMessage {
+                AgentStatusBanner(message: msg, isSuccess: store.isSuccessMessage) { store.statusMessage = nil }
+            }
 
-                if store.summaries.isEmpty {
-                    emptyOrLoading
-                } else {
-                    AgentStorageChartView()
-                    editorsSection
-                    if store.isOverviewFiltering {
-                        searchResultsSection
-                    }
+            if store.summaries.isEmpty {
+                emptyOrLoading
+            } else {
+                AgentStorageChartView()
+                editorsSection
+                if store.isOverviewFiltering {
+                    searchResultsSection
                 }
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(l10n.agentChatTitle).font(.system(size: 20, weight: .bold))
-                Text(l10n.agentChatSubtitle).font(.system(size: 11)).foregroundStyle(.secondary)
-            }
-            Spacer()
-            HStack(spacing: 8) {
-                Button { store.addCustomApplication() } label: {
-                    Label(l10n.agentAddCustomAppShort, systemImage: "plus.app")
+        PharosPageHeader(title: l10n.agentChatTitle, subtitle: l10n.agentChatSubtitle) {
+            HStack(spacing: PharosSpacing.s) {
+                PharosActionButton(l10n.agentAddCustomAppShort, systemImage: "plus.app", role: .standard) {
+                    store.addCustomApplication()
                 }
                 .controlSize(.small)
                 .help(l10n.agentAddCustomAppHelp)
@@ -89,6 +81,7 @@ private struct AgentOverviewPage: View {
                 Button { store.scan() } label: {
                     Label(store.isScanning ? l10n.loading : l10n.refreshNow, systemImage: "arrow.clockwise")
                 }
+                .buttonStyle(.pharos)
                 .controlSize(.small)
                 .disabled(store.isScanning)
                 .contextMenu {
@@ -101,15 +94,14 @@ private struct AgentOverviewPage: View {
 
                 if store.orphanedCount > 0 {
                     if armedOrphanClean {
-                        HStack(spacing: 4) {
+                        HStack(spacing: PharosSpacing.xs) {
                             Button {
                                 armedOrphanClean = false
                                 store.cleanAllOrphaned()
                             } label: {
-                                Text(l10n.cleanOrphanedConfirm).font(.system(size: 11, weight: .semibold))
+                                Text(l10n.cleanOrphanedConfirm).font(PharosFont.caption)
                             }
-                            .buttonStyle(.borderedProminent)
-                            .tint(.red)
+                            .buttonStyle(.pharosDestructive)
                             .controlSize(.small)
                             IconButton(systemImage: "xmark", help: l10n.cancel) { armedOrphanClean = false }
                         }
@@ -117,8 +109,7 @@ private struct AgentOverviewPage: View {
                         Button { armedOrphanClean = true } label: {
                             Label(l10n.cleanOrphaned, systemImage: "trash")
                         }
-                        .buttonStyle(.bordered)
-                        .tint(.red)
+                        .buttonStyle(.pharosDestructive)
                         .controlSize(.small)
                         .help(l10n.cleanOrphanedHelp)
                     }
@@ -258,33 +249,32 @@ private struct AgentOverviewPage: View {
     // MARK: Cross-editor search results (shown only when searching)
 
     private var searchResultsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center, spacing: 10) {
-                Text("\(l10n.agentSearchResults) (\(store.filteredEntries.count))")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                AgentScopePicker(selection: $store.selectedScope)
-                Toggle(l10n.onlyOrphaned, isOn: $store.showOnlyOrphaned)
-                    .toggleStyle(.checkbox)
-                    .font(.system(size: 11))
-                    .foregroundStyle(store.showOnlyOrphaned ? Color.red : Color.secondary)
-                    .fixedSize()
-                AgentSortPicker(selection: $store.sortOrder)
-            }
+        PharosCard {
+            VStack(alignment: .leading, spacing: PharosSpacing.m) {
+                HStack(alignment: .center, spacing: PharosSpacing.s) {
+                    Text("\(l10n.agentSearchResults) (\(store.filteredEntries.count))")
+                        .font(PharosFont.rowLabel)
+                        .foregroundStyle(PharosColor.textSecondary)
+                    Spacer()
+                    AgentScopePicker(selection: $store.selectedScope)
+                    Toggle(l10n.onlyOrphaned, isOn: $store.showOnlyOrphaned)
+                        .toggleStyle(.checkbox)
+                        .font(PharosFont.caption)
+                        .foregroundStyle(store.showOnlyOrphaned ? PharosColor.error : PharosColor.textSecondary)
+                        .fixedSize()
+                    AgentSortPicker(selection: $store.sortOrder)
+                }
 
-            if store.filteredEntries.isEmpty {
-                Text(l10n.agentDbNoMatch)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
-                    .padding(.vertical, 8)
-            } else {
-                AgentDatabaseList(entries: store.filteredEntries, showsEditor: true, query: store.searchQuery)
+                if store.filteredEntries.isEmpty {
+                    Text(l10n.agentDbNoMatch)
+                        .font(PharosFont.caption)
+                        .foregroundStyle(PharosColor.textTertiary)
+                        .padding(.vertical, PharosSpacing.s)
+                } else {
+                    AgentDatabaseList(entries: store.filteredEntries, showsEditor: true, query: store.searchQuery)
+                }
             }
         }
-        .padding(14)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .controlBackgroundColor)))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.08), lineWidth: 1))
     }
 }
 
@@ -294,36 +284,35 @@ private struct AgentEditorGridCard: View {
     @State private var hovering = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                AgentEditorIconView(editor: summary.editor, customAppPath: summary.customAppPath, size: 28)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(summary.displayName).font(.system(size: 12.5, weight: .semibold)).lineLimit(1)
-                    Text(ByteFormat.disk(summary.totalBytes))
-                        .font(.system(size: 11, weight: .medium).monospacedDigit())
-                        .foregroundStyle(summary.editor.themeColor)
+        PharosCard(padding: PharosSpacing.s + 2) {
+            VStack(alignment: .leading, spacing: PharosSpacing.s) {
+                HStack(spacing: PharosSpacing.s) {
+                    AgentEditorIconView(editor: summary.editor, customAppPath: summary.customAppPath, size: 28)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(summary.displayName).font(PharosFont.rowLabel).lineLimit(1)
+                        Text(ByteFormat.disk(summary.totalBytes))
+                            .font(PharosFont.captionDigits)
+                            .foregroundStyle(summary.editor.themeColor)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right").font(.system(size: 9, weight: .semibold)).foregroundStyle(PharosColor.textTertiary)
                 }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right").font(.system(size: 9, weight: .semibold)).foregroundStyle(.tertiary)
+                HStack(spacing: PharosSpacing.s) {
+                    Label(l10n.agentDbCount(summary.databaseCount), systemImage: "cylinder")
+                    Label("\(summary.conversationCount)", systemImage: "bubble.left")
+                    if summary.orphanedCount > 0 {
+                        Label("\(summary.orphanedCount)", systemImage: "exclamationmark.triangle.fill").foregroundStyle(PharosColor.error)
+                    }
+                    Spacer(minLength: 0)
+                    if summary.editor.isAppInstalled {
+                        Circle().fill(PharosColor.success).frame(width: 6, height: 6).help(l10n.appInstalled)
+                    }
+                }
+                .font(PharosFont.captionDigits)
+                .foregroundStyle(PharosColor.textSecondary)
+                .labelStyle(TightLabelStyle())
             }
-            HStack(spacing: 10) {
-                Label(l10n.agentDbCount(summary.databaseCount), systemImage: "cylinder")
-                Label("\(summary.conversationCount)", systemImage: "bubble.left")
-                if summary.orphanedCount > 0 {
-                    Label("\(summary.orphanedCount)", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red)
-                }
-                Spacer(minLength: 0)
-                if summary.editor.isAppInstalled {
-                    Circle().fill(Color.green).frame(width: 6, height: 6).help(l10n.appInstalled)
-                }
-            }
-            .font(.system(size: 10).monospacedDigit())
-            .foregroundStyle(.secondary)
-            .labelStyle(TightLabelStyle())
         }
-        .padding(10)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(hovering ? 0.07 : 0.04)))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(summary.editor.themeColor.opacity(hovering ? 0.5 : 0.2), lineWidth: 1))
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
     }
@@ -348,43 +337,42 @@ struct AgentStorageChartView: View {
 
     var body: some View {
         let summaries = store.summaries
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Label(l10n.editorStorageChart, systemImage: "chart.bar.xaxis").font(.system(size: 13, weight: .semibold))
+        PharosCard {
+            VStack(alignment: .leading, spacing: PharosSpacing.m) {
+                HStack(alignment: .center) {
+                    VStack(alignment: .leading, spacing: PharosSpacing.xxs) {
+                        Label(l10n.editorStorageChart, systemImage: "chart.bar.xaxis").font(PharosFont.rowLabel)
+                        if !store.chartCollapsed {
+                            Text(l10n.editorStorageDesc).font(PharosFont.caption).foregroundStyle(PharosColor.textSecondary)
+                        }
+                    }
+                    Spacer()
                     if !store.chartCollapsed {
-                        Text(l10n.editorStorageDesc).font(.system(size: 10)).foregroundStyle(.secondary)
+                        Picker("", selection: $mode) {
+                            Text(l10n.chartModeTotal).tag(Mode.total)
+                            Text(l10n.chartModeBreakdown).tag(Mode.breakdown)
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .frame(width: 150)
+                        .controlSize(.small)
+                    }
+                    IconButton(
+                        systemImage: store.chartCollapsed ? "chevron.down" : "chevron.up",
+                        help: store.chartCollapsed ? l10n.agentChartExpand : l10n.agentChartCollapse
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.18)) { store.chartCollapsed.toggle() }
                     }
                 }
-                Spacer()
+
+                compositionBar(summaries)
+
                 if !store.chartCollapsed {
-                    Picker("", selection: $mode) {
-                        Text(l10n.chartModeTotal).tag(Mode.total)
-                        Text(l10n.chartModeBreakdown).tag(Mode.breakdown)
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(width: 150)
-                    .controlSize(.small)
+                    legend(summaries)
+                    if mode == .total { totalChart(summaries) } else { breakdownChart(summaries) }
                 }
-                IconButton(
-                    systemImage: store.chartCollapsed ? "chevron.down" : "chevron.up",
-                    help: store.chartCollapsed ? l10n.agentChartExpand : l10n.agentChartCollapse
-                ) {
-                    withAnimation(.easeInOut(duration: 0.18)) { store.chartCollapsed.toggle() }
-                }
-            }
-
-            compositionBar(summaries)
-
-            if !store.chartCollapsed {
-                legend(summaries)
-                if mode == .total { totalChart(summaries) } else { breakdownChart(summaries) }
             }
         }
-        .padding(14)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .controlBackgroundColor)))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.08), lineWidth: 1))
     }
 
     private func compositionBar(_ summaries: [AgentEditorSummary]) -> some View {

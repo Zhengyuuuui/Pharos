@@ -147,3 +147,85 @@ struct PharosStatusIndicator: View {
         .accessibilityElement(children: .combine)
     }
 }
+
+/// Chart wrapper container (DESIGN.md §5 & §7). Handles title, legend, time range,
+/// and unified states: loading / empty / unavailable / error / ready.
+struct PharosChartContainer<Content: View, Trailing: View>: View {
+    enum State: Equatable {
+        case ready
+        case loading
+        case empty(message: String)
+        case unavailable(message: String)
+        case error(message: String)
+    }
+
+    let title: String
+    var systemImage: String? = nil
+    var state: State = .ready
+    var minHeight: CGFloat = 160
+    @ViewBuilder var trailing: Trailing
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        PharosSection(title: title, systemImage: systemImage) {
+            trailing
+        } content: {
+            Group {
+                switch state {
+                case .loading:
+                    HStack(spacing: PharosSpacing.s) {
+                        ProgressView().controlSize(.small)
+                        Text(L10n.shared.loading)
+                            .font(PharosFont.caption)
+                            .foregroundStyle(PharosColor.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: minHeight)
+                case .empty(let message):
+                    PharosEmptyState(
+                        title: title,
+                        systemImage: "chart.line.uptrend.xyaxis",
+                        message: message
+                    )
+                    .frame(minHeight: minHeight)
+                case .unavailable(let message):
+                    PharosEmptyState(
+                        title: title,
+                        systemImage: "slash.circle",
+                        message: message,
+                        tint: PharosColor.warning
+                    )
+                    .frame(minHeight: minHeight)
+                case .error(let message):
+                    PharosEmptyState(
+                        title: title,
+                        systemImage: "exclamationmark.triangle",
+                        message: message,
+                        tint: PharosColor.error
+                    )
+                    .frame(minHeight: minHeight)
+                case .ready:
+                    content
+                }
+            }
+        }
+    }
+}
+
+extension PharosChartContainer where Trailing == EmptyView {
+    init(
+        title: String,
+        systemImage: String? = nil,
+        state: State = .ready,
+        minHeight: CGFloat = 160,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.init(
+            title: title,
+            systemImage: systemImage,
+            state: state,
+            minHeight: minHeight,
+            trailing: { EmptyView() },
+            content: content
+        )
+    }
+}

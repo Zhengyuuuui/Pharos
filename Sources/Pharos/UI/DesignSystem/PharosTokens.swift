@@ -5,7 +5,7 @@ import SwiftUI
 /// corner radii or spacing; add a token here instead.
 enum PharosColor {
     /// Hierarchy comes from lightness steps (background → surface → fill), not strokes.
-    static let background = dynamic(light: 0.925, dark: 0.118)
+    static let background = dynamic(light: 0.945, dark: 0.118)
     static let surface = dynamic(light: 1.0, dark: 0.173)
     static let surfaceSecondary = dynamic(light: 0.972, dark: 0.145)
     static let fill = dynamic(light: 0.895, dark: 0.235)
@@ -24,7 +24,14 @@ enum PharosColor {
     private static func dynamic(light: CGFloat, dark: CGFloat) -> Color {
         Color(nsColor: NSColor(name: nil) { appearance in
             let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            return NSColor(white: isDark ? dark : light, alpha: 1)
+            let contrast = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
+            let val: CGFloat
+            if contrast {
+                val = isDark ? max(0.05, dark - 0.04) : min(1.0, light + 0.03)
+            } else {
+                val = isDark ? dark : light
+            }
+            return NSColor(white: val, alpha: 1)
         })
     }
 }

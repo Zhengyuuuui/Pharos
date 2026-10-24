@@ -92,92 +92,109 @@ struct PortsOverviewView: View {
     var onSelect: (Project) -> Void = { _ in }
     var onSelectFavorite: (Favorite) -> Void = { _ in }
 
+    private let metricColumns = [GridItem(.adaptive(minimum: 150), spacing: PharosSpacing.l, alignment: .top)]
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                Text(l10n.portsOverview).font(.system(size: 20, weight: .bold))
+        PharosPage {
+            PharosPageHeader(title: l10n.portsOverview)
+        } content: {
+            FavoritesTable(onSelect: onSelectFavorite)
 
-                FavoritesTable(onSelect: onSelectFavorite)
-
-                HStack(spacing: 12) {
-                    StatCard(title: l10n.projects, value: "\(store.projects.count)", icon: "shippingbox")
-                    StatCard(title: l10n.ports, value: "\(store.totalPorts)", icon: "point.3.connected.trianglepath.dotted")
-                    StatCard(title: l10n.exposed, value: "\(store.exposedPorts)",
-                             icon: "globe", tint: store.exposedPorts > 0 ? .orange : .secondary)
-                        .help(l10n.exposedHint)
-                    StatCard(title: l10n.memory, value: ByteFormat.short(store.totalMemory), icon: "memorychip")
+            PharosSection(title: l10n.overview, systemImage: "gauge.with.dots.needle.33percent") {
+                LazyVGrid(columns: metricColumns, alignment: .leading, spacing: PharosSpacing.l) {
+                    PharosMetricValue(title: l10n.projects,
+                                      value: "\(store.projects.count)",
+                                      systemImage: "shippingbox")
+                    PharosMetricValue(title: l10n.ports,
+                                      value: "\(store.totalPorts)",
+                                      systemImage: "point.3.connected.trianglepath.dotted")
+                    PharosMetricValue(title: l10n.exposed,
+                                      value: "\(store.exposedPorts)",
+                                      detail: store.exposedPorts > 0 ? l10n.exposedHint : nil,
+                                      systemImage: "globe")
+                    PharosMetricValue(title: l10n.memory,
+                                      value: ByteFormat.short(store.totalMemory),
+                                      systemImage: "memorychip")
                 }
+            }
 
-                if store.projects.isEmpty {
-                    ContentUnavailableView(l10n.noProjects, systemImage: "network.slash",
-                                           description: Text(l10n.noProjectsDesc))
-                        .frame(height: 200)
-                } else {
-                    Section(title: l10n.portMap) {
+            if store.projects.isEmpty {
+                PharosCard {
+                    PharosEmptyState(
+                        title: l10n.noProjects,
+                        systemImage: "network.slash",
+                        message: l10n.noProjectsDesc
+                    )
+                }
+            } else {
+                PharosSection(title: l10n.portMap, systemImage: "point.3.connected.trianglepath.dotted") {
+                    VStack(alignment: .leading, spacing: PharosSpacing.m) {
                         PortMapChart(projects: store.projects)
-                        HStack(spacing: 14) {
+                        HStack(spacing: PharosSpacing.m) {
                             Label(l10n.localOnly, systemImage: "circle.fill")
                             Label(l10n.allInterfaces, systemImage: "diamond.fill")
                         }
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                    }
-
-                    HStack(alignment: .top, spacing: 16) {
-                        Section(title: l10n.memoryByProject) {
-                            ProjectMemoryBars(projects: store.projects)
-                        }
-                        Section(title: l10n.devMemoryTrend, trailing: l10n.lastHour) {
-                            if store.history.samples.count < 2 {
-                                CollectingHint()
-                            } else {
-                                DevTrendChart(history: store.history)
-                                    .frame(height: max(160, CGFloat(store.projects.count) * 24))
-                            }
-                        }
-                    }
-
-                    Section(title: l10n.runningProjects) {
-                        portTable
+                        .font(PharosFont.caption)
+                        .foregroundStyle(PharosColor.textSecondary)
                     }
                 }
+
+                HStack(alignment: .top, spacing: PharosSpacing.l) {
+                    PharosSection(title: l10n.memoryByProject, systemImage: "chart.bar") {
+                        ProjectMemoryBars(projects: store.projects)
+                    }
+                    PharosSection(title: l10n.devMemoryTrend, systemImage: "chart.xyaxis.line") {
+                        Text(l10n.lastHour)
+                            .font(PharosFont.caption)
+                            .foregroundStyle(PharosColor.textTertiary)
+                    } content: {
+                        if store.history.samples.count < 2 {
+                            CollectingHint()
+                        } else {
+                            DevTrendChart(history: store.history)
+                                .frame(height: max(160, CGFloat(store.projects.count) * 24))
+                        }
+                    }
+                }
+
+                PharosSection(title: l10n.runningProjects, systemImage: "shippingbox") {
+                    portTable
+                }
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     private var portTable: some View {
         VStack(spacing: 0) {
             ForEach(Array(store.projects.enumerated()), id: \.element.id) { index, p in
-                HStack(spacing: 10) {
+                if index > 0 {
+                    PharosListDivider()
+                }
+                HStack(spacing: PharosSpacing.s) {
                     Button { onSelect(p) } label: {
                         Text(p.name)
-                            .font(.system(size: 12, weight: .medium))
+                            .font(PharosFont.rowLabel)
                             .lineLimit(1)
                     }
                     .buttonStyle(.plain)
                     .frame(width: 150, alignment: .leading)
                     PortChips(ports: p.ports)
-                    Spacer(minLength: 8)
+                    Spacer(minLength: PharosSpacing.s)
                     Text(p.listeners.first?.shortCommand ?? "")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.tertiary)
+                        .font(PharosFont.technical)
+                        .foregroundStyle(PharosColor.textTertiary)
                         .lineLimit(1)
                         .frame(maxWidth: 200, alignment: .trailing)
                     Text(ByteFormat.short(p.memoryBytes))
-                        .font(.system(size: 11, weight: .medium).monospacedDigit())
+                        .font(PharosFont.captionDigits)
                         .frame(width: 52, alignment: .trailing)
                     PinButton(project: p)
                     StopButton(project: p, compact: true)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(index.isMultiple(of: 2) ? Color.primary.opacity(0.03) : .clear)
+                .padding(.horizontal, PharosSpacing.xs)
+                .padding(.vertical, PharosSpacing.s)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.primary.opacity(0.08)))
     }
 }
 

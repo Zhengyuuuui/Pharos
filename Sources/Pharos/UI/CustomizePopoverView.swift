@@ -14,45 +14,52 @@ struct CustomizePopoverView: View {
 
     var body: some View {
         let layout = layoutStore.layout
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(l10n.customizeTitle).font(.system(size: 20, weight: .bold))
-                    Spacer()
-                    if armedReset {
+        PharosPage(maxWidth: 1200) {
+            PharosPageHeader(title: l10n.customizeTitle, subtitle: l10n.customizeIntro) {
+                if armedReset {
+                    HStack(spacing: PharosSpacing.xs) {
                         Button(l10n.resetLayout) { armedReset = false; layoutStore.reset() }
-                            .buttonStyle(.borderedProminent).tint(.red).controlSize(.small)
-                        IconButton(systemImage: "xmark", help: l10n.cancel) { armedReset = false }
-                    } else {
-                        Button(l10n.resetLayout) { armedReset = true }
+                            .buttonStyle(.pharosDestructive)
                             .controlSize(.small)
-                            .disabled(layout == .standard)
+                        IconButton(systemImage: "xmark", help: l10n.cancel) { armedReset = false }
                     }
-                }
-                Text(l10n.customizeIntro)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HStack(alignment: .top, spacing: 20) {
-                    PopoverSnapshot(layout: layout, tab: $previewTab)
-                    VStack(alignment: .leading, spacing: 14) {
-                        HStack(alignment: .top, spacing: 14) {
-                            ForEach(PopoverTab.allCases, id: \.self) { tab in
-                                TabColumn(tab: tab, blocks: layout[tab], selected: previewTab == tab) {
-                                    previewTab = tab
-                                }
-                            }
-                        }
-                        LibraryColumn(unused: layout.unused)
-                        ProjectRowsSettings(blockInUse: layout.tab(of: .projects) != nil)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                } else {
+                    Button(l10n.resetLayout) { armedReset = true }
+                        .buttonStyle(.pharos)
+                        .controlSize(.small)
+                        .disabled(layout == .standard)
                 }
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        } content: {
+            ViewThatFits(in: .horizontal) {
+                // Wide layout: side-by-side snapshot and editor
+                HStack(alignment: .top, spacing: PharosSpacing.l) {
+                    PopoverSnapshot(layout: layout, tab: $previewTab)
+                    editorColumns(layout: layout)
+                }
+
+                // Compact layout: snapshot on top, editor below to prevent squeezing
+                VStack(alignment: .leading, spacing: PharosSpacing.l) {
+                    PopoverSnapshot(layout: layout, tab: $previewTab)
+                    editorColumns(layout: layout)
+                }
+            }
         }
+    }
+
+    private func editorColumns(layout: PopoverLayout) -> some View {
+        VStack(alignment: .leading, spacing: PharosSpacing.m) {
+            HStack(alignment: .top, spacing: PharosSpacing.m) {
+                ForEach(PopoverTab.allCases, id: \.self) { tab in
+                    TabColumn(tab: tab, blocks: layout[tab], selected: previewTab == tab) {
+                        previewTab = tab
+                    }
+                }
+            }
+            LibraryColumn(unused: layout.unused)
+            ProjectRowsSettings(blockInUse: layout.tab(of: .projects) != nil)
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 }
 
@@ -120,7 +127,7 @@ private struct TabColumn: View {
             dropTail
         }
         .padding(10)
-        .frame(minWidth: 200, maxWidth: .infinity, alignment: .topLeading)
+        .frame(minWidth: 150, maxWidth: .infinity, alignment: .topLeading)
         .background(background)
         .overlay(border)
     }
@@ -202,7 +209,7 @@ private struct LibraryColumn: View {
             Text(l10n.libraryEmpty).font(.system(size: 11)).foregroundStyle(.tertiary)
                 .frame(maxWidth: .infinity, minHeight: 40)
         } else {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 200), spacing: 8)], spacing: 8) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 8)], spacing: 8) {
                 ForEach(unused, id: \.self) { block in
                     BlockTile(block: block, inTab: nil, isFirst: true, isLast: true)
                 }

@@ -29,22 +29,19 @@ struct PackageView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                header
-                tabPicker
+        PharosPage {
+            header
+        } content: {
+            tabPicker
 
-                switch selectedTab {
-                case .globalCli:
-                    globalCliSection
-                case .projectDeps:
-                    projectDepsSection
-                case .cacheRepos:
-                    cacheReposSection
-                }
+            switch selectedTab {
+            case .globalCli:
+                globalCliSection
+            case .projectDeps:
+                projectDepsSection
+            case .cacheRepos:
+                cacheReposSection
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .onAppear {
             store.scanIfNeeded()
@@ -74,24 +71,12 @@ struct PackageView: View {
 
     // MARK: - Header
     private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(l10n.packagesTitle)
-                    .font(.title2.weight(.bold))
-                Text(l10n.packagesSubtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+        PharosPageHeader(title: l10n.packagesTitle, subtitle: l10n.packagesSubtitle) {
+            PharosActionButton(store.isScanning ? l10n.loading : l10n.refreshNow, systemImage: "arrow.clockwise", role: .standard) {
+                store.scanAll()
             }
-            Spacer()
-            HStack(spacing: 8) {
-                Button {
-                    store.scanAll()
-                } label: {
-                    Label(store.isScanning ? l10n.loading : l10n.refreshNow, systemImage: "arrow.clockwise")
-                }
-                .controlSize(.small)
-                .disabled(store.isScanning)
-            }
+            .controlSize(.small)
+            .disabled(store.isScanning)
         }
     }
 
@@ -129,25 +114,14 @@ struct PackageView: View {
             featuredToolsShelf
 
             // Filter Bar
-            HStack(spacing: 12) {
-                HStack {
-                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                    TextField(l10n.searchPackages, text: $store.cliSearchQuery)
-                        .textFieldStyle(.plain)
-                    if !store.cliSearchQuery.isEmpty {
-                        IconButton(systemImage: "xmark.circle.fill", help: l10n.cancel) {
-                            store.cliSearchQuery = ""
-                        }
-                    }
-                }
-                .padding(6)
-                .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.04)))
-                .frame(maxWidth: 320)
+            HStack(spacing: PharosSpacing.m) {
+                PharosSearchField(text: $store.cliSearchQuery, prompt: l10n.searchPackages)
+                    .frame(maxWidth: 300)
 
                 Spacer()
                 Text(l10n.showingCount(shown: min(displayLimit, store.filteredCliTools.count), total: store.filteredCliTools.count))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(PharosFont.caption)
+                    .foregroundStyle(PharosColor.textSecondary)
             }
 
             // Full List
@@ -183,68 +157,74 @@ struct PackageView: View {
 
     // MARK: - Homebrew Control Bar
     private var homebrewControlBar: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "mug.fill")
-                    .foregroundStyle(.orange)
-                    .font(.system(size: 14))
-                Text(l10n.homebrewControlTitle)
-                    .font(.system(size: 13, weight: .semibold))
-                Spacer()
-                if let feedback = store.homebrewCleanFeedback {
-                    Text(l10n.homebrewCleanDirectlySuccess(feedback))
-                        .font(.caption)
-                        .foregroundStyle(.green)
+        PharosCard {
+            VStack(alignment: .leading, spacing: PharosSpacing.m) {
+                HStack(spacing: PharosSpacing.s) {
+                    Image(systemName: "mug.fill")
+                        .foregroundStyle(PharosColor.warning)
+                        .font(.system(size: 14))
+                    Text(l10n.homebrewControlTitle)
+                        .font(PharosFont.sectionTitle)
+                    Spacer()
+                    if let feedback = store.homebrewCleanFeedback {
+                        Text(l10n.homebrewCleanDirectlySuccess(feedback))
+                            .font(PharosFont.caption)
+                            .foregroundStyle(PharosColor.success)
+                    }
+                }
+                Text(l10n.homebrewControlSubtitle)
+                    .font(PharosFont.caption)
+                    .foregroundStyle(PharosColor.textSecondary)
+
+                HStack(spacing: PharosSpacing.s) {
+                    Button {
+                        store.runHomebrewCleanup()
+                    } label: {
+                        Label(l10n.homebrewCleanCacheBtn, systemImage: "trash")
+                    }
+                    .buttonStyle(.pharos)
+                    .controlSize(.small)
+                    .help(l10n.homebrewCleanCacheHelp)
+
+                    Button {
+                        store.runHomebrewOutdated()
+                    } label: {
+                        Label(l10n.homebrewOutdatedBtn, systemImage: "arrow.triangle.2.circlepath")
+                    }
+                    .buttonStyle(.pharos)
+                    .controlSize(.small)
+                    .help(l10n.homebrewOutdatedHelp)
+
+                    Button {
+                        store.runHomebrewDoctor()
+                    } label: {
+                        Label(l10n.homebrewDoctorBtn, systemImage: "stethoscope")
+                    }
+                    .buttonStyle(.pharos)
+                    .controlSize(.small)
+                    .help(l10n.homebrewDoctorHelp)
+
+                    Button {
+                        store.runHomebrewServices()
+                    } label: {
+                        Label(l10n.homebrewServicesBtn, systemImage: "gearshape.2")
+                    }
+                    .buttonStyle(.pharos)
+                    .controlSize(.small)
+                    .help(l10n.homebrewServicesHelp)
+
+                    Spacer()
+
+                    Button {
+                        store.cleanHomebrewCacheDirectly()
+                    } label: {
+                        Label(l10n.homebrewCleanDirectlyBtn, systemImage: "sparkles")
+                    }
+                    .buttonStyle(.pharosPrimary)
+                    .controlSize(.small)
                 }
             }
-            Text(l10n.homebrewControlSubtitle)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-
-            HStack(spacing: 8) {
-                Button {
-                    store.runHomebrewCleanup()
-                } label: {
-                    Label(l10n.homebrewCleanCacheBtn, systemImage: "trash")
-                }
-                .help(l10n.homebrewCleanCacheHelp)
-
-                Button {
-                    store.runHomebrewOutdated()
-                } label: {
-                    Label(l10n.homebrewOutdatedBtn, systemImage: "arrow.triangle.2.circlepath")
-                }
-                .help(l10n.homebrewOutdatedHelp)
-
-                Button {
-                    store.runHomebrewDoctor()
-                } label: {
-                    Label(l10n.homebrewDoctorBtn, systemImage: "stethoscope")
-                }
-                .help(l10n.homebrewDoctorHelp)
-
-                Button {
-                    store.runHomebrewServices()
-                } label: {
-                    Label(l10n.homebrewServicesBtn, systemImage: "gearshape.2")
-                }
-                .help(l10n.homebrewServicesHelp)
-
-                Spacer()
-
-                Button {
-                    store.cleanHomebrewCacheDirectly()
-                } label: {
-                    Label(l10n.homebrewCleanDirectlyBtn, systemImage: "sparkles")
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-            }
-            .controlSize(.small)
         }
-        .padding(12)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.orange.opacity(0.06)))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.orange.opacity(0.18), lineWidth: 1))
     }
 
 
@@ -327,19 +307,8 @@ struct PackageView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         // Filter & Search
                         HStack(spacing: 10) {
-                            HStack {
-                                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                                TextField(l10n.searchPackages, text: $store.projectSearchQuery)
-                                    .textFieldStyle(.plain)
-                                if !store.projectSearchQuery.isEmpty {
-                                    IconButton(systemImage: "xmark.circle.fill", help: l10n.cancel) {
-                                        store.projectSearchQuery = ""
-                                    }
-                                }
-                            }
-                            .padding(6)
-                            .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.04)))
-                            .frame(maxWidth: 280)
+                            PharosSearchField(text: $store.projectSearchQuery, prompt: l10n.searchPackages)
+                                .frame(maxWidth: 260)
 
                             Picker("", selection: $store.projectFilter) {
                                 Text(l10n.showAll).tag(ProjectDepFilter.all)
@@ -391,17 +360,7 @@ struct PackageView: View {
             }
 
             // Informative Notice Banner linking directly to Disk Cleanup
-            HStack(alignment: .center, spacing: 10) {
-                Image(systemName: "info.circle.fill")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.secondary)
-
-                Text(l10n.cleanLanguageCachesBannerText)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-
+            PharosBanner(kind: .info, text: l10n.cleanLanguageCachesBannerText) {
                 Button {
                     WindowRouter.shared.cleanupTargetGroup = .packages
                     UserDefaults.standard.set(true, forKey: "cleanupGroupExpanded.packages")
@@ -412,13 +371,11 @@ struct PackageView: View {
                         Text(l10n.goToDiskCleanup)
                         Image(systemName: "chevron.right")
                     }
-                    .font(.system(size: 11, weight: .medium))
+                    .font(PharosFont.caption)
                 }
-                .buttonStyle(.link)
+                .buttonStyle(.pharos)
+                .controlSize(.small)
             }
-            .padding(10)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.025)))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.06), lineWidth: 1))
 
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 14) {
                 ForEach(store.cacheRepos) { repo in

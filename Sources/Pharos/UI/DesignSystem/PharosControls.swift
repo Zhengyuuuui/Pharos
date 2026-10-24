@@ -47,6 +47,32 @@ extension ButtonStyle where Self == PharosActionButtonStyle {
     static var pharosDestructive: PharosActionButtonStyle { PharosActionButtonStyle(role: .destructive) }
 }
 
+/// Convenience view for action buttons following DESIGN.md §2.3/§2.4.
+struct PharosActionButton: View {
+    let title: String
+    var systemImage: String? = nil
+    var role: PharosActionButtonStyle.Role = .standard
+    var action: () -> Void
+
+    init(_ title: String, systemImage: String? = nil, role: PharosActionButtonStyle.Role = .standard, action: @escaping () -> Void) {
+        self.title = title
+        self.systemImage = systemImage
+        self.role = role
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            if let systemImage {
+                Label(title, systemImage: systemImage)
+            } else {
+                Text(title)
+            }
+        }
+        .buttonStyle(PharosActionButtonStyle(role: role))
+    }
+}
+
 /// Standard scrolling page: title row, then sections spaced by `PharosSpacing.section`,
 /// on the shared window background.
 struct PharosPage<Header: View, Content: View>: View {
@@ -226,6 +252,20 @@ struct PharosTag: View {
     var tint: Color? = nil
     var monospaced = false
 
+    init(_ text: String, systemImage: String? = nil, tint: Color? = nil, monospaced: Bool = false) {
+        self.text = text
+        self.systemImage = systemImage
+        self.tint = tint
+        self.monospaced = monospaced
+    }
+
+    init(text: String, systemImage: String? = nil, tint: Color? = nil, monospaced: Bool = false) {
+        self.text = text
+        self.systemImage = systemImage
+        self.tint = tint
+        self.monospaced = monospaced
+    }
+
     var body: some View {
         HStack(spacing: 3) {
             if let systemImage { Image(systemName: systemImage) }
@@ -245,5 +285,35 @@ struct PharosListDivider: View {
         Rectangle()
             .fill(PharosColor.separator.opacity(0.6))
             .frame(height: 0.5)
+    }
+}
+
+/// Capsule search field with wireframe magnifying glass and clear button.
+struct PharosSearchField: View {
+    @Binding var text: String
+    var prompt: String = ""
+
+    var body: some View {
+        HStack(spacing: PharosSpacing.xs) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 11))
+                .foregroundStyle(PharosColor.textTertiary)
+            TextField(prompt, text: $text)
+                .textFieldStyle(.plain)
+                .font(PharosFont.body)
+            if !text.isEmpty {
+                Button {
+                    text = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(PharosColor.textTertiary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, PharosSpacing.s + 2)
+        .padding(.vertical, PharosSpacing.xs + 1)
+        .background(Capsule(style: .continuous).fill(PharosColor.fill))
     }
 }

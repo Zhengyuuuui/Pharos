@@ -13,33 +13,32 @@ struct CleanupView: View {
     private let otherGroups: [DiskCleaner.Group] = [.appCaches, .apple, .packages]
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                if let targetGroup = selectedGroup {
-                    groupFocusedHeader(targetGroup)
-                    if let report = cleanup.report {
-                        ReportBanner(report: report)
-                            .transition(.asymmetric(
-                                insertion: .opacity.combined(with: .move(edge: .top)),
-                                removal: .opacity
-                            ))
-                    }
-                    groupFocusedContent(targetGroup)
-                } else {
-                    header
-                    if let report = cleanup.report {
-                        ReportBanner(report: report)
-                            .transition(.asymmetric(
-                                insertion: .opacity.combined(with: .move(edge: .top)),
-                                removal: .opacity
-                            ))
-                    }
-                    PinnedTempSection(onSelectDetail: { group in
-                        withAnimation(.easeInOut(duration: 0.2)) { selectedGroup = group }
-                    })
-                    Text(l10n.otherCaches)
-                        .font(.system(size: 13, weight: .semibold))
-                        .padding(.top, 4)
+        PharosPage {
+            if let targetGroup = selectedGroup {
+                groupFocusedHeader(targetGroup)
+            } else {
+                header
+            }
+        } content: {
+            if let report = cleanup.report {
+                ReportBanner(report: report)
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .move(edge: .top)),
+                        removal: .opacity
+                    ))
+            }
+
+            if let targetGroup = selectedGroup {
+                groupFocusedContent(targetGroup)
+            } else {
+                PinnedTempSection(onSelectDetail: { group in
+                    withAnimation(.easeInOut(duration: 0.2)) { selectedGroup = group }
+                })
+
+                PharosSectionHeader(title: l10n.otherCaches, systemImage: "archivebox")
+                    .padding(.horizontal, PharosSpacing.xs)
+
+                VStack(spacing: PharosSpacing.m) {
                     ForEach(otherGroups, id: \.self) { group in
                         CacheGroupSection(group: group) { selected in
                             withAnimation(.easeInOut(duration: 0.2)) { selectedGroup = selected }
@@ -47,10 +46,8 @@ struct CleanupView: View {
                     }
                 }
             }
-            .animation(.easeInOut(duration: 0.25), value: cleanup.report != nil)
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .animation(.easeInOut(duration: 0.25), value: cleanup.report != nil)
         .onAppear {
             cleanup.viewAppeared()
             if let target = router.cleanupTargetGroup {
@@ -145,42 +142,41 @@ struct CleanupView: View {
         let rows = cleanup.rows(in: group)
         let bytes = cleanup.bytes(in: group)
 
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .center, spacing: 14) {
-                Image(systemName: l10n.groupIcon(group))
-                    .font(.system(size: 22))
-                    .foregroundStyle(Color.accentColor)
-                    .frame(width: 44, height: 44)
-                    .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+        return VStack(alignment: .leading, spacing: PharosSpacing.m) {
+            PharosCard {
+                HStack(alignment: .center, spacing: PharosSpacing.m) {
+                    Image(systemName: l10n.groupIcon(group))
+                        .font(.system(size: 20))
+                        .foregroundStyle(PharosColor.accent)
+                        .frame(width: 40, height: 40)
+                        .background(PharosColor.fill, in: RoundedRectangle(cornerRadius: PharosRadius.control, style: .continuous))
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(l10n.groupTitle(group))
-                        .font(.system(size: 14, weight: .semibold))
-                    Text(l10n.locationCount(rows.count))
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
+                    VStack(alignment: .leading, spacing: PharosSpacing.xxs) {
+                        Text(l10n.groupTitle(group))
+                            .font(PharosFont.rowLabel)
+                        Text(l10n.locationCount(rows.count))
+                            .font(PharosFont.caption)
+                            .foregroundStyle(PharosColor.textSecondary)
+                    }
 
-                Spacer()
+                    Spacer()
 
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(cleanup.rows.isEmpty ? "–" : ByteFormat.short(bytes))
-                        .font(.system(size: 22, weight: .bold, design: .monospaced))
-                        .foregroundStyle(bytes == 0 ? Color.secondary : Color.primary)
-                        .contentTransition(.numericText())
-                        .animation(.easeInOut(duration: 0.25), value: bytes)
-                    Text(l10n.cacheSize)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
+                    VStack(alignment: .trailing, spacing: PharosSpacing.xxs) {
+                        Text(cleanup.rows.isEmpty ? "–" : ByteFormat.short(bytes))
+                            .font(PharosFont.metricValue)
+                            .foregroundStyle(bytes == 0 ? PharosColor.textSecondary : PharosColor.textPrimary)
+                            .contentTransition(.numericText())
+                            .animation(.easeInOut(duration: 0.25), value: bytes)
+                        Text(l10n.cacheSize)
+                            .font(PharosFont.caption)
+                            .foregroundStyle(PharosColor.textTertiary)
+                    }
                 }
             }
-            .padding(14)
-            .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.03)))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.primary.opacity(0.08), lineWidth: 1))
 
             if group == .temp {
-                HStack(spacing: 10) {
-                    Text(l10n.keepNewerThan).font(.system(size: 11)).foregroundStyle(.secondary)
+                HStack(spacing: PharosSpacing.s) {
+                    Text(l10n.keepNewerThan).font(PharosFont.caption).foregroundStyle(PharosColor.textSecondary)
                     Picker("", selection: $cleanup.tempRetentionHours) {
                         ForEach(CleanupStore.tempRetentionChoices, id: \.self) {
                             Text(l10n.retentionLabel(hours: $0)).tag($0)
@@ -192,7 +188,7 @@ struct CleanupView: View {
                     .disabled(cleanup.isBusy)
                     Spacer()
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, PharosSpacing.xs)
             }
 
             RowList(rows: rows)
@@ -200,19 +196,18 @@ struct CleanupView: View {
     }
 
     private var header: some View {
-
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(l10n.diskCleanup).font(.system(size: 20, weight: .bold))
-                Spacer()
-                Button {
+        PharosPageHeader(title: l10n.diskCleanup, subtitle: l10n.cleanupIntro) {
+            HStack(spacing: PharosSpacing.s) {
+                PharosActionButton(
+                    cleanup.isScanning ? l10n.scanning : l10n.cleanupScan,
+                    systemImage: "arrow.clockwise",
+                    role: .standard
+                ) {
                     cleanup.scan()
-                } label: {
-                    Label(cleanup.isScanning ? l10n.scanning : l10n.cleanupScan,
-                          systemImage: "arrow.clockwise")
                 }
                 .controlSize(.small)
                 .disabled(cleanup.isBusy)
+
                 ConfirmButton(title: l10n.cleanEverything, icon: "trash",
                               busy: cleanup.cleaning == .all,
                               disabled: cleanup.isBusy || cleanup.totalBytes == 0) {
@@ -220,10 +215,6 @@ struct CleanupView: View {
                 }
                 .help(l10n.cleanEverythingHelp(ByteFormat.short(cleanup.totalBytes)))
             }
-            Text(l10n.cleanupIntro)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
@@ -240,64 +231,67 @@ private struct PinnedTempSection: View {
 
     var body: some View {
         let bytes = cleanup.bytes(in: .temp)
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center, spacing: 8) {
-                Image(systemName: "pin.fill")
-                    .foregroundStyle(Color.accentColor)
-                    .rotationEffect(.degrees(45))
-                VStack(alignment: .leading, spacing: 2) {
-                    if let onSelectDetail {
-                        Button {
-                            onSelectDetail(.temp)
-                        } label: {
-                            HStack(spacing: 4) {
-                                Text(l10n.groupTitle(.temp)).font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(Color.primary)
-                                Image(systemName: "arrow.up.right.square")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(Color.secondary.opacity(0.6))
+        PharosCard {
+            VStack(alignment: .leading, spacing: PharosSpacing.m) {
+                HStack(alignment: .center, spacing: PharosSpacing.s) {
+                    Image(systemName: "pin.fill")
+                        .foregroundStyle(PharosColor.accent)
+                        .rotationEffect(.degrees(45))
+                    VStack(alignment: .leading, spacing: PharosSpacing.xxs) {
+                        if let onSelectDetail {
+                            Button {
+                                onSelectDetail(.temp)
+                            } label: {
+                                HStack(spacing: PharosSpacing.xs) {
+                                    Text(l10n.groupTitle(.temp))
+                                        .font(PharosFont.rowLabel)
+                                        .foregroundStyle(PharosColor.textPrimary)
+                                    Image(systemName: "arrow.up.right.square")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(PharosColor.textSecondary)
+                                }
                             }
+                            .buttonStyle(.plain)
+                            .help(l10n.viewGroupDetailHelp(l10n.groupTitle(.temp)))
+                        } else {
+                            Text(l10n.groupTitle(.temp))
+                                .font(PharosFont.rowLabel)
                         }
-                        .buttonStyle(.plain)
-                        .help(l10n.viewGroupDetailHelp(l10n.groupTitle(.temp)))
-                    } else {
-                        Text(l10n.groupTitle(.temp)).font(.system(size: 14, weight: .semibold))
+                        Text(l10n.tempGroupHint)
+                            .font(PharosFont.caption)
+                            .foregroundStyle(PharosColor.textSecondary)
                     }
-                    Text(l10n.tempGroupHint)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(cleanup.rows.isEmpty ? "–" : ByteFormat.short(bytes))
+                        .font(PharosFont.metricValue)
+                        .contentTransition(.numericText())
+                        .animation(.easeInOut(duration: 0.25), value: bytes)
                 }
-                Spacer()
-                Text(cleanup.rows.isEmpty ? "–" : ByteFormat.short(bytes))
-                    .font(.system(size: 20, weight: .semibold).monospacedDigit())
-                    .contentTransition(.numericText())
-                    .animation(.easeInOut(duration: 0.25), value: bytes)
-            }
 
-            HStack(spacing: 10) {
-                Text(l10n.keepNewerThan).font(.system(size: 11)).foregroundStyle(.secondary)
-                Picker("", selection: $cleanup.tempRetentionHours) {
-                    ForEach(CleanupStore.tempRetentionChoices, id: \.self) {
-                        Text(l10n.retentionLabel(hours: $0)).tag($0)
+                HStack(spacing: PharosSpacing.s) {
+                    Text(l10n.keepNewerThan)
+                        .font(PharosFont.caption)
+                        .foregroundStyle(PharosColor.textSecondary)
+                    Picker("", selection: $cleanup.tempRetentionHours) {
+                        ForEach(CleanupStore.tempRetentionChoices, id: \.self) {
+                            Text(l10n.retentionLabel(hours: $0)).tag($0)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: 320)
+                    .disabled(cleanup.isBusy)
+                    Spacer()
+                    ConfirmButton(title: l10n.cleanTemp, icon: "sparkles", prominent: true,
+                                  busy: cleanup.cleaning == .group(.temp),
+                                  disabled: cleanup.isBusy || bytes == 0) {
+                        cleanup.clean(group: .temp)
                     }
                 }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 320)
-                .disabled(cleanup.isBusy)
-                Spacer()
-                ConfirmButton(title: l10n.cleanTemp, icon: "sparkles", prominent: true,
-                              busy: cleanup.cleaning == .group(.temp),
-                              disabled: cleanup.isBusy || bytes == 0) {
-                    cleanup.clean(group: .temp)
-                }
-            }
 
-            RowList(rows: cleanup.rows(in: .temp))
+                RowList(rows: cleanup.rows(in: .temp))
+            }
         }
-        .padding(14)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.accentColor.opacity(0.07)))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.accentColor.opacity(0.25)))
     }
 }
 
@@ -317,63 +311,63 @@ private struct CacheGroupSection: View {
 
     var body: some View {
         let bytes = cleanup.bytes(in: group)
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                // Chevron button for inline expand/collapse
-                Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) { expanded.toggle() }
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .semibold))
-                        .rotationEffect(.degrees(expanded ? 90 : 0))
-                        .frame(width: 16, height: 16)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-
-                // Title + Icon: Click to enter dedicated detail page!
-                Button {
-                    onSelectDetail(group)
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: l10n.groupIcon(group))
-                            .font(.system(size: 12))
-                            .foregroundStyle(Color.accentColor)
-                        Text(l10n.groupTitle(group))
-                            .font(.system(size: 12.5, weight: .semibold))
-                            .foregroundStyle(Color.primary)
-                        Image(systemName: "arrow.up.right.square")
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(Color.secondary.opacity(0.6))
-                        Text(l10n.locationCount(cleanup.rows(in: group).count))
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
-                        Spacer()
-                        Text(cleanup.rows.isEmpty ? "–" : ByteFormat.short(bytes))
-                            .font(.system(size: 12, weight: .medium).monospacedDigit())
-                            .foregroundStyle(bytes == 0 ? Color.secondary : Color.primary)
-                            .contentTransition(.numericText())
-                            .animation(.easeInOut(duration: 0.25), value: bytes)
+        PharosCard {
+            VStack(alignment: .leading, spacing: PharosSpacing.m) {
+                HStack(spacing: PharosSpacing.s) {
+                    // Chevron button for inline expand/collapse
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) { expanded.toggle() }
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                            .rotationEffect(.degrees(expanded ? 90 : 0))
+                            .frame(width: 16, height: 16)
+                            .contentShape(Rectangle())
                     }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help(l10n.viewGroupDetailHelp(l10n.groupTitle(group)))
+                    .buttonStyle(.plain)
 
-                ConfirmButton(title: l10n.cleanGroup, icon: "trash",
-                              busy: cleanup.cleaning == .group(group),
-                              disabled: cleanup.isBusy || bytes == 0) {
-                    cleanup.clean(group: group)
+                    // Title + Icon: Click to enter dedicated detail page!
+                    Button {
+                        onSelectDetail(group)
+                    } label: {
+                        HStack(spacing: PharosSpacing.xs + 2) {
+                            Image(systemName: l10n.groupIcon(group))
+                                .font(.system(size: 12))
+                                .foregroundStyle(PharosColor.accent)
+                            Text(l10n.groupTitle(group))
+                                .font(PharosFont.rowLabel)
+                                .foregroundStyle(PharosColor.textPrimary)
+                            Image(systemName: "arrow.up.right.square")
+                                .font(.system(size: 10.5))
+                                .foregroundStyle(PharosColor.textTertiary)
+                            Text(l10n.locationCount(cleanup.rows(in: group).count))
+                                .font(PharosFont.caption)
+                                .foregroundStyle(PharosColor.textTertiary)
+                            Spacer()
+                            Text(cleanup.rows.isEmpty ? "–" : ByteFormat.short(bytes))
+                                .font(PharosFont.captionDigits)
+                                .foregroundStyle(bytes == 0 ? PharosColor.textSecondary : PharosColor.textPrimary)
+                                .contentTransition(.numericText())
+                                .animation(.easeInOut(duration: 0.25), value: bytes)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(l10n.viewGroupDetailHelp(l10n.groupTitle(group)))
+
+                    ConfirmButton(title: l10n.cleanGroup, icon: "trash",
+                                  busy: cleanup.cleaning == .group(group),
+                                  disabled: cleanup.isBusy || bytes == 0) {
+                        cleanup.clean(group: group)
+                    }
+                    .frame(width: 120, alignment: .trailing)
                 }
-                .frame(width: 120, alignment: .trailing)
-            }
-            if expanded {
-                RowList(rows: cleanup.rows(in: group))
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                if expanded {
+                    RowList(rows: cleanup.rows(in: group))
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
             }
         }
-        .padding(12)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
     }
 }
 
@@ -383,15 +377,15 @@ private struct RowList: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ForEach(rows) { (row: CleanupStore.Row) in
-                CleanupRowView(row: row)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
+            ForEach(rows.indices, id: \.self) { index in
+                if index > 0 {
+                    PharosListDivider()
+                }
+                CleanupRowView(row: rows[index])
+                    .padding(.horizontal, PharosSpacing.xs)
+                    .padding(.vertical, PharosSpacing.s)
             }
         }
-        .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .textBackgroundColor).opacity(0.5)))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.primary.opacity(0.08)))
     }
 }
 
@@ -404,20 +398,13 @@ private struct ReportBanner: View {
     var body: some View {
         let r = report.result
         let freedNothing = r.freedBytes == 0
-        HStack(spacing: 8) {
-            Image(systemName: freedNothing ? "exclamationmark.triangle" : "checkmark.circle")
-                .foregroundStyle(freedNothing ? Color.orange : Color.green)
-            Text("\(scopeTitle): ")
-                .font(.system(size: 11, weight: .semibold))
-            + Text(freedNothing
-                   ? l10n.nothingFreed(failed: r.failedCount)
-                   : l10n.freedReport(ByteFormat.short(r.freedBytes), files: r.removedCount, failed: r.failedCount))
-                .font(.system(size: 11))
-            Spacer()
-        }
-        .padding(10)
-        .background(RoundedRectangle(cornerRadius: 6)
-            .fill((freedNothing ? Color.orange : Color.green).opacity(0.1)))
+        let msg = freedNothing
+            ? l10n.nothingFreed(failed: r.failedCount)
+            : l10n.freedReport(ByteFormat.short(r.freedBytes), files: r.removedCount, failed: r.failedCount)
+        PharosBanner(
+            kind: freedNothing ? .warning : .success,
+            text: "\(scopeTitle): \(msg)"
+        )
     }
 
     private var scopeTitle: String {
@@ -487,20 +474,19 @@ private struct ConfirmButton: View {
     var body: some View {
         Group {
             if busy {
-                HStack(spacing: 5) {
+                HStack(spacing: PharosSpacing.xs) {
                     ProgressView().controlSize(.mini)
-                    Text(l10n.cleaning).font(.system(size: small ? 10 : 11)).foregroundStyle(.secondary)
+                    Text(l10n.cleaning).font(PharosFont.caption).foregroundStyle(PharosColor.textSecondary)
                 }
             } else if armed {
-                HStack(spacing: 4) {
+                HStack(spacing: PharosSpacing.xs) {
                     Button {
                         armed = false
                         action()
                     } label: {
-                        Text(l10n.confirmClean).font(.system(size: small ? 10 : 11, weight: .semibold))
+                        Text(l10n.confirmClean).font(PharosFont.caption)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.red)
+                    .buttonStyle(.pharosDestructive)
                     .controlSize(.small)
                     IconButton(systemImage: "xmark", help: l10n.cancel) { armed = false }
                 }
@@ -510,13 +496,14 @@ private struct ConfirmButton: View {
                 }
             } else if prominent {
                 Button { armed = true } label: { Label(title, systemImage: icon) }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.pharosPrimary)
                     .controlSize(.regular)
                     .disabled(disabled)
             } else {
                 Button { armed = true } label: {
-                    Label(title, systemImage: icon).font(.system(size: small ? 10 : 11))
+                    Label(title, systemImage: icon).font(PharosFont.caption)
                 }
+                .buttonStyle(.pharos)
                 .controlSize(.small)
                 .disabled(disabled)
             }

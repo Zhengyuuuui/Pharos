@@ -15,11 +15,12 @@ struct BrowserSettingsForm: View {
 
             VStack(spacing: 0) {
                 ForEach(Array(ChromiumBrowser.allCases.enumerated()), id: \.element) { index, b in
-                    row(b).background(index.isMultiple(of: 2) ? Color.primary.opacity(0.03) : .clear)
+                    if index > 0 {
+                        PharosListDivider()
+                    }
+                    row(b)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.primary.opacity(0.08)))
 
             if chrome.installedBrowsers.count > 1 {
                 Picker(l10n.defaultBrowserForNew, selection: $chrome.defaultBrowser) {

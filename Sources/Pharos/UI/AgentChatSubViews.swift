@@ -656,20 +656,13 @@ struct AgentStatCard: View {
     var color: Color? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Label(title, systemImage: icon).font(.system(size: 11)).foregroundStyle(color ?? .secondary).lineLimit(1)
-            Text(value)
-                .font(.system(size: 20, weight: .semibold).monospacedDigit())
-                .foregroundStyle(color ?? .primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-                .contentTransition(.numericText())
-                .animation(.easeInOut(duration: 0.25), value: value)
+        PharosCard {
+            PharosMetricValue(
+                title: title,
+                value: value,
+                systemImage: icon
+            )
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(color?.opacity(0.3) ?? Color.clear, lineWidth: 1))
     }
 }
 
@@ -680,15 +673,9 @@ struct AgentStatusBanner: View {
     @ObservedObject private var l10n = L10n.shared
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: isSuccess ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                .foregroundStyle(isSuccess ? Color.green : Color.red)
-            Text(message).font(.system(size: 11)).textSelection(.enabled)
-            Spacer()
+        PharosBanner(kind: isSuccess ? .success : .error, text: message) {
             IconButton(systemImage: "xmark", help: l10n.dismiss, action: onDismiss)
         }
-        .padding(10)
-        .background(RoundedRectangle(cornerRadius: 6).fill(isSuccess ? Color.green.opacity(0.08) : Color.red.opacity(0.08)))
     }
 }
 
@@ -697,19 +684,7 @@ struct AgentSearchField: View {
     @Binding var text: String
 
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass").font(.system(size: 11)).foregroundStyle(.secondary)
-            TextField(placeholder, text: $text).textFieldStyle(.plain).font(.system(size: 12))
-            if !text.isEmpty {
-                Button { text = "" } label: {
-                    Image(systemName: "xmark.circle.fill").font(.system(size: 11)).foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.05)))
+        PharosSearchField(text: $text, prompt: placeholder)
     }
 }
 

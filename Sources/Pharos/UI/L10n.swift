@@ -111,6 +111,11 @@ final class L10n: ObservableObject {
 
     // MARK: - Overview pages
 
+    var dashboard: String { en ? "Dashboard" : "仪表盘" }
+    var systemAndHardware: String { en ? "System & Hardware" : "系统与硬件" }
+    var runtimeAndServices: String { en ? "Runtime & Services" : "环境与运行时" }
+    var systemMaintenance: String { en ? "Maintenance" : "系统维护" }
+    var appearance: String { en ? "Appearance" : "外观" }
     var overview: String { en ? "Overview" : "总览" }
     var systemMemory: String { en ? "System Memory" : "本机内存" }
     var portsOverview: String { en ? "Ports Overview" : "端口总览" }
