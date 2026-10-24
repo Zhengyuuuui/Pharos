@@ -33,35 +33,25 @@ struct MainWindowView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Window Titlebar & Drag Clearance: Traffic lights sit at top-left
-            Color.clear
-                .frame(height: 44)
-                .contentShape(Rectangle())
+        HStack(alignment: .top, spacing: 14) {
+            // 1. Floating Sidebar Island (圆角矩形悬浮浮岛，内置交通灯)
+            sidebarIsland
+                .frame(width: 236)
+                .frame(maxHeight: .infinity)
+                .background(PharosColor.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(PharosColor.separator.opacity(0.35), lineWidth: 0.5)
+                )
+                .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
+                .shadow(color: Color.black.opacity(0.07), radius: 14, x: 0, y: 6)
 
-            HStack(alignment: .top, spacing: 14) {
-                // 1. Floating Sidebar Island (圆角矩形悬浮浮岛)
-                sidebarIsland
-                    .frame(width: 236)
-                    .frame(maxHeight: .infinity)
-                    .background(PharosColor.surface)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(PharosColor.separator.opacity(0.35), lineWidth: 0.5)
-                    )
-                    .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
-                    .shadow(color: Color.black.opacity(0.07), radius: 14, x: 0, y: 6)
-                    .padding(.leading, 14)
-                    .padding(.bottom, 14)
-
-                // 2. Detail Canvas
-                detailView
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.trailing, 14)
-                    .padding(.bottom, 14)
-            }
+            // 2. Detail Canvas
+            detailView
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .padding(14)
         .background(PharosColor.background)
         .ignoresSafeArea()
         .frame(minWidth: 940, minHeight: 620)
@@ -82,6 +72,16 @@ struct MainWindowView: View {
 
     private var sidebarIsland: some View {
         VStack(spacing: 0) {
+            // Built-in traffic lights inside the rounded rectangle box
+            HStack {
+                WindowTrafficLightsView()
+                    .frame(width: 54, height: 16)
+                Spacer()
+            }
+            .padding(.leading, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 12)
+
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 2) {
                     // Top: Dashboard Hero Item
@@ -531,6 +531,77 @@ struct ProjectDetailView: View {
                 }
             }
         }
+    }
+}
+
+final class WindowTrafficLightsHost: NSView {
+    private var trackingArea: NSTrackingArea?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        attachButtons()
+    }
+
+    override func layout() {
+        super.layout()
+        attachButtons()
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let trackingArea { removeTrackingArea(trackingArea) }
+        let area = NSTrackingArea(rect: bounds,
+                                  options: [.mouseEnteredAndExited, .activeAlways],
+                                  owner: self,
+                                  userInfo: nil)
+        addTrackingArea(area)
+        self.trackingArea = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        guard let window else { return }
+        window.standardWindowButton(.closeButton)?.mouseEntered(with: event)
+        window.standardWindowButton(.miniaturizeButton)?.mouseEntered(with: event)
+        window.standardWindowButton(.zoomButton)?.mouseEntered(with: event)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        guard let window else { return }
+        window.standardWindowButton(.closeButton)?.mouseExited(with: event)
+        window.standardWindowButton(.miniaturizeButton)?.mouseExited(with: event)
+        window.standardWindowButton(.zoomButton)?.mouseExited(with: event)
+    }
+
+    func attachButtons() {
+        guard let window = self.window,
+              let close = window.standardWindowButton(.closeButton),
+              let min = window.standardWindowButton(.miniaturizeButton),
+              let zoom = window.standardWindowButton(.zoomButton) else { return }
+
+        if close.superview !== self {
+            close.removeFromSuperview()
+            min.removeFromSuperview()
+            zoom.removeFromSuperview()
+            addSubview(close)
+            addSubview(min)
+            addSubview(zoom)
+        }
+        let y = (bounds.height - 16) / 2
+        close.frame = NSRect(x: 0, y: y, width: 14, height: 16)
+        min.frame = NSRect(x: 20, y: y, width: 14, height: 16)
+        zoom.frame = NSRect(x: 40, y: y, width: 14, height: 16)
+    }
+}
+
+private struct WindowTrafficLightsView: NSViewRepresentable {
+    func makeNSView(context: Context) -> WindowTrafficLightsHost {
+        WindowTrafficLightsHost()
+    }
+
+    func updateNSView(_ nsView: WindowTrafficLightsHost, context: Context) {
+        nsView.attachButtons()
     }
 }
 

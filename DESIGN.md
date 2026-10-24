@@ -168,15 +168,13 @@ SF Symbols 统一使用线框、单色、与文字同色或次级色。
 
 ### 6.1 侧边栏规范（参考现代纯净分层与清晰领域分类）
 
-1. **圆角矩形悬浮浮岛（Floating Island Sidebar）**：
+1. **圆角矩形悬浮浮岛与内置交通灯（Floating Island Sidebar with Integrated Window Controls）**：
    - 侧边栏整体为完全独立的圆角矩形卡片容器（`RoundedRectangle(cornerRadius: 16, style: .continuous)`）；
-   - **上下左右均与父窗口留有明确的 Margin 呼吸间距**：
-     - **左侧 (Leading)**：14pt 边距，与窗口左边缘分离；
-     - **顶部 (Top)**：44pt 顶部标题栏边距，macOS 红黄绿交通灯在窗口背景上轻盈悬浮，侧边栏卡片位于交通灯下方；
-     - **底侧 (Bottom)**：14pt 边距，与窗口底边缘分离；
-     - **右侧 (Trailing)**：14pt 间距，与右侧内容画布保持通透的间隔；
-   - 侧边栏纯白表面（`PharosColor.surface`）拥有全周 360° 柔和立体弥散阴影（`radius: 4, y: 2, opacity: 0.04` + `radius: 14, y: 6, opacity: 0.07`）与 0.5pt 精细发丝边框（`separator.opacity(0.35)`），真正形成悬浮于温润浅灰窗口底画布（`PharosColor.background`）之上的独立浮岛（Floating Island）；
-   - 内部纵向滚动仅在卡片内部进行，底部控制岛与顶部项目均收纳于该圆角矩形内，卡片内容被整体剪裁，底部圆角与侧边栏外壳完全同心。
+   - **上下左右均与父窗口留有明确的 14pt Margin 呼吸间距**（四周均不贴边，温润灰阶画布背景完全环绕）；
+   - **内置窗口控制按钮（Traffic Lights）**：系统的关闭、最小化、最大化按钮直接收纳在圆角矩形侧边栏方框的左上角（`padding(.leading, 14)`, `padding(.top, 14)`），与侧边栏完全融为一体，实现如 AlDente / 现代精致系统工具般的浑然一体质感；
+   - 按钮下方紧跟「总览 / 仪表盘 (Dashboard)」英雄项及精致分隔线；
+   - 侧边栏纯白表面（`PharosColor.surface`）拥有全周 360° 柔和立体弥散阴影（`radius: 4, y: 2, opacity: 0.04` + `radius: 14, y: 6, opacity: 0.07`）与 0.5pt 精细发丝边框（`separator.opacity(0.35)`），真正形成悬浮于窗口底画布（`PharosColor.background`）之上的独立浮岛（Floating Island）；
+   - 内部纵向滚动在卡片内部进行，底部控制岛与顶部项目均收纳于该圆角矩形内，卡片内容被整体平滑剪裁，底部圆角与侧边栏外壳完全同心。
 2. **顶部仪表盘英雄项（Dashboard Hero）**：
    - 顶部首项设立独立的「总览 / 仪表盘 (Dashboard)」，配备单色线框图标（`square.grid.2x2`），作为全局状态的核心入口。
    - 英雄项与下方子领域之间使用一条微妙发丝线（`PharosListDivider`）优雅分隔，形成稳定的锚点。
