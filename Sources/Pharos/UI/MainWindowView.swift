@@ -11,7 +11,6 @@ struct MainWindowView: View {
     @ObservedObject private var l10n = L10n.shared
     @AppStorage("pharos.trafficLightGlassTransparency") private var trafficLightGlassTransparency: Double = 0.75
     @State private var selection: SidebarItem?
-    @State private var sidebarScrollOffset: CGFloat = 0
     /// Entry point from the menu-bar popover (e.g. "Disk Cleanup").
     private let initialSelection: SidebarItem?
 
@@ -40,14 +39,17 @@ struct MainWindowView: View {
             sidebarIsland
                 .frame(width: 236)
                 .frame(maxHeight: .infinity)
-                .background(PharosColor.surface)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(PharosColor.surface)
+                        .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
+                        .shadow(color: Color.black.opacity(0.07), radius: 14, x: 0, y: 6)
+                )
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .stroke(PharosColor.separator.opacity(0.35), lineWidth: 0.5)
                 )
-                .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
-                .shadow(color: Color.black.opacity(0.07), radius: 14, x: 0, y: 6)
 
             // 2. Detail Canvas
             detailView
@@ -72,40 +74,11 @@ struct MainWindowView: View {
         }
     }
 
-    private var sidebarScrollProgress: CGFloat {
-        min(1.0, max(0.0, -sidebarScrollOffset / 14.0))
-    }
-
     private var sidebarIsland: some View {
         VStack(spacing: 0) {
             ScrollView(showsIndicators: false) {
                 sidebarContentList
-                    .background(alignment: .top) {
-                        SidebarScrollProbe { offset in
-                            if abs(offset - sidebarScrollOffset) > 0.25 {
-                                sidebarScrollOffset = offset
-                            }
-                        }
-                        .frame(width: 1, height: 1)
-                        .allowsHitTesting(false)
-                    }
             }
-            .mask(
-                VStack(spacing: 0) {
-                    LinearGradient(
-                        stops: [
-                            .init(color: .clear, location: 0.0),
-                            .init(color: .clear, location: 0.65),
-                            .init(color: .black.opacity(0.5), location: 0.85),
-                            .init(color: .black, location: 1.0)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 40)
-                    Rectangle().fill(.black)
-                }
-            )
             .overlay(alignment: .top) {
                 sidebarTrafficLightsBlurHeader
                     .allowsHitTesting(false)
@@ -287,37 +260,9 @@ struct MainWindowView: View {
     }
 
     private var sidebarTrafficLightsBlurHeader: some View {
-        let p = sidebarScrollProgress
-        let t = min(1.0, max(0.0, trafficLightGlassTransparency))
-        let blurRadius = 0.8 + (1.0 - t) * 7.2
-        let veilOpacity = (1.0 - t) * 0.82 * Double(p)
-        return ZStack(alignment: .top) {
-            sidebarContentList
-                .fixedSize(horizontal: false, vertical: true)
-                .background(PharosColor.surface)
-                .offset(y: sidebarScrollOffset)
-                .frame(width: 236, height: 48, alignment: .topLeading)
-                .background(PharosColor.surface)
-                .clipped()
-                .blur(radius: blurRadius)
-
-            PharosColor.surface.opacity(veilOpacity)
-        }
-        .frame(width: 236, height: 40, alignment: .top)
-        .clipped()
-        .mask(
-            LinearGradient(
-                stops: [
-                    .init(color: .black, location: 0.0),
-                    .init(color: .black, location: 0.65),
-                    .init(color: .black.opacity(0.45), location: 0.85),
-                    .init(color: .clear, location: 1.0)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
-        .shadow(color: Color.black.opacity(0.08 * Double(p)), radius: 4, x: 0, y: 2)
+        SidebarTrafficLightsFrostedGlass(transparency: trafficLightGlassTransparency)
+            .frame(width: 236, height: 42)
+            .shadow(color: Color.black.opacity(0.04), radius: 3, x: 0, y: 1)
     }
 
     private var detailView: some View {
@@ -597,63 +542,75 @@ struct ProjectDetailView: View {
     }
 }
 
-private final class SidebarScrollOffsetProbeView: NSView {
-    var onScroll: ((CGFloat) -> Void)?
-    private weak var observedClipView: NSClipView?
+private struct SidebarTrafficLightsFrostedGlass: NSViewRepresentable {
+    var transparency: Double
 
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        attachIfNeeded()
-    }
-
-    override func viewDidMoveToSuperview() {
-        super.viewDidMoveToSuperview()
-        attachIfNeeded()
-    }
-
-    override func layout() {
-        super.layout()
-        attachIfNeeded()
-    }
-
-    func attachIfNeeded() {
-        guard let clip = enclosingScrollView?.contentView, observedClipView !== clip else { return }
-        if let old = observedClipView {
-            NotificationCenter.default.removeObserver(self, name: NSView.boundsDidChangeNotification, object: old)
-        }
-        observedClipView = clip
-        clip.postsBoundsChangedNotifications = true
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(boundsChanged(_:)),
-            name: NSView.boundsDidChangeNotification,
-            object: clip
-        )
-        onScroll?(-clip.bounds.origin.y)
-    }
-
-    @objc private func boundsChanged(_ note: Notification) {
-        guard let clip = observedClipView else { return }
-        onScroll?(-clip.bounds.origin.y)
-    }
-
-    deinit {
-        NotificationCenter.default.removeObserver(self)
-    }
-}
-
-private struct SidebarScrollProbe: NSViewRepresentable {
-    var onScroll: (CGFloat) -> Void
-
-    func makeNSView(context: Context) -> SidebarScrollOffsetProbeView {
-        let v = SidebarScrollOffsetProbeView()
-        v.onScroll = onScroll
+    func makeNSView(context: Context) -> FrostedGlassNSView {
+        let v = FrostedGlassNSView()
+        v.transparency = CGFloat(transparency)
         return v
     }
 
-    func updateNSView(_ nsView: SidebarScrollOffsetProbeView, context: Context) {
-        nsView.onScroll = onScroll
-        nsView.attachIfNeeded()
+    func updateNSView(_ nsView: FrostedGlassNSView, context: Context) {
+        nsView.transparency = CGFloat(transparency)
+    }
+}
+
+private final class FrostedGlassNSView: NSView {
+    private let effectView = NSVisualEffectView()
+    private let veilView = NSView()
+    private static let fadeMask: NSImage = {
+        let h: CGFloat = 42
+        let img = NSImage(size: NSSize(width: 1, height: h), flipped: true) { rect in
+            guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
+            let colors = [
+                NSColor.black.cgColor,
+                NSColor.black.cgColor,
+                NSColor.black.withAlphaComponent(0.45).cgColor,
+                NSColor.clear.cgColor
+            ] as CFArray
+            let locs: [CGFloat] = [0.0, 0.62, 0.85, 1.0]
+            if let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: locs) {
+                ctx.drawLinearGradient(grad, start: CGPoint(x: 0, y: 0), end: CGPoint(x: 0, y: h), options: [])
+            }
+            return true
+        }
+        img.capInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
+        img.resizingMode = .stretch
+        return img
+    }()
+
+    var transparency: CGFloat = 0.75 {
+        didSet { updateAppearance() }
+    }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+
+        effectView.blendingMode = .withinWindow
+        effectView.material = .headerView
+        effectView.state = .active
+        effectView.maskImage = Self.fadeMask
+        effectView.autoresizingMask = [.width, .height]
+        addSubview(effectView)
+
+        veilView.wantsLayer = true
+        veilView.autoresizingMask = [.width, .height]
+        addSubview(veilView)
+
+        updateAppearance()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    private func updateAppearance() {
+        let t = min(1.0, max(0.0, transparency))
+        effectView.alphaValue = 0.5 + t * 0.5
+        let veilAlpha = (1.0 - t) * 0.72
+        veilView.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(veilAlpha).cgColor
     }
 }
 
