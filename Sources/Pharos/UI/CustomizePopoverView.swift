@@ -32,7 +32,7 @@ struct CustomizePopoverView: View {
             }
         } content: {
             HStack(alignment: .top, spacing: PharosSpacing.l) {
-                // Left: Live popover snapshot preview
+                // Left: Live popover snapshot preview (fixed 310 width)
                 VStack(alignment: .leading, spacing: PharosSpacing.s) {
                     Label(l10n.livePreview, systemImage: "macwindow")
                         .font(PharosFont.caption)
@@ -40,7 +40,7 @@ struct CustomizePopoverView: View {
                         .padding(.leading, 4)
                     PopoverSnapshot(layout: layout, tab: $previewTab)
                 }
-                .fixedSize(horizontal: true, vertical: false)
+                .frame(width: 310)
 
                 // Right: Tabs configuration on top, Library and Settings below
                 editorColumns(layout: layout)
@@ -461,8 +461,55 @@ private struct ProjectRowsSettings: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            headerView
-            controlsView
+            // Header: title on left, range on right
+            HStack(alignment: .firstTextBaseline) {
+                Label(l10n.projectRowsTitle, systemImage: "arrow.up.and.down.text.horizontal")
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Text(l10n.projectRowsRange(PopoverLayout.minProjectRows, upper, running: store.projects.count))
+                    .font(.system(size: 10).monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            // Controls: Presets capsules on left, Stepper on right
+            HStack(spacing: 6) {
+                // Preset capsules
+                HStack(spacing: 4) {
+                    ForEach(presets, id: \.self) { n in
+                        Button { set(n) } label: {
+                            Text(n == upper && !PopoverLayout.projectRowChoices.contains(n) ? l10n.rowsAll(n) : "\(n)")
+                                .font(.system(size: 11, weight: .medium).monospacedDigit())
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(Capsule().fill(n == current ? Color.accentColor : Color.primary.opacity(0.07)))
+                                .foregroundStyle(n == current ? Color.white : Color.primary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                Spacer(minLength: 4)
+
+                // Compact custom number input with Stepper
+                HStack(spacing: 3) {
+                    TextField("", text: $text)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 11).monospacedDigit())
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 38)
+                        .focused($focused)
+                        .onSubmit { commit() }
+                        .onChange(of: focused) { _, isFocused in if !isFocused { commit() } }
+                    Stepper("", value: Binding(get: { current }, set: { set($0) }),
+                            in: PopoverLayout.minProjectRows...upper)
+                        .labelsHidden()
+                    Text(l10n.projectsUnit)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.03)))
@@ -470,85 +517,6 @@ private struct ProjectRowsSettings: View {
         .opacity(blockInUse ? 1 : 0.6)
         .onAppear { text = "\(current)" }
         .onChange(of: current) { _, v in if !focused { text = "\(v)" } }
-    }
-
-    private var headerView: some View {
-        ViewThatFits(in: .horizontal) {
-            // Wide header: title on left, range on right
-            HStack(alignment: .firstTextBaseline) {
-                Label(l10n.projectRowsTitle, systemImage: "arrow.up.and.down.text.horizontal")
-                    .font(.system(size: 12, weight: .semibold))
-                Spacer(minLength: 8)
-                Text(l10n.projectRowsRange(PopoverLayout.minProjectRows, upper, running: store.projects.count))
-                    .font(.system(size: 10).monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
-
-            // Compact header: title on top, range below
-            VStack(alignment: .leading, spacing: 2) {
-                Label(l10n.projectRowsTitle, systemImage: "arrow.up.and.down.text.horizontal")
-                    .font(.system(size: 12, weight: .semibold))
-                Text(l10n.projectRowsRange(PopoverLayout.minProjectRows, upper, running: store.projects.count))
-                    .font(.system(size: 10).monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private var controlsView: some View {
-        ViewThatFits(in: .horizontal) {
-            // Wide layout: preset capsules on left, custom stepper on right
-            HStack(spacing: 6) {
-                presetButtons
-                Spacer(minLength: 8)
-                customInputView
-            }
-
-            // Compact layout: preset capsules on row 1, custom stepper on row 2
-            VStack(alignment: .leading, spacing: 8) {
-                presetButtons
-                HStack(spacing: 6) {
-                    Text(l10n.customRowLimit)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    customInputView
-                }
-            }
-        }
-    }
-
-    private var presetButtons: some View {
-        HStack(spacing: 5) {
-            ForEach(presets, id: \.self) { n in
-                Button { set(n) } label: {
-                    Text(n == upper && !PopoverLayout.projectRowChoices.contains(n) ? l10n.rowsAll(n) : "\(n)")
-                        .font(.system(size: 11, weight: .medium).monospacedDigit())
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(n == current ? Color.accentColor : Color.primary.opacity(0.07)))
-                        .foregroundStyle(n == current ? Color.white : Color.primary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-
-    private var customInputView: some View {
-        HStack(spacing: 4) {
-            TextField("", text: $text)
-                .textFieldStyle(.roundedBorder)
-                .font(.system(size: 11).monospacedDigit())
-                .multilineTextAlignment(.trailing)
-                .frame(width: 44)
-                .focused($focused)
-                .onSubmit { commit() }
-                .onChange(of: focused) { _, isFocused in if !isFocused { commit() } }
-            Stepper("", value: Binding(get: { current }, set: { set($0) }),
-                    in: PopoverLayout.minProjectRows...upper)
-                .labelsHidden()
-            Text(l10n.projectsUnit).font(.system(size: 11)).foregroundStyle(.secondary)
-        }
     }
 
     /// Fixed presets that fit, plus the current maximum ("all running").
