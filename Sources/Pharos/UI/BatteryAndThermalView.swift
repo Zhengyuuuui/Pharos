@@ -23,12 +23,12 @@ struct BatteryAndThermalView: View {
         VStack(spacing: 0) {
             // Unified top toolbar with Segmented Picker
             HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: PharosSpacing.xxs) {
                     Text(l10n.batteryAndThermalsTitle)
-                        .font(.system(size: 20, weight: .bold))
+                        .font(PharosFont.pageTitle)
                     Text(l10n.batteryAndThermalsDesc)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                        .font(PharosFont.caption)
+                        .foregroundStyle(PharosColor.textSecondary)
                 }
                 Spacer()
                 Picker("", selection: $selectedTab) {
@@ -40,11 +40,12 @@ struct BatteryAndThermalView: View {
                 .pickerStyle(.segmented)
                 .frame(width: 250)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 16)
-            .padding(.bottom, 12)
+            .padding(.horizontal, PharosSpacing.page)
+            .padding(.top, PharosSpacing.l)
+            .padding(.bottom, PharosSpacing.m)
+            .background(PharosColor.background)
 
-            Divider()
+            PharosListDivider()
 
             // Selected Sub-View
             Group {

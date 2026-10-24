@@ -15,11 +15,11 @@
   <img src="https://img.shields.io/badge/dependencies-none-brightgreen" alt="Dependencies">
   <img src="https://img.shields.io/badge/network-none-lightgrey" alt="No network">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.9-blue" alt="Version 2.9">
-  <img src="https://img.shields.io/badge/updated-2026--10--23-informational" alt="Last updated 2026-10-23">
+  <img src="https://img.shields.io/badge/version-3.0-blue" alt="Version 3.0">
+  <img src="https://img.shields.io/badge/updated-2026--10--24-informational" alt="Last updated 2026-10-24">
 </p>
 
-<p align="center"><sub>Last updated / 最后更新：2026-10-23 15:46 (UTC+8) · v2.9 · Author / 作者：zys · Model / 模型：Gemini 4 Argon</sub></p>
+<p align="center"><sub>Last updated / 最后更新：2026-10-24 08:40 (UTC+8) · v3.0 · Author / 作者：zys · Model / 模型：Gemini 4 Argon</sub></p>
 
 <p align="center"><b>English</b> · <a href="README_CN.md">简体中文</a> · <a href="CHANGELOG.md">Changelog / 更新记录</a></p>
 
@@ -47,6 +47,7 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 | **Browser instances** | Chrome, Chrome Beta / Canary, Chromium, Edge and Brave — every profile folder with its debug port, proxy and memory; save favorites that stay listed with their launch command after quitting; start and quit |
 | **AI agent chat databases** | Inspect, clean and backup local chat / session databases from 23+ AI IDEs and editors (Cursor, Trae, Windsurf, VS Code, Antigravity, OpenCode, Claude Code, MiniMax…); nanosecond-precision incremental fingerprint cache (`DB + WAL` size/mtime) skips unchanged databases; detect orphaned workspaces; manually add and scan any custom application under `/Applications` |
 | **Packages & CLI tools** | Real Homebrew Cellar formula & Caskroom package scanning, diagnostics (`brew doctor`/`services`) and cache cleanup; global CLI tools (Node, Homebrew, Rust, Python, Go) with terminal run, reveal and uninstall; two-stage progressive project dependency scanning with `mtime` + lockfile fingerprint cache across 10 developer workspace directories (`.venv`, `node_modules`, `.build`, `target`); language cache repos overview |
+| **Design system & sidebar** | Strict 3-step lightness hierarchy (`background` → `surface` → `fill`), pure high-contrast custom sidebar with domain categorization (System, Runtime, Maintenance, Workspaces, Appearance), zero AppKit blue highlight clashing, and adaptive responsive popover customizer (`ViewThatFits`) |
 
 ---
 
@@ -56,7 +57,7 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 - **Overview** tab: system memory, pressure, disk usage of every volume (incl. external drives), top apps
 - **Projects** tab: running projects with ports and memory, plus your browser instances (start / quit / open debug list, “Manage…” jumps to the Browsers page)
 - Quick buttons to open the main window or jump straight to Disk Cleanup
-- **Customizable like widgets** (Main window → Customize): a live snapshot of the popover next to its two tabs and a component library — drag blocks to reorder them, move them between tabs, drag them out to hide or in to add (memory, disk, fans & temperature, dev projects, top apps, running projects, browser instances, favorite projects). Empty tabs disappear; Reset to Default restores the original layout
+- **Customizable like widgets** (Main window → Customize): a live snapshot of the popover next to its two tabs and a component library — drag blocks to reorder them, move them between tabs, drag them out to hide or in to add (memory, disk, fans & temperature, dev projects, top apps, running projects, browser instances, favorite projects). Adaptive side-by-side or stacked layout (`ViewThatFits`) prevents window squeezing; Empty tabs disappear; Reset to Default restores the original layout
 - Below the library, **Running projects shown** sets how many projects the popover lists before scrolling: quick picks (3 / 5 / 8 / 10 / 15 / all running) or type a number — minimum 3, maximum the number of projects running right now (default 5). Extra projects scroll inside the list
 
 ### Projects

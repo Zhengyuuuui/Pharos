@@ -111,6 +111,11 @@ final class L10n: ObservableObject {
 
     // MARK: - Overview pages
 
+    var dashboard: String { en ? "Dashboard" : "仪表盘" }
+    var systemAndHardware: String { en ? "System & Hardware" : "系统与硬件" }
+    var runtimeAndServices: String { en ? "Runtime & Services" : "环境与运行时" }
+    var systemMaintenance: String { en ? "Maintenance" : "系统维护" }
+    var appearance: String { en ? "Appearance" : "外观" }
     var overview: String { en ? "Overview" : "总览" }
     var systemMemory: String { en ? "System Memory" : "本机内存" }
     var portsOverview: String { en ? "Ports Overview" : "端口总览" }
@@ -1267,6 +1272,20 @@ final class L10n: ObservableObject {
     var batteryStatusNotInstalled: String { en ? "Not Installed" : "未安装" }
     var batteryStatusNotResponding: String { en ? "Not Responding" : "未响应" }
     var batteryStatusRunning: String { en ? "Running" : "运行正常" }
+
+    // MARK: - Settings Modern Redesign (Target App Alignment)
+    var quickActions: String { en ? "Quick Action" : "快捷动作" }
+    var aboutPharos: String { en ? "About Pharos" : "关于与版本" }
+    var generalSettings: String { en ? "General & System" : "常规与系统" }
+    var appearanceSettings: String { en ? "Menu Bar & Appearance" : "菜单栏与视觉" }
+    var devToolsSettings: String { en ? "Developer & Workspaces" : "开发工具与环境" }
+    var openSourceSubtitle: String { en ? "100% Native Swift · Local Dev Lighthouse · Zero Network" : "100% 原生 Swift 构建 · 本地开发环境灯塔 · 纯净零网络请求" }
+    var viewOnGitHub: String { en ? "GitHub Repo" : "访问 GitHub 仓库" }
+    var resetAllSettings: String { en ? "Reset Settings" : "恢复默认设置" }
+    var resetAllSettingsConfirm: String { en ? "Are you sure you want to restore all settings and popover layout to default?" : "确定要将所有设置及下拉框布局恢复为默认值吗？" }
+    var resetSettingsDone: String { en ? "All settings have been restored to defaults." : "所有设置已恢复为默认值。" }
+    var launchAtLoginHelp: String { en ? "Automatically launch Pharos in the menu bar when you log into your Mac." : "在登录 Mac 时自动在菜单栏启动 Pharos。" }
+    var footerCrafted: String { en ? "By zys with ♡" : "由 zys 精心打造 ♡" }
 }
 
 

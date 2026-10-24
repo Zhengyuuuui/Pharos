@@ -14,45 +14,52 @@ struct CustomizePopoverView: View {
 
     var body: some View {
         let layout = layoutStore.layout
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(l10n.customizeTitle).font(.system(size: 20, weight: .bold))
-                    Spacer()
-                    if armedReset {
+        PharosPage(maxWidth: 1200) {
+            PharosPageHeader(title: l10n.customizeTitle, subtitle: l10n.customizeIntro) {
+                if armedReset {
+                    HStack(spacing: PharosSpacing.xs) {
                         Button(l10n.resetLayout) { armedReset = false; layoutStore.reset() }
-                            .buttonStyle(.borderedProminent).tint(.red).controlSize(.small)
-                        IconButton(systemImage: "xmark", help: l10n.cancel) { armedReset = false }
-                    } else {
-                        Button(l10n.resetLayout) { armedReset = true }
+                            .buttonStyle(.pharosDestructive)
                             .controlSize(.small)
-                            .disabled(layout == .standard)
+                        IconButton(systemImage: "xmark", help: l10n.cancel) { armedReset = false }
                     }
-                }
-                Text(l10n.customizeIntro)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HStack(alignment: .top, spacing: 20) {
-                    PopoverSnapshot(layout: layout, tab: $previewTab)
-                    VStack(alignment: .leading, spacing: 14) {
-                        HStack(alignment: .top, spacing: 14) {
-                            ForEach(PopoverTab.allCases, id: \.self) { tab in
-                                TabColumn(tab: tab, blocks: layout[tab], selected: previewTab == tab) {
-                                    previewTab = tab
-                                }
-                            }
-                        }
-                        LibraryColumn(unused: layout.unused)
-                        ProjectRowsSettings(blockInUse: layout.tab(of: .projects) != nil)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                } else {
+                    Button(l10n.resetLayout) { armedReset = true }
+                        .buttonStyle(.pharos)
+                        .controlSize(.small)
+                        .disabled(layout == .standard)
                 }
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        } content: {
+            ViewThatFits(in: .horizontal) {
+                // Wide layout: side-by-side snapshot and editor
+                HStack(alignment: .top, spacing: PharosSpacing.l) {
+                    PopoverSnapshot(layout: layout, tab: $previewTab)
+                    editorColumns(layout: layout)
+                }
+
+                // Compact layout: snapshot on top, editor below to prevent squeezing
+                VStack(alignment: .leading, spacing: PharosSpacing.l) {
+                    PopoverSnapshot(layout: layout, tab: $previewTab)
+                    editorColumns(layout: layout)
+                }
+            }
         }
+    }
+
+    private func editorColumns(layout: PopoverLayout) -> some View {
+        VStack(alignment: .leading, spacing: PharosSpacing.m) {
+            HStack(alignment: .top, spacing: PharosSpacing.m) {
+                ForEach(PopoverTab.allCases, id: \.self) { tab in
+                    TabColumn(tab: tab, blocks: layout[tab], selected: previewTab == tab) {
+                        previewTab = tab
+                    }
+                }
+            }
+            LibraryColumn(unused: layout.unused)
+            ProjectRowsSettings(blockInUse: layout.tab(of: .projects) != nil)
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 }
 
@@ -109,20 +116,24 @@ private struct TabColumn: View {
     let blocks: [PopoverBlock]
     let selected: Bool
     let onSelect: () -> Void
-    @State private var targeted = false
+    @State private var tailTargeted = false
+    @State private var columnTargeted = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             header
             ForEach(blocks, id: \.self) { block in
-                tile(block)
+                TileDropContainer(tab: tab, block: block, isFirst: block == blocks.first, isLast: block == blocks.last)
             }
             dropTail
+            Spacer(minLength: 0)
         }
         .padding(10)
-        .frame(minWidth: 200, maxWidth: .infinity, alignment: .topLeading)
+        .frame(minWidth: 150, maxWidth: .infinity, minHeight: 180, alignment: .topLeading)
         .background(background)
         .overlay(border)
+        .contentShape(Rectangle())
+        .onDrop(of: [UTType.text], delegate: TabColumnDropDelegate(tab: tab, isTargeted: $columnTargeted))
     }
 
     private var header: some View {
@@ -137,20 +148,35 @@ private struct TabColumn: View {
         .buttonStyle(.plain)
     }
 
-    private func tile(_ block: PopoverBlock) -> some View {
-        BlockTile(block: block, inTab: tab, isFirst: block == blocks.first, isLast: block == blocks.last)
-            .onDrop(of: [UTType.text], delegate: BlockDropDelegate(tab: tab, before: block))
-    }
-
     /// Empty tail: drop here to append.
     private var dropTail: some View {
-        let color: Color = targeted ? .accentColor : Color.secondary.opacity(0.4)
+        let isGlow = tailTargeted || columnTargeted
+        let color: Color = isGlow ? PharosColor.accent : Color.secondary.opacity(0.35)
         return RoundedRectangle(cornerRadius: 8)
-            .strokeBorder(color, style: StrokeStyle(lineWidth: 1, dash: [4]))
-            .frame(height: blocks.isEmpty ? 70 : 34)
-            .overlay(Text(l10n.dropHere).font(.system(size: 10)).foregroundStyle(.tertiary))
-            .onDrop(of: [UTType.text], isTargeted: $targeted) { providers in
-                append(providers)
+            .strokeBorder(color, style: StrokeStyle(lineWidth: isGlow ? 1.5 : 1, dash: [4]))
+            .frame(height: blocks.isEmpty ? 80 : 38)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isGlow ? PharosColor.accent.opacity(0.08) : Color.clear)
+            )
+            .overlay(
+                HStack(spacing: 4) {
+                    Image(systemName: "plus.circle")
+                        .font(.system(size: 11))
+                    Text(l10n.dropHere)
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .foregroundStyle(isGlow ? PharosColor.accent : PharosColor.textTertiary)
+            )
+            .contentShape(Rectangle())
+            .onDrop(of: [UTType.text], isTargeted: $tailTargeted) { providers in
+                if let active = DragCoordinator.shared.endDrag() {
+                    withAnimation(.spring(response: 0.22, dampingFraction: 0.8)) {
+                        layoutStore.update { $0.insert(active, into: tab) }
+                    }
+                    return true
+                }
+                return append(providers)
             }
     }
 
@@ -160,12 +186,53 @@ private struct TabColumn: View {
     }
 
     private var background: some View {
-        RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(selected ? 0.06 : 0.03))
+        RoundedRectangle(cornerRadius: 10)
+            .fill(columnTargeted ? PharosColor.accent.opacity(0.05) : (selected ? Color.primary.opacity(0.06) : Color.primary.opacity(0.03)))
     }
 
     private var border: some View {
-        let color: Color = selected ? Color.accentColor.opacity(0.5) : Color.primary.opacity(0.06)
-        return RoundedRectangle(cornerRadius: 10).stroke(color)
+        let color: Color = columnTargeted
+            ? PharosColor.accent.opacity(0.8)
+            : (selected ? Color.accentColor.opacity(0.5) : Color.primary.opacity(0.06))
+        return RoundedRectangle(cornerRadius: 10).stroke(color, lineWidth: columnTargeted ? 1.5 : 1)
+    }
+}
+
+private struct TileDropContainer: View {
+    let tab: PopoverTab
+    let block: PopoverBlock
+    let isFirst: Bool
+    let isLast: Bool
+    @State private var isTargeted = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Drop insertion bar above tile with tactile amber guide
+            if isTargeted {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(PharosColor.accent)
+                        .frame(width: 5, height: 5)
+                    Rectangle()
+                        .fill(PharosColor.accent)
+                        .frame(height: 2)
+                    Circle()
+                        .fill(PharosColor.accent)
+                        .frame(width: 5, height: 5)
+                }
+                .padding(.horizontal, 4)
+                .padding(.vertical, 3)
+                .transition(.scale.combined(with: .opacity))
+            }
+
+            BlockTile(block: block, inTab: tab, isFirst: isFirst, isLast: isLast)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(isTargeted ? PharosColor.accent.opacity(0.8) : Color.clear, lineWidth: isTargeted ? 1.5 : 0)
+                )
+        }
+        .contentShape(Rectangle())
+        .onDrop(of: [UTType.text], delegate: BlockDropDelegate(tab: tab, before: block, isTargeted: $isTargeted))
     }
 }
 
@@ -183,8 +250,15 @@ private struct LibraryColumn: View {
         .padding(10)
         .background(background)
         .overlay(border)
+        .contentShape(Rectangle())
         .onDrop(of: [UTType.text], isTargeted: $targeted) { providers in
-            remove(providers)
+            if let active = DragCoordinator.shared.endDrag() {
+                withAnimation(.spring(response: 0.22, dampingFraction: 0.8)) {
+                    layoutStore.update { $0.remove(active) }
+                }
+                return true
+            }
+            return remove(providers)
         }
     }
 
@@ -202,9 +276,18 @@ private struct LibraryColumn: View {
             Text(l10n.libraryEmpty).font(.system(size: 11)).foregroundStyle(.tertiary)
                 .frame(maxWidth: .infinity, minHeight: 40)
         } else {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 200), spacing: 8)], spacing: 8) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 8)], spacing: 8) {
                 ForEach(unused, id: \.self) { block in
                     BlockTile(block: block, inTab: nil, isFirst: true, isLast: true)
+                        .onDrop(of: [UTType.text], isTargeted: nil) { providers in
+                            if let active = DragCoordinator.shared.endDrag() {
+                                withAnimation(.spring(response: 0.22, dampingFraction: 0.8)) {
+                                    layoutStore.update { $0.remove(active) }
+                                }
+                                return true
+                            }
+                            return remove(providers)
+                        }
                 }
             }
         }
@@ -230,6 +313,7 @@ private struct LibraryColumn: View {
 private struct BlockTile: View {
     @ObservedObject private var layoutStore = PopoverLayoutStore.shared
     @ObservedObject private var l10n = L10n.shared
+    @ObservedObject private var dragCoord = DragCoordinator.shared
     let block: PopoverBlock
     /// nil = in the library.
     let inTab: PopoverTab?
@@ -237,30 +321,84 @@ private struct BlockTile: View {
     let isLast: Bool
     @State private var hovering = false
 
+    var isBeingDragged: Bool {
+        dragCoord.activeBlock == block
+    }
+
     var body: some View {
+        tileContent
+            .opacity(isBeingDragged ? 0.35 : 1.0)
+            .contentShape(Rectangle())
+            .onHover { hovering = $0 }
+            .onDrag {
+                dragCoord.beginDrag(block)
+                return NSItemProvider(object: block.rawValue as NSString)
+            } preview: {
+                dragPreview
+            }
+    }
+
+    private var tileContent: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                Image(systemName: "line.3.horizontal").font(.system(size: 10)).foregroundStyle(.tertiary)
-                Image(systemName: block.icon).font(.system(size: 13)).foregroundStyle(Color.accentColor).frame(width: 18)
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(hovering ? PharosColor.textSecondary : PharosColor.textTertiary)
+                    .frame(width: 14)
+                Image(systemName: block.icon)
+                    .font(.system(size: 13))
+                    .foregroundStyle(PharosColor.accent)
+                    .frame(width: 18)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(l10n.blockName(block)).font(.system(size: 12, weight: .medium)).lineLimit(1)
-                    Text(l10n.blockDescription(block)).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
+                    Text(l10n.blockName(block))
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(PharosColor.textPrimary)
+                        .lineLimit(1)
+                    Text(l10n.blockDescription(block))
+                        .font(.system(size: 10))
+                        .foregroundStyle(PharosColor.textSecondary)
+                        .lineLimit(1)
                 }
                 Spacer(minLength: 4)
                 if hovering { actions }
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 7)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .controlBackgroundColor)))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(hovering ? 0.15 : 0.08)))
-        .contentShape(Rectangle())
-        .onHover { hovering = $0 }
-        .onDrag { NSItemProvider(object: block.rawValue as NSString) } preview: {
-            Label(l10n.blockName(block), systemImage: block.icon)
-                .padding(8)
-                .background(RoundedRectangle(cornerRadius: 8).fill(.regularMaterial))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(hovering ? PharosColor.accent.opacity(0.35) : PharosColor.separator.opacity(0.3), lineWidth: 0.5)
+        )
+        .shadow(color: Color.black.opacity(hovering ? 0.05 : 0.02), radius: 2, y: 1)
+    }
+
+    private var dragPreview: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(PharosColor.textSecondary)
+            Image(systemName: block.icon)
+                .font(.system(size: 13))
+                .foregroundStyle(PharosColor.accent)
+            Text(l10n.blockName(block))
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(PharosColor.textPrimary)
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(PharosColor.accent.opacity(0.6), lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.2), radius: 8, y: 4)
+        )
     }
 
     @ViewBuilder
@@ -369,17 +507,43 @@ private struct ProjectRowsSettings: View {
     }
 }
 
-// MARK: - Drag & drop
+// MARK: - Drag & drop coordinator
+
+@MainActor
+final class DragCoordinator: ObservableObject {
+    static let shared = DragCoordinator()
+    @Published var activeBlock: PopoverBlock? = nil
+    private var clearTask: Task<Void, Never>? = nil
+
+    func beginDrag(_ block: PopoverBlock) {
+        clearTask?.cancel()
+        activeBlock = block
+        clearTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 10_000_000_000)
+            if !Task.isCancelled {
+                self?.activeBlock = nil
+            }
+        }
+    }
+
+    func endDrag() -> PopoverBlock? {
+        clearTask?.cancel()
+        clearTask = nil
+        let b = activeBlock
+        activeBlock = nil
+        return b
+    }
+}
 
 private enum BlockDrag {
-    /// Drag payload is the block's raw name as plain text.
+    /// Drag payload fallback using NSItemProvider.
     @MainActor
     static func load(_ providers: [NSItemProvider], perform: @escaping @MainActor (PopoverLayoutStore, PopoverBlock) -> Void) -> Bool {
         guard let provider = providers.first(where: { $0.canLoadObject(ofClass: NSString.self) }) else { return false }
         _ = provider.loadObject(ofClass: NSString.self) { item, _ in
             guard let raw = item as? String, let block = PopoverBlock(rawValue: raw) else { return }
             Task { @MainActor in
-                withAnimation(.easeInOut(duration: 0.18)) { perform(PopoverLayoutStore.shared, block) }
+                withAnimation(.spring(response: 0.22, dampingFraction: 0.8)) { perform(PopoverLayoutStore.shared, block) }
             }
         }
         return true
@@ -390,13 +554,67 @@ private enum BlockDrag {
 private struct BlockDropDelegate: DropDelegate {
     let tab: PopoverTab
     let before: PopoverBlock
+    @Binding var isTargeted: Bool
+
+    func dropEntered(info: DropInfo) {
+        withAnimation(.easeOut(duration: 0.12)) { isTargeted = true }
+    }
+
+    func dropExited(info: DropInfo) {
+        withAnimation(.easeOut(duration: 0.12)) { isTargeted = false }
+    }
 
     func performDrop(info: DropInfo) -> Bool {
+        withAnimation(.easeOut(duration: 0.12)) { isTargeted = false }
+        if let active = DragCoordinator.shared.endDrag() {
+            withAnimation(.spring(response: 0.22, dampingFraction: 0.8)) {
+                PopoverLayoutStore.shared.update { $0.insert(active, into: tab, before: before) }
+            }
+            return true
+        }
         let providers = info.itemProviders(for: [UTType.text])
         return MainActor.assumeIsolated {
-            BlockDrag.load(providers) { store, block in store.update { $0.insert(block, into: tab, before: before) } }
+            BlockDrag.load(providers) { store, block in
+                store.update { $0.insert(block, into: tab, before: before) }
+            }
         }
     }
 
-    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+}
+
+/// Dropping anywhere on a tab column appends to the tab.
+private struct TabColumnDropDelegate: DropDelegate {
+    let tab: PopoverTab
+    @Binding var isTargeted: Bool
+
+    func dropEntered(info: DropInfo) {
+        withAnimation(.easeOut(duration: 0.12)) { isTargeted = true }
+    }
+
+    func dropExited(info: DropInfo) {
+        withAnimation(.easeOut(duration: 0.12)) { isTargeted = false }
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        withAnimation(.easeOut(duration: 0.12)) { isTargeted = false }
+        if let active = DragCoordinator.shared.endDrag() {
+            withAnimation(.spring(response: 0.22, dampingFraction: 0.8)) {
+                PopoverLayoutStore.shared.update { $0.insert(active, into: tab) }
+            }
+            return true
+        }
+        let providers = info.itemProviders(for: [UTType.text])
+        return MainActor.assumeIsolated {
+            BlockDrag.load(providers) { store, block in
+                store.update { $0.insert(block, into: tab) }
+            }
+        }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
 }

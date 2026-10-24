@@ -15,11 +15,11 @@
   <img src="https://img.shields.io/badge/dependencies-none-brightgreen" alt="Dependencies">
   <img src="https://img.shields.io/badge/network-none-lightgrey" alt="No network">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.9-blue" alt="Version 2.9">
-  <img src="https://img.shields.io/badge/updated-2026--10--23-informational" alt="Last updated 2026-10-23">
+  <img src="https://img.shields.io/badge/version-3.0-blue" alt="Version 3.0">
+  <img src="https://img.shields.io/badge/updated-2026--10--24-informational" alt="Last updated 2026-10-24">
 </p>
 
-<p align="center"><sub>最后更新 / Last updated：2026-10-23 15:46 (UTC+8) · v2.9 · 作者 / Author：zys · 模型 / Model：Gemini 4 Argon</sub></p>
+<p align="center"><sub>最后更新 / Last updated：2026-10-24 08:40 (UTC+8) · v3.0 · 作者 / Author：zys · 模型 / Model：Gemini 4 Argon</sub></p>
 
 <p align="center"><a href="README.md">English</a> · <b>简体中文</b> · <a href="CHANGELOG.md">更新记录 / Changelog</a></p>
 
@@ -47,6 +47,7 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 | **浏览器实例** | 支持 Chrome、Chrome Beta / Canary、Chromium、Edge、Brave，按配置文件夹列出每个实例，显示调试端口、代理、内存；收藏后关闭也能看到端口和启动命令；启动与退出 |
 | **AI 助手会话管理** | 扫描、分析、备份与清理 23+ 种本地 AI 编程助手与编辑器（Cursor、Trae、Windsurf、VS Code、Antigravity、OpenCode、Claude Code、MiniMax 等）的会话数据库；内置纳秒级 `DB + WAL` 指纹增量缓存，未变动大库免重复解析；识别孤立工作区，支持手动添加扫描 `/Applications` 下的任意应用 |
 | **依赖与软件包** | 真实 Homebrew Cellar 与 Caskroom 软件包深度管理、环境自检与缓存清理；全局命令行软件统一管理（Node、Homebrew、Rust、Python、Go 等）；支持两阶段渐进式首屏秒开与 `mtime` + 锁文件指纹缓存的全生态项目依赖识别（`.venv`、`node_modules`、`.build`、`target` 等）；语言缓存仓库概览 |
+| **全局设计系统与侧边栏** | 全局统一明度层级架构（`background` → `surface` → `fill`）、纯净高对比度定制侧边栏与清晰领域分类（系统硬件、环境运行、维护清理、工作区、外观设置），彻底杜绝原生蓝条高亮反差冲突；内置响应式防挤压小组件布局引擎（`ViewThatFits`） |
 
 ---
 
@@ -56,7 +57,7 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 - **概览**页：本机内存、内存压力、所有磁盘的用量（含外接硬盘）、应用内存排行
 - **项目**页：运行中的项目（端口、内存）以及浏览器实例（启动 / 退出 / 打开调试列表，「管理…」直达「浏览器实例」页面）
 - 快捷按钮：打开主窗口、直达磁盘清理
-- **像小组件一样自定义**（主窗口 →「自定义」）：左边是下拉框的实时快照，旁边是两个页签和组件库——拖动组件调整顺序、在页签之间移动、拖出隐藏或拖入添加（内存、磁盘、风扇与温度、开发项目、应用排行、运行中的项目、浏览器实例、常用项目）。空页签会自动隐藏；「恢复默认」可还原原始布局
+- **像小组件一样自定义**（主窗口 →「自定义」）：左边是下拉框的实时快照，旁边是两个页签和组件库——拖动组件调整顺序、在页签之间移动、拖出隐藏或拖入添加（内存、磁盘、风扇与温度、开发项目、应用排行、运行中的项目、浏览器实例、常用项目）。内置 `ViewThatFits` 智能响应式防挤压布局，并列与纵向无缝适配；空页签会自动隐藏；「恢复默认」可还原原始布局
 - 组件库下方的**运行中的项目显示个数**：设置下拉框里最多列出几个项目，可点快捷选项（3 / 5 / 8 / 10 / 15 / 全部运行中）或直接输入数字——最少 3 个，最多为当前正在运行的项目数（默认 5 个）。多出来的项目在列表内滚动
 
 ### 项目

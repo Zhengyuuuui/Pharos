@@ -83,49 +83,57 @@ struct ThermalView: View {
     @EnvironmentObject var store: ProjectStore
     @ObservedObject private var l10n = L10n.shared
 
+    private var statusLevel: PharosStatusIndicator.Level {
+        switch store.thermalState {
+        case .nominal: return .normal
+        case .critical: return .critical
+        default: return .warning
+        }
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(alignment: .firstTextBaseline) {
-                    if showsTitle {
-                        Text(l10n.thermalTitle).font(.system(size: 20, weight: .bold))
-                    } else {
-                        Text(l10n.blockDescription(.thermals))
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
+        PharosPage {
+            PharosPageHeader(
+                title: showsTitle ? l10n.thermalTitle : l10n.blockDescription(.thermals)
+            ) {
+                HStack(spacing: PharosSpacing.s) {
+                    PharosStatusIndicator(
+                        level: statusLevel,
+                        text: l10n.thermalStateName(store.thermalState)
+                    )
+                    PharosActionButton(l10n.openEnergySettings, role: .standard) {
+                        ThermalStyle.openEnergySettings()
                     }
-                    Spacer()
-                    Label(l10n.thermalStateName(store.thermalState), systemImage: "thermometer.medium")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(ThermalStyle.stateColor(store.thermalState))
-                    Button(l10n.openEnergySettings) { ThermalStyle.openEnergySettings() }
-                        .controlSize(.small)
+                    .controlSize(.small)
                 }
+            }
+        } content: {
+            if let t = store.thermals {
+                FanSpeedometerClusterView()
 
-                if let t = store.thermals {
-                    FanSpeedometerClusterView()
+                FanControlCard()
 
-                    FanControlCard()
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(l10n.temperaturesTitle).font(.system(size: 13, weight: .semibold))
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
-                            ForEach(SensorGroup.allCases, id: \.self) { g in
-                                if let c = t.groups[g] { TempTile(group: g, celsius: c) }
+                PharosSection(title: l10n.temperaturesTitle, systemImage: "thermometer.medium") {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: PharosSpacing.m)], spacing: PharosSpacing.m) {
+                        ForEach(SensorGroup.allCases, id: \.self) { g in
+                            if let c = t.groups[g] {
+                                TempTile(group: g, celsius: c)
                             }
                         }
                     }
-                } else {
-                    Label(l10n.thermalUnavailable, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
                 }
-
-                Text(l10n.thermalReadNotice)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
-                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                PharosCard {
+                    PharosEmptyState(
+                        title: l10n.thermalUnavailable,
+                        systemImage: "exclamationmark.triangle",
+                        message: l10n.thermalReadNotice,
+                        tint: PharosColor.warning
+                    )
+                }
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
+
+            PharosBanner(kind: .info, text: l10n.thermalReadNotice)
         }
         .onAppear {
             FanStore.shared.refreshState()
@@ -147,14 +155,16 @@ private struct TempTile: View {
     let celsius: Double
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(l10n.sensorGroup(group)).font(.system(size: 11)).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: PharosSpacing.xs) {
+            Text(l10n.sensorGroup(group))
+                .font(PharosFont.caption)
+                .foregroundStyle(PharosColor.textSecondary)
             Text(ThermalStyle.temp(celsius))
-                .font(.system(size: 20, weight: .semibold).monospacedDigit())
+                .font(PharosFont.metricValue)
                 .foregroundStyle(ThermalStyle.color(celsius))
         }
-        .padding(12)
+        .padding(PharosSpacing.m)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
+        .background(RoundedRectangle(cornerRadius: PharosRadius.card, style: .continuous).fill(PharosColor.fill))
     }
 }

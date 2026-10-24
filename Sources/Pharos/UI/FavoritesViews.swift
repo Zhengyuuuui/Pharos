@@ -64,14 +64,9 @@ struct WorkspaceErrorBanner: View {
 
     var body: some View {
         if let message = workspaces.errorMessage {
-            HStack(spacing: 8) {
-                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
-                Text(message).font(.system(size: 11)).textSelection(.enabled)
-                Spacer()
+            PharosBanner(kind: .error, text: message) {
                 IconButton(systemImage: "xmark", help: L10n.shared.dismiss) { workspaces.errorMessage = nil }
             }
-            .padding(10)
-            .background(RoundedRectangle(cornerRadius: 6).fill(Color.red.opacity(0.1)))
         }
     }
 }
@@ -84,37 +79,39 @@ struct FavoritesTable: View {
     var onSelect: (Favorite) -> Void = { _ in }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(l10n.favorites).font(.system(size: 13, weight: .semibold))
-                Spacer()
-                Button {
+        VStack(alignment: .leading, spacing: PharosSpacing.titleToCard) {
+            PharosSectionHeader(title: l10n.favorites, systemImage: "star") {
+                PharosActionButton(l10n.addWorkspace, systemImage: "plus", role: .standard) {
                     if let id = workspaces.addFolder(), let fav = workspaces.favorite(id: id) { onSelect(fav) }
-                } label: {
-                    Label(l10n.addWorkspace, systemImage: "plus")
                 }
                 .controlSize(.small)
             }
+            .padding(.horizontal, PharosSpacing.xs)
+
             WorkspaceErrorBanner()
+
             let statuses = workspaces.statuses(store.projects)
             if statuses.isEmpty {
-                Text(l10n.favoritesEmpty)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.03)))
+                PharosCard {
+                    Text(l10n.favoritesEmpty)
+                        .font(PharosFont.caption)
+                        .foregroundStyle(PharosColor.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, PharosSpacing.s)
+                }
             } else {
-                VStack(spacing: 0) {
-                    ForEach(Array(statuses.enumerated()), id: \.element.favorite.id) { index, s in
-                        FavoriteTableRow(status: s, onSelect: onSelect)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(index.isMultiple(of: 2) ? Color.primary.opacity(0.03) : .clear)
+                PharosCard {
+                    VStack(spacing: 0) {
+                        ForEach(Array(statuses.enumerated()), id: \.element.favorite.id) { index, s in
+                            if index > 0 {
+                                PharosListDivider()
+                            }
+                            FavoriteTableRow(status: s, onSelect: onSelect)
+                                .padding(.horizontal, PharosSpacing.xs)
+                                .padding(.vertical, PharosSpacing.s)
+                        }
                     }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.primary.opacity(0.08)))
             }
         }
     }
@@ -182,23 +179,18 @@ struct FavoriteDetailView: View {
     var body: some View {
         if let fav = workspaces.favorite(id: favoriteId) {
             let status = FavoriteStatus(favorite: fav, running: workspaces.running(in: store.projects)[fav.id] ?? [])
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    header(fav, status)
-                    WorkspaceErrorBanner()
-                    if !FileManager.default.fileExists(atPath: fav.directory) {
-                        Label(l10n.folderMissing(fav.directory), systemImage: "folder.badge.questionmark")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.orange)
-                    }
-                    commandSection(fav, status)
-                    if !candidates.filter({ $0.command != fav.command }).isEmpty {
-                        candidatesSection(fav)
-                    }
-                    runningSection(fav, status)
+            PharosPage {
+                header(fav, status)
+            } content: {
+                WorkspaceErrorBanner()
+                if !FileManager.default.fileExists(atPath: fav.directory) {
+                    PharosBanner(kind: .warning, text: l10n.folderMissing(fav.directory))
                 }
-                .padding(20)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                commandSection(fav, status)
+                if !candidates.filter({ $0.command != fav.command }).isEmpty {
+                    candidatesSection(fav)
+                }
+                runningSection(fav, status)
             }
             .task(id: fav.directory) {
                 let dir = fav.directory
@@ -213,20 +205,20 @@ struct FavoriteDetailView: View {
 
     private func header(_ fav: Favorite, _ status: FavoriteStatus) -> some View {
         HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: PharosSpacing.xs) {
+                HStack(spacing: PharosSpacing.s) {
                     RunDot(running: status.isRunning)
                     if editingName {
                         TextField("", text: $draftName)
                             .textFieldStyle(.roundedBorder)
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(PharosFont.pageTitle)
                             .frame(maxWidth: 260)
                             .onSubmit {
                                 workspaces.update(id: fav.id, name: draftName)
                                 editingName = false
                             }
                     } else {
-                        Text(fav.name).font(.system(size: 20, weight: .bold)).lineLimit(1)
+                        Text(fav.name).font(PharosFont.pageTitle).lineLimit(1)
                         IconButton(systemImage: "pencil", help: l10n.rename) {
                             draftName = fav.name
                             editingName = true
@@ -234,8 +226,8 @@ struct FavoriteDetailView: View {
                     }
                 }
                 Text(fav.directory)
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                    .font(PharosFont.technical)
+                    .foregroundStyle(PharosColor.textSecondary)
                     .textSelection(.enabled)
                     .lineLimit(1)
                     .truncationMode(.head)
@@ -243,28 +235,29 @@ struct FavoriteDetailView: View {
                      ? l10n.runningSummary(ports: status.ports.count, memory: ByteFormat.short(status.memoryBytes))
                      : (fav.lastPorts.isEmpty ? l10n.notRunning
                         : l10n.notRunningLastPorts(fav.lastPorts.map { ":\($0)" }.joined(separator: " "))))
-                    .font(.system(size: 11))
-                    .foregroundStyle(status.isRunning ? Color.green : Color.secondary)
+                    .font(PharosFont.caption)
+                    .foregroundStyle(status.isRunning ? PharosColor.success : PharosColor.textSecondary)
             }
             Spacer()
-            HStack(spacing: 8) {
+            HStack(spacing: PharosSpacing.s) {
                 Button { workspaces.revealInFinder(fav) } label: {
                     Label(l10n.revealInFinder, systemImage: "folder")
                 }
+                .buttonStyle(.pharos)
                 .controlSize(.small)
                 if confirmRemove {
                     Button(l10n.removeFavorite) {
                         workspaces.unpin(id: fav.id)
                         onRemoved()
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.red)
+                    .buttonStyle(.pharosDestructive)
                     .controlSize(.small)
                     IconButton(systemImage: "xmark", help: l10n.cancel) { confirmRemove = false }
                 } else {
                     Button { confirmRemove = true } label: {
                         Label(l10n.removeFavorite, systemImage: "star.slash")
                     }
+                    .buttonStyle(.pharos)
                     .controlSize(.small)
                 }
             }
@@ -272,48 +265,61 @@ struct FavoriteDetailView: View {
     }
 
     private func commandSection(_ fav: Favorite, _ status: FavoriteStatus) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(l10n.startCommand).font(.system(size: 13, weight: .semibold))
-                Text(l10n.commandSourceLabel(fav.commandSource))
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
-            }
-            if editingCommand {
-                HStack(spacing: 8) {
-                    TextField(l10n.commandPlaceholder, text: $draftCommand)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(size: 12, design: .monospaced))
-                        .onSubmit { commitCommand(fav) }
-                    Button(l10n.save) { commitCommand(fav) }.controlSize(.small)
-                    Button(l10n.cancel) { editingCommand = false }.controlSize(.small)
+        PharosSection(title: l10n.startCommand, systemImage: "terminal") {
+            VStack(alignment: .leading, spacing: PharosSpacing.m) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(l10n.commandSourceLabel(fav.commandSource))
+                        .font(PharosFont.caption)
+                        .foregroundStyle(PharosColor.textTertiary)
+                    Spacer()
                 }
-            } else {
-                HStack(spacing: 8) {
-                    Text(fav.command.isEmpty ? l10n.noCommandSet : fav.command)
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundStyle(fav.command.isEmpty ? Color.orange : Color.primary)
-                        .textSelection(.enabled)
-                        .padding(8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.05)))
-                    IconButton(systemImage: "pencil", help: l10n.editCommand) {
-                        draftCommand = fav.command
-                        editingCommand = true
+
+                if editingCommand {
+                    HStack(spacing: PharosSpacing.s) {
+                        TextField(l10n.commandPlaceholder, text: $draftCommand)
+                            .textFieldStyle(.roundedBorder)
+                            .font(PharosFont.technical)
+                            .onSubmit { commitCommand(fav) }
+                        PharosActionButton(l10n.save, role: .primary) { commitCommand(fav) }
+                            .controlSize(.small)
+                        PharosActionButton(l10n.cancel, role: .standard) { editingCommand = false }
+                            .controlSize(.small)
                     }
-                    IconButton(systemImage: "doc.on.doc", help: l10n.copyCommand) { workspaces.copyCommand(fav) }
+                } else {
+                    HStack(spacing: PharosSpacing.s) {
+                        Text(fav.command.isEmpty ? l10n.noCommandSet : fav.command)
+                            .font(PharosFont.technical)
+                            .foregroundStyle(fav.command.isEmpty ? PharosColor.warning : PharosColor.textPrimary)
+                            .textSelection(.enabled)
+                            .padding(PharosSpacing.s)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: PharosRadius.control, style: .continuous)
+                                    .fill(PharosColor.fill)
+                            )
+                        IconButton(systemImage: "pencil", help: l10n.editCommand) {
+                            draftCommand = fav.command
+                            editingCommand = true
+                        }
+                        IconButton(systemImage: "doc.on.doc", help: l10n.copyCommand) { workspaces.copyCommand(fav) }
+                            .disabled(fav.command.isEmpty)
+                    }
+
+                    HStack(spacing: PharosSpacing.s) {
+                        PharosActionButton(l10n.openInTerminal, systemImage: "terminal", role: .primary) {
+                            workspaces.openInTerminal(fav)
+                        }
                         .disabled(fav.command.isEmpty)
-                }
-                HStack(spacing: 8) {
-                    Button { workspaces.openInTerminal(fav) } label: {
-                        Label(l10n.openInTerminal, systemImage: "terminal")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(fav.command.isEmpty)
-                    if status.isRunning {
-                        Text(l10n.alreadyRunningHint).font(.system(size: 10)).foregroundStyle(.secondary)
-                    } else {
-                        Text(l10n.openInTerminalHint).font(.system(size: 10)).foregroundStyle(.tertiary)
+
+                        if status.isRunning {
+                            Text(l10n.alreadyRunningHint)
+                                .font(PharosFont.caption)
+                                .foregroundStyle(PharosColor.textSecondary)
+                        } else {
+                            Text(l10n.openInTerminalHint)
+                                .font(PharosFont.caption)
+                                .foregroundStyle(PharosColor.textTertiary)
+                        }
                     }
                 }
             }
@@ -321,25 +327,42 @@ struct FavoriteDetailView: View {
     }
 
     private func candidatesSection(_ fav: Favorite) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(l10n.detectedCommands).font(.system(size: 12, weight: .semibold))
-            ForEach(candidates.filter { $0.command != fav.command }, id: \.self) { c in
-                HStack(spacing: 8) {
-                    Text(c.command).font(.system(size: 11, design: .monospaced))
-                    Text(c.origin).font(.system(size: 10)).foregroundStyle(.tertiary)
-                    if c.destructive {
-                        Label(l10n.destructiveScript, systemImage: "exclamationmark.triangle.fill")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.orange)
-                            .help(l10n.destructiveScriptHelp)
-                    } else if c.confidence == .script {
-                        Text(l10n.reviewScript).font(.system(size: 10)).foregroundStyle(.secondary)
+        let activeCandidates = candidates.filter { $0.command != fav.command }
+        return PharosSection(title: l10n.detectedCommands, systemImage: "sparkles") {
+            VStack(spacing: 0) {
+                ForEach(activeCandidates.indices, id: \.self) { index in
+                    let c = activeCandidates[index]
+                    if index > 0 {
+                        PharosListDivider()
                     }
-                    Spacer()
-                    Button(l10n.useThis) { workspaces.useCandidate(id: fav.id, c) }
-                        .controlSize(.small)
-                        .disabled(c.destructive)
-                        .help(c.destructive ? l10n.destructiveScriptHelp : "")
+                    HStack(spacing: PharosSpacing.s) {
+                        Text(c.command)
+                            .font(PharosFont.technical)
+                            .foregroundStyle(PharosColor.textPrimary)
+                        Text(c.origin)
+                            .font(PharosFont.caption)
+                            .foregroundStyle(PharosColor.textTertiary)
+
+                        if c.destructive {
+                            Label(l10n.destructiveScript, systemImage: "exclamationmark.triangle.fill")
+                                .font(PharosFont.caption)
+                                .foregroundStyle(PharosColor.warning)
+                                .help(l10n.destructiveScriptHelp)
+                        } else if c.confidence == .script {
+                            Text(l10n.reviewScript)
+                                .font(PharosFont.caption)
+                                .foregroundStyle(PharosColor.textSecondary)
+                        }
+
+                        Spacer()
+
+                        Button(l10n.useThis) { workspaces.useCandidate(id: fav.id, c) }
+                            .buttonStyle(.pharos)
+                            .controlSize(.small)
+                            .disabled(c.destructive)
+                            .help(c.destructive ? l10n.destructiveScriptHelp : "")
+                    }
+                    .padding(.vertical, PharosSpacing.s)
                 }
             }
         }
@@ -348,23 +371,29 @@ struct FavoriteDetailView: View {
     @ViewBuilder
     private func runningSection(_ fav: Favorite, _ status: FavoriteStatus) -> some View {
         if status.isRunning {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(l10n.runningNow).font(.system(size: 13, weight: .semibold))
-                ForEach(status.running) { p in
-                    HStack(spacing: 10) {
-                        Text(p.name).font(.system(size: 12, weight: .medium))
-                        PortChips(ports: p.ports).fixedSize()
-                        Text(p.listeners.first?.shortCommand ?? "")
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(.tertiary)
-                            .lineLimit(1)
-                        Spacer()
-                        Text(ByteFormat.short(p.memoryBytes))
-                            .font(.system(size: 11, weight: .medium).monospacedDigit())
-                        StopButton(project: p, compact: true)
+            PharosSection(title: l10n.runningNow, systemImage: "play.circle") {
+                VStack(spacing: 0) {
+                    ForEach(status.running.indices, id: \.self) { index in
+                        let p = status.running[index]
+                        if index > 0 {
+                            PharosListDivider()
+                        }
+                        HStack(spacing: PharosSpacing.s) {
+                            Text(p.name)
+                                .font(PharosFont.rowLabel)
+                            PortChips(ports: p.ports).fixedSize()
+                            Text(p.listeners.first?.shortCommand ?? "")
+                                .font(PharosFont.technical)
+                                .foregroundStyle(PharosColor.textTertiary)
+                                .lineLimit(1)
+                            Spacer()
+                            Text(ByteFormat.short(p.memoryBytes))
+                                .font(PharosFont.captionDigits)
+                                .fontWeight(.medium)
+                            StopButton(project: p, compact: true)
+                        }
+                        .padding(.vertical, PharosSpacing.s)
                     }
-                    .padding(8)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.04)))
                 }
             }
         }
