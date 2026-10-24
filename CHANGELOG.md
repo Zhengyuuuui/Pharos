@@ -37,10 +37,13 @@ Times are UTC+8. 时间为北京时间（UTC+8）。
   - Re-architected sidebar from native `List`/`NSTableView` to a pure custom `ScrollView` with specialized interactive rows (`PharosSidebarRow`, `BatteryAndThermalSidebarRow`, `FavoriteSidebarRow`, `ProjectSidebarRow`)
   - **Eliminated native AppKit blue highlight clashing**: selected rows use a gentle neutral card background (`PharosColor.fill`) with a 0.5pt subtle separator stroke; selected text strictly maintains high-contrast `PharosColor.textPrimary` (solid black in light mode, pure white in dark mode) while icons display warm amber accent (`PharosColor.accent`)
   - Organized navigation into 6 clear domain categories (System & Hardware, Runtime & Services, System Maintenance, Favorite Workspaces, Running Projects, Appearance), anchored by a top Dashboard Hero item and bottom control island (refresh, settings, project status pill)
-- **Adaptive Anti-Squeezing Popover Customizer Layout**:
+- **Adaptive Anti-Squeezing Popover Customizer Layout & Tactile Drag-and-Drop**:
   - Upgraded `CustomizePopoverView` with `ViewThatFits(in: .horizontal)` responsive engine: automatically displays side-by-side snapshot and editor columns on wide screens, and smoothly transitions to stacked layout on narrower windows with zero column or sidebar squeezing
   - Optimized tab and library column minWidth from 200pt to 150pt and uncapped the previous artificial 960pt limit via `PharosPage(maxWidth: 1200)`
   - Elevated default main window dimensions to `1040 × 700` (minWidth `920 × 600`)
+  - **Zero-Latency In-Memory Drag Engine (`DragCoordinator`)**: added synchronous in-memory tracking eliminating the 100ms NSItemProvider async lag; introduced dynamic amber insertion guide lines on tiles, full-area drop zones across tab columns and library, and 35% in-place grab dimming with `.spring()` physics
+- **Card-Structured Settings Redesign (AlDente Inspired)**:
+  - Re-architected `MainSettingsView` with modular card hierarchy: 2x2 capsule Quick Action grid (Refresh, Export, Import, Reset with confirmation), License & About card, categorized setting cards with SF Symbols, help tooltips, and aligned 3-column footer
 - **Codebase Integrity**: 100% native Swift/SwiftUI, zero third-party dependencies, all **765 unit assertions passed**.
 
 **简体中文**
@@ -53,10 +56,13 @@ Times are UTC+8. 时间为北京时间（UTC+8）。
   - 彻底重构原有原生 `List`/`NSTableView` 侧边栏，转换为高性能纯净 `ScrollView` + 独立行组件体系（`PharosSidebarRow` 等）
   - **根治系统原生蓝条高亮反差冲突**：选中态采用柔和低对比度中性底（`PharosColor.fill`）与 0.5pt 发丝微边框；选中文字**严格保持最高清晰度主文本色（`PharosColor.textPrimary`）**（浅色模式纯黑、深色模式纯白），仅图标点缀精致琥珀色（`PharosColor.accent`），在任何光照外观下文字均字字分明
   - 领域化清晰归组：划分为仪表盘英雄项、系统与硬件、环境与运行时、系统维护、常用项目、运行中进程、外观与设置 6 大领域，配合底部控制岛（一键刷新、设置直达、运行状态药丸胶囊）
-- **响应式防挤压小组件自定义布局引擎**：
+- **响应式防挤压小组件自定义布局与高贴手拖拽重构**：
   - `CustomizePopoverView` 全面引入 `ViewThatFits(in: .horizontal)` 智能响应式架构：宽屏下 Popover 实时预览与编辑列左右舒展并列，窄屏或小显示器下自动平滑降级为上下纵向排列，彻底解决侧边栏被压扁、主内容区被横向挤压的问题
   - 弹性列宽调优：两列 Tab 与组件库最小宽度从 200pt 缩减至更合理的 150pt，并通过 `PharosPage(maxWidth: 1200)` 释放宽度约束
   - 窗口基准尺寸升级：主窗口默认大小调整为更宽敞舒适的 `1040 × 700`（最小尺寸 `920 × 600`）
+  - **跟手性与拖拽体验彻底根治（`DragCoordinator`）**：引入内存同步拖拽协调器，消灭原异步跨线程 100ms 停顿；新增动态琥珀色插入指示线、页签全域无盲区吸附、组件库全域直接回收，以及 35% 原位抓取置灰与物理弹簧平滑位移动效
+- **卡片式分层设置面板重构（对标目标 App）**：
+  - 重新设计主窗口设置 `MainSettingsView`：2×2 胶囊快捷动作网格（立即刷新、导出配置、导入配置、破坏性红字重置与弹窗防误触）、许可与关于卡片、SF Symbols 分组卡片与三栏对齐页脚
 - **工程质量与纯净度**：纯 Apple 原生 Swift / SwiftUI，零第三方依赖，全量单测套件 **765 项断言全绿通过**。
 
 ---

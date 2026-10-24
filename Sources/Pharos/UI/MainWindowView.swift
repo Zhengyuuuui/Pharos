@@ -502,30 +502,6 @@ struct ProjectDetailView: View {
     }
 }
 
-struct MainSettingsView: View {
-    @ObservedObject private var l10n = L10n.shared
-
-    var body: some View {
-        PharosPage {
-            PharosPageHeader(title: l10n.settings)
-        } content: {
-            PharosSection(title: l10n.settings, systemImage: "gearshape") {
-                SettingsForm()
-                    .frame(maxWidth: 480, alignment: .leading)
-            }
-            PharosSection(title: l10n.menuBarText, systemImage: "slider.horizontal.3") {
-                ExtraSettingsForm()
-                    .frame(maxWidth: 520, alignment: .leading)
-            }
-            PharosSection(title: l10n.browsersSettings, systemImage: "globe") {
-                BrowserSettingsForm()
-                    .frame(maxWidth: 560, alignment: .leading)
-            }
-            PharosBanner(kind: .info, text: l10n.dataNotice)
-        }
-    }
-}
-
 private struct PharosSidebarSectionHeader<Trailing: View>: View {
     let title: String
     @ViewBuilder var trailing: Trailing

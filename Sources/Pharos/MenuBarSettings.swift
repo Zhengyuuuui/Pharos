@@ -114,6 +114,13 @@ final class MenuBarSettings: ObservableObject {
         if status != noErr { hotkeyError = L10n.shared.hotkeyFailed }
     }
 
+    func reset() {
+        text = .none
+        maxProjects = 25
+        maxPorts = 50
+        hotkey = .none
+    }
+
     /// MenuBarExtra has no API to open its popover, so click its status item button.
     static func togglePopover() {
         func find(_ view: NSView?) -> NSStatusBarButton? {
