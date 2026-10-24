@@ -1298,6 +1298,14 @@ final class L10n: ObservableObject {
     var resetSettingsDone: String { en ? "All settings have been restored to defaults." : "所有设置已恢复为默认值。" }
     var launchAtLoginHelp: String { en ? "Automatically launch Pharos in the menu bar when you log into your Mac." : "在登录 Mac 时自动在菜单栏启动 Pharos。" }
     var footerCrafted: String { en ? "By zys with ♡" : "由 zys 精心打造 ♡" }
+    var trafficLightGlassTitle: String { en ? "Traffic Lights Glass Transparency" : "交通灯毛玻璃透明度" }
+    var trafficLightGlassHint: String {
+        en ? "Adjust the frosted glass translucency over the top-left traffic lights when scrolling the sidebar. Live preview on the left shows overlapping text."
+           : "调节向下滑动侧边栏时，左上方三个交通灯按钮区域的毛玻璃通透度。左侧预览实时展示文字滑入按钮下方的模糊效果。"
+    }
+    var trafficLightGlassPreviewLabel: String { en ? "LIVE PREVIEW" : "实时预览" }
+    var trafficLightGlassFrosted: String { en ? "Frosted" : "浓雾" }
+    var trafficLightGlassClear: String { en ? "Clear" : "通透" }
 }
 
 

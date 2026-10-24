@@ -19,7 +19,7 @@
   <img src="https://img.shields.io/badge/updated-2026--10--24-informational" alt="Last updated 2026-10-24">
 </p>
 
-<p align="center"><sub>Last updated / 最后更新：2026-10-24 08:40 (UTC+8) · v3.0 · Author / 作者：zys · Model / 模型：Gemini 4 Argon</sub></p>
+<p align="center"><sub>Last updated / 最后更新：2026-10-24 10:46 (UTC+8) · v3.0 · Author / 作者：zys · Model / 模型：Gemini 4 Argon</sub></p>
 
 <p align="center"><b>English</b> · <a href="README_CN.md">简体中文</a> · <a href="CHANGELOG.md">Changelog / 更新记录</a></p>
 
@@ -47,7 +47,7 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 | **Browser instances** | Chrome, Chrome Beta / Canary, Chromium, Edge and Brave — every profile folder with its debug port, proxy and memory; save favorites that stay listed with their launch command after quitting; start and quit |
 | **AI agent chat databases** | Inspect, clean and backup local chat / session databases from 23+ AI IDEs and editors (Cursor, Trae, Windsurf, VS Code, Antigravity, OpenCode, Claude Code, MiniMax…); nanosecond-precision incremental fingerprint cache (`DB + WAL` size/mtime) skips unchanged databases; detect orphaned workspaces; manually add and scan any custom application under `/Applications` |
 | **Packages & CLI tools** | Real Homebrew Cellar formula & Caskroom package scanning, diagnostics (`brew doctor`/`services`) and cache cleanup; global CLI tools (Node, Homebrew, Rust, Python, Go) with terminal run, reveal and uninstall; two-stage progressive project dependency scanning with `mtime` + lockfile fingerprint cache across 10 developer workspace directories (`.venv`, `node_modules`, `.build`, `target`); language cache repos overview |
-| **Design system & sidebar** | Strict 3-step lightness hierarchy (`background` → `surface` → `fill`), pure high-contrast custom sidebar with domain categorization (System, Runtime, Maintenance, Workspaces, Appearance), zero AppKit blue highlight clashing, and adaptive responsive popover customizer (`ViewThatFits`) |
+| **Design system & sidebar** | Strict 3-step lightness hierarchy (`background` → `surface` → `fill` with calibrated high-contrast tokens and `Font.TextStyle` dynamic typography), floating sidebar island with native traffic lights and customizable frosted-glass scroll blur (0%–100% slider + live top-left 3-buttons preview in Settings), zero AppKit blue highlight clashing, and adaptive responsive popover customizer (`ViewThatFits`) |
 
 ---
 
@@ -256,6 +256,11 @@ make icon                           # regenerate the app icon from Scripts/make-
 ---
 
 ## Recent Updates
+
+### v3.0 (2026-10-24)
+- **Floating Sidebar Island & Controllable Traffic Lights Frosted Glass**: redesigned the main window with a rounded floating sidebar island housing the native macOS traffic lights (`NSToolbar` unified layout) and a bottom status/settings footer island; scrolling sidebar items underneath the top-left traffic lights row triggers real-time Gaussian frosted-glass blur (`NSClipView.boundsDidChangeNotification`), with a 0%–100% transparency slider and a live miniature top-left 3-buttons preview card in **Settings → Menu Bar & Appearance**.
+- **Calibrated High-Contrast & Dynamic Typography Tokens**: `PharosColor` provides calibrated high-contrast lightness steps in both light and dark modes (increasing both `background`→`surface` and `surface`→`fill` separation), and `PharosFont` uses relative `Font.TextStyle` tokens with `.monospacedDigit()`.
+- **Comprehensive Settings Reset**: confirming **Reset Settings** in the modern Settings page restores all persisted preferences across stores (`ProjectStore`, `L10n`, `PopoverLayoutStore`, `MenuBarSettings`, `WorkspaceStore`, `Notifier`, `ChromeStore`, `PackageStore`, `AgentChatStore`, and visual toggles) while preserving saved workspaces, browser presets, and hardware fan/battery daemons.
 
 ### v2.9 (2026-10-23)
 - **Persistent Lid-Closed & Background Battery Guard**: optional toggle in Battery & Charging lets `pharos-battd` persist its target mode/limit to `/Library/PrivilegedHelperTools/local.pharos.battd.state` (mode `0600`) and maintain the hardware charge limit across lid-close sleep, DarkWake, app quits, and reboots without requiring UI heartbeats.

@@ -19,7 +19,7 @@
   <img src="https://img.shields.io/badge/updated-2026--10--24-informational" alt="Last updated 2026-10-24">
 </p>
 
-<p align="center"><sub>最后更新 / Last updated：2026-10-24 08:40 (UTC+8) · v3.0 · 作者 / Author：zys · 模型 / Model：Gemini 4 Argon</sub></p>
+<p align="center"><sub>最后更新 / Last updated：2026-10-24 10:46 (UTC+8) · v3.0 · 作者 / Author：zys · 模型 / Model：Gemini 4 Argon</sub></p>
 
 <p align="center"><a href="README.md">English</a> · <b>简体中文</b> · <a href="CHANGELOG.md">更新记录 / Changelog</a></p>
 
@@ -47,7 +47,7 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 | **浏览器实例** | 支持 Chrome、Chrome Beta / Canary、Chromium、Edge、Brave，按配置文件夹列出每个实例，显示调试端口、代理、内存；收藏后关闭也能看到端口和启动命令；启动与退出 |
 | **AI 助手会话管理** | 扫描、分析、备份与清理 23+ 种本地 AI 编程助手与编辑器（Cursor、Trae、Windsurf、VS Code、Antigravity、OpenCode、Claude Code、MiniMax 等）的会话数据库；内置纳秒级 `DB + WAL` 指纹增量缓存，未变动大库免重复解析；识别孤立工作区，支持手动添加扫描 `/Applications` 下的任意应用 |
 | **依赖与软件包** | 真实 Homebrew Cellar 与 Caskroom 软件包深度管理、环境自检与缓存清理；全局命令行软件统一管理（Node、Homebrew、Rust、Python、Go 等）；支持两阶段渐进式首屏秒开与 `mtime` + 锁文件指纹缓存的全生态项目依赖识别（`.venv`、`node_modules`、`.build`、`target` 等）；语言缓存仓库概览 |
-| **全局设计系统与侧边栏** | 全局统一明度层级架构（`background` → `surface` → `fill`）、纯净高对比度定制侧边栏与清晰领域分类（系统硬件、环境运行、维护清理、工作区、外观设置），彻底杜绝原生蓝条高亮反差冲突；内置响应式防挤压小组件布局引擎（`ViewThatFits`） |
+| **全局设计系统与侧边栏** | 全局统一明度层级架构（`background` → `surface` → `fill`，支持浅/深色高对比度校准与 `Font.TextStyle` 动态字号）、圆角悬浮侧边栏浮岛与原生交通灯毛玻璃滚动模糊（支持在设置中 0%–100% 连续调节通透度并配有左上角三按钮实时预览图），彻底杜绝原生蓝条高亮反差冲突；内置响应式防挤压小组件布局引擎（`ViewThatFits`） |
 
 ---
 
@@ -256,6 +256,11 @@ make icon                           # 重新生成浅色/深色 App 图标
 ---
 
 ## 最新版本更新速览
+
+### v3.0 (2026-10-24)
+- **圆角悬浮侧边栏浮岛与可控交通灯毛玻璃效果**：主窗口采用圆角矩形悬浮侧边栏浮岛（内置 macOS 原生交通灯与底部状态/设置浮岛）；向下滑动侧边栏时，滑入左上角三个交通灯按钮区域的文字自动呈现真实高斯毛玻璃模糊（基于 `NSClipView.boundsDidChangeNotification` 实时驱动），并在「设置 → 菜单栏与视觉」中提供 `0% ~ 100%` 透明度调节滑块与左上角三按钮微缩实时预览卡片。
+- **高对比度语义色彩校准与动态字体令牌**：`PharosColor` 在浅色与深色高对比度模式下独立校准 `background`、`surface`、`fill` 的明度阶梯差值；`PharosFont` 全面切换至基于 `Font.TextStyle` 的动态字号令牌并保留等宽数字特性。
+- **全量偏好设置一键重置**：「设置 → 恢复默认设置」覆盖全部持久化偏好项（刷新频率、语言、通知、浏览器显示、终端、包管理视图、AI 会话布局、菜单栏容量与视觉开关），同时安全保留已收藏工作区、浏览器预设及风扇/电池硬件守护配置。
 
 ### v2.9 (2026-10-23)
 - **电池合盖与后台持续守护（Persistent Guard）**：「电池与充电」页面新增可选「合盖与后台持续守护」开关，开启后 `pharos-battd` 将限充策略持久化至 `/Library/PrivilegedHelperTools/local.pharos.battd.state`（权限 `0600`），即使合盖休眠、DarkWake 唤醒、退出 Pharos 主程序或重启系统，仍持续守住 80% 充电上限。

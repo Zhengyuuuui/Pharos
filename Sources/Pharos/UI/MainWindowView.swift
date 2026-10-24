@@ -9,6 +9,7 @@ struct MainWindowView: View {
     @ObservedObject private var packageStore = PackageStore.shared
     @ObservedObject private var router = WindowRouter.shared
     @ObservedObject private var l10n = L10n.shared
+    @AppStorage("pharos.trafficLightGlassTransparency") private var trafficLightGlassTransparency: Double = 0.75
     @State private var selection: SidebarItem?
     @State private var sidebarScrollOffset: CGFloat = 0
     /// Entry point from the menu-bar popover (e.g. "Disk Cleanup").
@@ -72,194 +73,40 @@ struct MainWindowView: View {
     }
 
     private var sidebarScrollProgress: CGFloat {
-        min(1.0, max(0.0, -sidebarScrollOffset / 16.0))
+        min(1.0, max(0.0, -sidebarScrollOffset / 14.0))
     }
 
     private var sidebarIsland: some View {
         VStack(spacing: 0) {
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 2) {
-                    GeometryReader { geo in
-                        Color.clear.preference(
-                            key: SidebarScrollOffsetKey.self,
-                            value: geo.frame(in: .named("sidebarScroll")).minY
-                        )
-                    }
-                    .frame(height: 0)
-
-                    // Top: Dashboard Hero Item
-                    PharosSidebarRow(
-                        icon: "square.grid.2x2",
-                        title: l10n.dashboard,
-                        badge: store.totalPorts > 0 ? "\(store.totalPorts)" : nil,
-                        isSelected: selection == .portsOverview
-                    ) {
-                        selection = .portsOverview
-                    }
-
-                    PharosListDivider()
-                        .padding(.vertical, 4)
-                        .padding(.horizontal, 6)
-
-                    // Group 1: 系统与硬件 (System & Hardware)
-                    PharosSidebarSectionHeader(title: l10n.systemAndHardware)
-                        .padding(.horizontal, 10)
-                        .padding(.top, 4)
-                        .padding(.bottom, 2)
-
-                    PharosSidebarRow(
-                        icon: "memorychip",
-                        title: l10n.systemMemory,
-                        badge: store.system.map { "\(Int(($0.usedFraction * 100).rounded()))%" },
-                        isSelected: selection == .systemMemory
-                    ) {
-                        selection = .systemMemory
-                    }
-
-                    PharosSidebarRow(
-                        icon: "internaldrive",
-                        title: l10n.diskUsage,
-                        badge: store.volumes.first(where: { $0.kind == .startup }).map { "\(Int(($0.usedFraction * 100).rounded()))%" },
-                        extraBadge: {
-                            let extra = store.volumes.filter { $0.kind == .external || $0.kind == .network }.count
-                            return extra > 0 ? "+\(extra)" : nil
-                        }(),
-                        isSelected: selection == .diskUsage
-                    ) {
-                        selection = .diskUsage
-                    }
-
-                    BatteryAndThermalSidebarRow(isSelected: selection == .batteryAndThermals) {
-                        selection = .batteryAndThermals
-                    }
-
-                    // Group 2: 环境与运行时 (Runtime & Services)
-                    PharosSidebarSectionHeader(title: l10n.runtimeAndServices)
-                        .padding(.horizontal, 10)
-                        .padding(.top, 6)
-                        .padding(.bottom, 2)
-
-                    PharosSidebarRow(
-                        icon: "shippingbox",
-                        title: l10n.packagesTitle,
-                        badge: packageStore.globalCliCount > 0 ? "\(packageStore.globalCliCount)" : nil,
-                        isSelected: selection == .packages
-                    ) {
-                        selection = .packages
-                    }
-
-                    PharosSidebarRow(
-                        icon: "globe",
-                        title: l10n.chromeTitle,
-                        badge: {
-                            let browserCount = store.chrome.filter { ChromeStore.shared.isVisible($0.config.browser) }.count
-                            return browserCount > 0 ? "\(browserCount)" : nil
-                        }(),
-                        isSelected: selection == .chrome
-                    ) {
-                        selection = .chrome
-                    }
-
-                    PharosSidebarRow(
-                        icon: "bubble.left.and.text.bubble.right",
-                        title: l10n.agentChats,
-                        badge: agentStore.totalDatabases > 0 ? "\(agentStore.totalDatabases)" : nil,
-                        badgeIcon: agentStore.orphanedCount > 0 ? "exclamationmark.triangle.fill" : nil,
-                        badgeColor: PharosColor.warning,
-                        isSelected: selection == .agentChats
-                    ) {
-                        selection = .agentChats
-                    }
-
-                    // Group 3: 系统维护 (Maintenance)
-                    PharosSidebarSectionHeader(title: l10n.systemMaintenance)
-                        .padding(.horizontal, 10)
-                        .padding(.top, 6)
-                        .padding(.bottom, 2)
-
-                    PharosSidebarRow(
-                        icon: "trash",
-                        title: l10n.diskCleanup,
-                        badge: cleanup.totalBytes > 0 ? ByteFormat.short(cleanup.totalBytes) : nil,
-                        isSelected: selection == .diskCleanup
-                    ) {
-                        selection = .diskCleanup
-                    }
-
-                    // Group 4: 常用项目 (Favorites)
-                    if !workspaces.favorites.isEmpty {
-                        PharosSidebarSectionHeader(title: l10n.favorites) {
-                            Button {
-                                if let id = workspaces.addFolder() { selection = .favorite(id) }
-                            } label: {
-                                Image(systemName: "plus")
-                                    .font(.system(size: 11, weight: .medium))
-                            }
-                            .buttonStyle(.borderless)
-                            .help(l10n.addWorkspace)
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.top, 6)
-                        .padding(.bottom, 2)
-
-                        ForEach(workspaces.statuses(store.projects), id: \.favorite.id) { s in
-                            FavoriteSidebarRow(
-                                status: s,
-                                isSelected: selection == .favorite(s.favorite.id)
-                            ) {
-                                selection = .favorite(s.favorite.id)
-                            }
-                            .contextMenu {
-                                Button(l10n.openInTerminal) { workspaces.openInTerminal(s.favorite) }
-                                    .disabled(s.favorite.command.isEmpty)
-                                Button(l10n.revealInFinder) { workspaces.revealInFinder(s.favorite) }
-                                Divider()
-                                Button(l10n.removeFavorite) { workspaces.unpin(id: s.favorite.id) }
+                sidebarContentList
+                    .background(alignment: .top) {
+                        SidebarScrollProbe { offset in
+                            if abs(offset - sidebarScrollOffset) > 0.25 {
+                                sidebarScrollOffset = offset
                             }
                         }
+                        .frame(width: 1, height: 1)
+                        .allowsHitTesting(false)
                     }
-
-                    // Group 5: 运行中进程 (Running Projects)
-                    if !store.projects.isEmpty {
-                        PharosSidebarSectionHeader(title: l10n.runningProjects)
-                            .padding(.horizontal, 10)
-                            .padding(.top, 6)
-                            .padding(.bottom, 2)
-
-                        ForEach(store.projects) { project in
-                            ProjectSidebarRow(
-                                project: project,
-                                isPinned: workspaces.isPinned(project),
-                                isSelected: selection == .project(project.id)
-                            ) {
-                                selection = .project(project.id)
-                            }
-                        }
-                    }
-
-                    // Group 6: 外观与设置 (Appearance)
-                    PharosSidebarSectionHeader(title: l10n.appearance)
-                        .padding(.horizontal, 10)
-                        .padding(.top, 6)
-                        .padding(.bottom, 2)
-
-                    PharosSidebarRow(
-                        icon: "slider.horizontal.3",
-                        title: l10n.customizeTitle,
-                        isSelected: selection == .customize
-                    ) {
-                        selection = .customize
-                    }
+            }
+            .mask(
+                VStack(spacing: 0) {
+                    LinearGradient(
+                        stops: [
+                            .init(color: .clear, location: 0.0),
+                            .init(color: .clear, location: 0.65),
+                            .init(color: .black.opacity(0.5), location: 0.85),
+                            .init(color: .black, location: 1.0)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 40)
+                    Rectangle().fill(.black)
                 }
-                .padding(.horizontal, 8)
-                .padding(.top, 38)
-                .padding(.bottom, 12)
-            }
-            .coordinateSpace(name: "sidebarScroll")
-            .onPreferenceChange(SidebarScrollOffsetKey.self) { offset in
-                sidebarScrollOffset = offset
-            }
-            .overlay(alignment: .topLeading) {
+            )
+            .overlay(alignment: .top) {
                 sidebarTrafficLightsBlurHeader
                     .allowsHitTesting(false)
             }
@@ -268,48 +115,209 @@ struct MainWindowView: View {
         }
     }
 
+    private var sidebarContentList: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            // Top: Dashboard Hero Item
+            PharosSidebarRow(
+                icon: "square.grid.2x2",
+                title: l10n.dashboard,
+                badge: store.totalPorts > 0 ? "\(store.totalPorts)" : nil,
+                isSelected: selection == .portsOverview
+            ) {
+                selection = .portsOverview
+            }
+
+            PharosListDivider()
+                .padding(.vertical, 4)
+                .padding(.horizontal, 6)
+
+            // Group 1: 系统与硬件 (System & Hardware)
+            PharosSidebarSectionHeader(title: l10n.systemAndHardware)
+                .padding(.horizontal, 10)
+                .padding(.top, 4)
+                .padding(.bottom, 2)
+
+            PharosSidebarRow(
+                icon: "memorychip",
+                title: l10n.systemMemory,
+                badge: store.system.map { "\(Int(($0.usedFraction * 100).rounded()))%" },
+                isSelected: selection == .systemMemory
+            ) {
+                selection = .systemMemory
+            }
+
+            PharosSidebarRow(
+                icon: "internaldrive",
+                title: l10n.diskUsage,
+                badge: store.volumes.first(where: { $0.kind == .startup }).map { "\(Int(($0.usedFraction * 100).rounded()))%" },
+                extraBadge: {
+                    let extra = store.volumes.filter { $0.kind == .external || $0.kind == .network }.count
+                    return extra > 0 ? "+\(extra)" : nil
+                }(),
+                isSelected: selection == .diskUsage
+            ) {
+                selection = .diskUsage
+            }
+
+            BatteryAndThermalSidebarRow(isSelected: selection == .batteryAndThermals) {
+                selection = .batteryAndThermals
+            }
+
+            // Group 2: 环境与运行时 (Runtime & Services)
+            PharosSidebarSectionHeader(title: l10n.runtimeAndServices)
+                .padding(.horizontal, 10)
+                .padding(.top, 6)
+                .padding(.bottom, 2)
+
+            PharosSidebarRow(
+                icon: "shippingbox",
+                title: l10n.packagesTitle,
+                badge: packageStore.globalCliCount > 0 ? "\(packageStore.globalCliCount)" : nil,
+                isSelected: selection == .packages
+            ) {
+                selection = .packages
+            }
+
+            PharosSidebarRow(
+                icon: "globe",
+                title: l10n.chromeTitle,
+                badge: {
+                    let browserCount = store.chrome.filter { ChromeStore.shared.isVisible($0.config.browser) }.count
+                    return browserCount > 0 ? "\(browserCount)" : nil
+                }(),
+                isSelected: selection == .chrome
+            ) {
+                selection = .chrome
+            }
+
+            PharosSidebarRow(
+                icon: "bubble.left.and.text.bubble.right",
+                title: l10n.agentChats,
+                badge: agentStore.totalDatabases > 0 ? "\(agentStore.totalDatabases)" : nil,
+                badgeIcon: agentStore.orphanedCount > 0 ? "exclamationmark.triangle.fill" : nil,
+                badgeColor: PharosColor.warning,
+                isSelected: selection == .agentChats
+            ) {
+                selection = .agentChats
+            }
+
+            // Group 3: 系统维护 (Maintenance)
+            PharosSidebarSectionHeader(title: l10n.systemMaintenance)
+                .padding(.horizontal, 10)
+                .padding(.top, 6)
+                .padding(.bottom, 2)
+
+            PharosSidebarRow(
+                icon: "trash",
+                title: l10n.diskCleanup,
+                badge: cleanup.totalBytes > 0 ? ByteFormat.short(cleanup.totalBytes) : nil,
+                isSelected: selection == .diskCleanup
+            ) {
+                selection = .diskCleanup
+            }
+
+            // Group 4: 常用项目 (Favorites)
+            if !workspaces.favorites.isEmpty {
+                PharosSidebarSectionHeader(title: l10n.favorites) {
+                    Button {
+                        if let id = workspaces.addFolder() { selection = .favorite(id) }
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .buttonStyle(.borderless)
+                    .help(l10n.addWorkspace)
+                }
+                .padding(.horizontal, 10)
+                .padding(.top, 6)
+                .padding(.bottom, 2)
+
+                ForEach(workspaces.statuses(store.projects), id: \.favorite.id) { s in
+                    FavoriteSidebarRow(
+                        status: s,
+                        isSelected: selection == .favorite(s.favorite.id)
+                    ) {
+                        selection = .favorite(s.favorite.id)
+                    }
+                    .contextMenu {
+                        Button(l10n.openInTerminal) { workspaces.openInTerminal(s.favorite) }
+                            .disabled(s.favorite.command.isEmpty)
+                        Button(l10n.revealInFinder) { workspaces.revealInFinder(s.favorite) }
+                        Divider()
+                        Button(l10n.removeFavorite) { workspaces.unpin(id: s.favorite.id) }
+                    }
+                }
+            }
+
+            // Group 5: 运行中进程 (Running Projects)
+            if !store.projects.isEmpty {
+                PharosSidebarSectionHeader(title: l10n.runningProjects)
+                    .padding(.horizontal, 10)
+                    .padding(.top, 6)
+                    .padding(.bottom, 2)
+
+                ForEach(store.projects) { project in
+                    ProjectSidebarRow(
+                        project: project,
+                        isPinned: workspaces.isPinned(project),
+                        isSelected: selection == .project(project.id)
+                    ) {
+                        selection = .project(project.id)
+                    }
+                }
+            }
+
+            // Group 6: 外观与设置 (Appearance)
+            PharosSidebarSectionHeader(title: l10n.appearance)
+                .padding(.horizontal, 10)
+                .padding(.top, 6)
+                .padding(.bottom, 2)
+
+            PharosSidebarRow(
+                icon: "slider.horizontal.3",
+                title: l10n.customizeTitle,
+                isSelected: selection == .customize
+            ) {
+                selection = .customize
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.top, 38)
+        .padding(.bottom, 12)
+    }
+
     private var sidebarTrafficLightsBlurHeader: some View {
         let p = sidebarScrollProgress
-        return ZStack(alignment: .topLeading) {
-            // 1. Progressive top blur & soft diffused shadow when scrolling text under traffic lights
-            ZStack(alignment: .bottom) {
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                Rectangle()
-                    .fill(PharosColor.surface.opacity(0.55))
-            }
-            .frame(height: 46)
-            .mask(
-                LinearGradient(
-                    stops: [
-                        .init(color: .black, location: 0.0),
-                        .init(color: .black.opacity(0.92), location: 0.52),
-                        .init(color: .black.opacity(0.38), location: 0.80),
-                        .init(color: .clear, location: 1.0)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-            .shadow(color: Color.black.opacity(0.14 * p), radius: 8, x: 0, y: 4)
-            .opacity(Double(max(0.2, p)))
+        let t = min(1.0, max(0.0, trafficLightGlassTransparency))
+        let blurRadius = 0.8 + (1.0 - t) * 7.2
+        let veilOpacity = (1.0 - t) * 0.82 * Double(p)
+        return ZStack(alignment: .top) {
+            sidebarContentList
+                .fixedSize(horizontal: false, vertical: true)
+                .background(PharosColor.surface)
+                .offset(y: sidebarScrollOffset)
+                .frame(width: 236, height: 48, alignment: .topLeading)
+                .background(PharosColor.surface)
+                .clipped()
+                .blur(radius: blurRadius)
 
-            // 2. Frosted capsule & blurred shadow halo surrounding the 3 traffic lights
-            Capsule(style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    Capsule(style: .continuous)
-                        .fill(PharosColor.surface.opacity(0.45 + 0.25 * p))
-                )
-                .overlay(
-                    Capsule(style: .continuous)
-                        .strokeBorder(PharosColor.separator.opacity(0.16 + 0.34 * p), lineWidth: 0.5)
-                )
-                .frame(width: 68, height: 24)
-                .shadow(color: Color.black.opacity(0.05 + 0.18 * p), radius: 3 + 7 * p, x: 0, y: 1 + 2 * p)
-                .shadow(color: Color.black.opacity(0.10 * p), radius: 12 * p, x: 0, y: 4 * p)
-                .offset(x: 2, y: 4)
+            PharosColor.surface.opacity(veilOpacity)
         }
+        .frame(width: 236, height: 40, alignment: .top)
+        .clipped()
+        .mask(
+            LinearGradient(
+                stops: [
+                    .init(color: .black, location: 0.0),
+                    .init(color: .black, location: 0.65),
+                    .init(color: .black.opacity(0.45), location: 0.85),
+                    .init(color: .clear, location: 1.0)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .shadow(color: Color.black.opacity(0.08 * Double(p)), radius: 4, x: 0, y: 2)
     }
 
     private var detailView: some View {
@@ -589,10 +597,63 @@ struct ProjectDetailView: View {
     }
 }
 
-private struct SidebarScrollOffsetKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
+private final class SidebarScrollOffsetProbeView: NSView {
+    var onScroll: ((CGFloat) -> Void)?
+    private weak var observedClipView: NSClipView?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        attachIfNeeded()
+    }
+
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        attachIfNeeded()
+    }
+
+    override func layout() {
+        super.layout()
+        attachIfNeeded()
+    }
+
+    func attachIfNeeded() {
+        guard let clip = enclosingScrollView?.contentView, observedClipView !== clip else { return }
+        if let old = observedClipView {
+            NotificationCenter.default.removeObserver(self, name: NSView.boundsDidChangeNotification, object: old)
+        }
+        observedClipView = clip
+        clip.postsBoundsChangedNotifications = true
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(boundsChanged(_:)),
+            name: NSView.boundsDidChangeNotification,
+            object: clip
+        )
+        onScroll?(-clip.bounds.origin.y)
+    }
+
+    @objc private func boundsChanged(_ note: Notification) {
+        guard let clip = observedClipView else { return }
+        onScroll?(-clip.bounds.origin.y)
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+}
+
+private struct SidebarScrollProbe: NSViewRepresentable {
+    var onScroll: (CGFloat) -> Void
+
+    func makeNSView(context: Context) -> SidebarScrollOffsetProbeView {
+        let v = SidebarScrollOffsetProbeView()
+        v.onScroll = onScroll
+        return v
+    }
+
+    func updateNSView(_ nsView: SidebarScrollOffsetProbeView, context: Context) {
+        nsView.onScroll = onScroll
+        nsView.attachIfNeeded()
     }
 }
 

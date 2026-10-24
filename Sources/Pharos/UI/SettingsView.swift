@@ -200,6 +200,7 @@ struct SettingsForm: View {
     @ObservedObject private var l10n = L10n.shared
     @AppStorage("pharos.gauge3DAcceleration") private var gauge3DAcceleration: Bool = true
     @AppStorage("pharos.popoverGaussianBlur") private var popoverGaussianBlur: Bool = true
+    @AppStorage("pharos.trafficLightGlassTransparency") private var trafficLightGlassTransparency: Double = 0.75
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var loginError: String? = nil
@@ -343,6 +344,7 @@ struct MainSettingsView: View {
 
     @AppStorage("pharos.gauge3DAcceleration") private var gauge3DAcceleration: Bool = true
     @AppStorage("pharos.popoverGaussianBlur") private var popoverGaussianBlur: Bool = true
+    @AppStorage("pharos.trafficLightGlassTransparency") private var trafficLightGlassTransparency: Double = 0.75
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
 
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -581,6 +583,11 @@ struct MainSettingsView: View {
                                 .labelsHidden()
                                 .disabled(systemReduceMotion)
                         }
+
+                        PharosListDivider()
+
+                        // Traffic lights frosted glass transparency + live top-left preview
+                        TrafficLightsGlassSettingSection(transparency: $trafficLightGlassTransparency)
                     }
                 }
             }
@@ -704,6 +711,7 @@ struct MainSettingsView: View {
                 agentStore.resetSettings()
                 gauge3DAcceleration = true
                 popoverGaussianBlur = true
+                trafficLightGlassTransparency = 0.75
                 UserDefaults.standard.removeObject(forKey: "pharos.fanViewMode")
                 UserDefaults.standard.removeObject(forKey: "popoverTab")
                 if launchAtLogin {
@@ -770,5 +778,209 @@ private struct CapsuleActionButton: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
+    }
+}
+
+// MARK: - Traffic Lights Frosted Glass Setting & Live Preview
+
+private struct TrafficLightsGlassSettingSection: View {
+    @Binding var transparency: Double
+    @ObservedObject private var l10n = L10n.shared
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 16) {
+            // Left: Miniature live snapshot of the top-left sidebar & 3 traffic light buttons
+            TrafficLightsGlassPreview(transparency: transparency)
+
+            // Right: Title, percentage badge, slider, and description
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "circle.hexagongrid.fill")
+                        .font(PharosFont.body)
+                        .foregroundStyle(PharosColor.textSecondary)
+                    Text(l10n.trafficLightGlassTitle)
+                        .font(PharosFont.rowLabel)
+                        .foregroundStyle(PharosColor.textPrimary)
+                    Spacer()
+                    Text("\(Int((transparency * 100).rounded()))%")
+                        .font(PharosFont.captionDigits)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(PharosColor.accent)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(PharosColor.accent.opacity(0.12)))
+                }
+
+                HStack(spacing: 8) {
+                    Text(l10n.trafficLightGlassFrosted)
+                        .font(PharosFont.caption)
+                        .foregroundStyle(PharosColor.textTertiary)
+                    Slider(value: $transparency, in: 0.0...1.0)
+                        .tint(PharosColor.accent)
+                    Text(l10n.trafficLightGlassClear)
+                        .font(PharosFont.caption)
+                        .foregroundStyle(PharosColor.textTertiary)
+                }
+
+                Text(l10n.trafficLightGlassHint)
+                    .font(PharosFont.caption)
+                    .foregroundStyle(PharosColor.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+private struct TrafficLightsGlassPreview: View {
+    let transparency: Double
+    @ObservedObject private var l10n = L10n.shared
+
+    private var simulatedList: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            // Row 1: Overlapping right behind the 3 traffic lights (scrolled up state)
+            HStack(spacing: 8) {
+                Image(systemName: "square.grid.2x2")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(PharosColor.accent)
+                    .frame(width: 16)
+                Text(l10n.dashboard)
+                    .font(PharosFont.rowLabel)
+                    .foregroundStyle(PharosColor.textPrimary)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Text("12")
+                    .font(PharosFont.captionDigits)
+                    .foregroundStyle(PharosColor.textSecondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 1)
+                    .background(Capsule().fill(PharosColor.fill))
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(PharosColor.accent.opacity(0.12))
+            )
+
+            // Row 2: Partially entering the bottom of the blur zone
+            HStack(spacing: 8) {
+                Image(systemName: "memorychip")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(PharosColor.textSecondary)
+                    .frame(width: 16)
+                Text(l10n.systemMemory)
+                    .font(PharosFont.rowLabel)
+                    .foregroundStyle(PharosColor.textPrimary)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Text("68%")
+                    .font(PharosFont.captionDigits)
+                    .foregroundStyle(PharosColor.textSecondary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+
+            // Row 3: Sharp below the blur zone
+            HStack(spacing: 8) {
+                Image(systemName: "internaldrive")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(PharosColor.textSecondary)
+                    .frame(width: 16)
+                Text(l10n.diskUsage)
+                    .font(PharosFont.rowLabel)
+                    .foregroundStyle(PharosColor.textPrimary)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Text("42%")
+                    .font(PharosFont.captionDigits)
+                    .foregroundStyle(PharosColor.textSecondary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+        }
+        .padding(.horizontal, 8)
+        .padding(.top, 6)
+    }
+
+    var body: some View {
+        let t = min(1.0, max(0.0, transparency))
+        let blurRadius = 0.8 + (1.0 - t) * 7.2
+        let veilOpacity = (1.0 - t) * 0.82
+
+        ZStack(alignment: .topLeading) {
+            // 1. Base sharp list (masked out in the top traffic-lights row)
+            simulatedList
+                .frame(width: 196, height: 86, alignment: .topLeading)
+                .mask(
+                    VStack(spacing: 0) {
+                        LinearGradient(
+                            stops: [
+                                .init(color: .clear, location: 0.0),
+                                .init(color: .clear, location: 0.65),
+                                .init(color: .black.opacity(0.5), location: 0.85),
+                                .init(color: .black, location: 1.0)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 38)
+                        Rectangle().fill(.black)
+                    }
+                )
+
+            // 2. Frosted glass top row (exact same formula as MainWindowView)
+            ZStack(alignment: .top) {
+                simulatedList
+                    .frame(width: 196, height: 46, alignment: .topLeading)
+                    .background(PharosColor.surface)
+                    .clipped()
+                    .blur(radius: blurRadius)
+
+                PharosColor.surface.opacity(veilOpacity)
+            }
+            .frame(width: 196, height: 38, alignment: .top)
+            .clipped()
+            .mask(
+                LinearGradient(
+                    stops: [
+                        .init(color: .black, location: 0.0),
+                        .init(color: .black, location: 0.65),
+                        .init(color: .black.opacity(0.45), location: 0.85),
+                        .init(color: .clear, location: 1.0)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 2)
+
+            // 3. Simulated macOS top-left 3 traffic light buttons on top
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(Color(red: 1.0, green: 0.373, blue: 0.341))
+                    .overlay(Circle().stroke(Color(red: 0.878, green: 0.267, blue: 0.243), lineWidth: 0.5))
+                    .frame(width: 12, height: 12)
+                Circle()
+                    .fill(Color(red: 0.996, green: 0.737, blue: 0.180))
+                    .overlay(Circle().stroke(Color(red: 0.847, green: 0.620, blue: 0.141), lineWidth: 0.5))
+                    .frame(width: 12, height: 12)
+                Circle()
+                    .fill(Color(red: 0.157, green: 0.784, blue: 0.251))
+                    .overlay(Circle().stroke(Color(red: 0.102, green: 0.671, blue: 0.161), lineWidth: 0.5))
+                    .frame(width: 12, height: 12)
+            }
+            .padding(.leading, 12)
+            .padding(.top, 11)
+        }
+        .frame(width: 196, height: 86)
+        .background(PharosColor.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(PharosColor.separator.opacity(0.45), lineWidth: 0.5)
+        )
+        .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
+        .allowsHitTesting(false)
     }
 }
