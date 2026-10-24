@@ -559,6 +559,7 @@ final class L10n: ObservableObject {
     }
     func rowsAll(_ n: Int) -> String { en ? "All (\(n))" : "全部（\(n)）" }
     var projectsUnit: String { en ? "projects" : "个" }
+    var customRowLimit: String { en ? "Custom count:" : "自定义数值：" }
     func popoverTabName(_ t: PopoverTab) -> String {
         switch t {
         case .overview: return overview
