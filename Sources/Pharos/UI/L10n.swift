@@ -535,6 +535,7 @@ final class L10n: ObservableObject {
 
     var customizePopover: String { en ? "Customize Popover…" : "自定义下拉框…" }
     var customizeTitle: String { en ? "Customize" : "自定义" }
+    var livePreview: String { en ? "Live Preview" : "实时预览" }
     var customizeIntro: String {
         en ? "Arrange the menu bar popover like widgets: drag blocks between the two tabs to reorder them, drag one out to the library to hide it, or drag one in from the library. The preview on the left is the real popover with live data."
            : "像编辑小组件一样排列菜单栏下拉框：在两个页签之间拖动块来调整顺序，拖到右侧组件库即可隐藏，从组件库拖进来即可添加。左边的预览就是实际的下拉框，显示实时数据。"

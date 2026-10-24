@@ -143,14 +143,15 @@ struct IconButton: View {
     let systemImage: String
     let help: String
     var tint: Color = PharosColor.textSecondary
+    var size: CGFloat = 22
     let action: () -> Void
     @State private var hovering = false
 
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 11, weight: .regular))
-                .frame(width: 22, height: 22)
+                .font(.system(size: size <= 20 ? 10 : 11, weight: .regular))
+                .frame(width: size, height: size)
                 .background(
                     RoundedRectangle(cornerRadius: PharosRadius.small, style: .continuous)
                         .fill(hovering ? PharosColor.fill : .clear)

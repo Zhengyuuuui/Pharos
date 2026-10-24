@@ -31,24 +31,26 @@ struct CustomizePopoverView: View {
                 }
             }
         } content: {
-            ViewThatFits(in: .horizontal) {
-                // Wide layout: side-by-side snapshot and editor
-                HStack(alignment: .top, spacing: PharosSpacing.l) {
+            HStack(alignment: .top, spacing: PharosSpacing.l) {
+                // Left: Live popover snapshot preview
+                VStack(alignment: .leading, spacing: PharosSpacing.s) {
+                    Label(l10n.livePreview, systemImage: "macwindow")
+                        .font(PharosFont.caption)
+                        .foregroundStyle(PharosColor.textSecondary)
+                        .padding(.leading, 4)
                     PopoverSnapshot(layout: layout, tab: $previewTab)
-                    editorColumns(layout: layout)
                 }
+                .fixedSize(horizontal: true, vertical: false)
 
-                // Compact layout: snapshot on top, editor below to prevent squeezing
-                VStack(alignment: .leading, spacing: PharosSpacing.l) {
-                    PopoverSnapshot(layout: layout, tab: $previewTab)
-                    editorColumns(layout: layout)
-                }
+                // Right: Tabs configuration on top, Library and Settings below
+                editorColumns(layout: layout)
             }
         }
     }
 
     private func editorColumns(layout: PopoverLayout) -> some View {
         VStack(alignment: .leading, spacing: PharosSpacing.m) {
+            // Upper right: Overview & Projects tabs side-by-side
             HStack(alignment: .top, spacing: PharosSpacing.m) {
                 ForEach(PopoverTab.allCases, id: \.self) { tab in
                     TabColumn(tab: tab, blocks: layout[tab], selected: previewTab == tab) {
@@ -56,7 +58,9 @@ struct CustomizePopoverView: View {
                     }
                 }
             }
+            // Lower right: Component Library
             LibraryColumn(unused: layout.unused)
+            // Bottom: Running projects row limit
             ProjectRowsSettings(blockInUse: layout.tab(of: .projects) != nil)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -87,7 +91,7 @@ private struct PopoverSnapshot: View {
             footer
         }
         .padding(14)
-        .frame(width: 340)
+        .frame(width: 320)
         .background(RoundedRectangle(cornerRadius: 12).fill(.regularMaterial))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.12)))
         .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
@@ -129,7 +133,7 @@ private struct TabColumn: View {
             Spacer(minLength: 0)
         }
         .padding(10)
-        .frame(minWidth: 150, maxWidth: .infinity, minHeight: 180, alignment: .topLeading)
+        .frame(minWidth: 140, maxWidth: .infinity, minHeight: 160, alignment: .topLeading)
         .background(background)
         .overlay(border)
         .contentShape(Rectangle())
@@ -276,7 +280,7 @@ private struct LibraryColumn: View {
             Text(l10n.libraryEmpty).font(.system(size: 11)).foregroundStyle(.tertiary)
                 .frame(maxWidth: .infinity, minHeight: 40)
         } else {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 8)], spacing: 8) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 8)], spacing: 8) {
                 ForEach(unused, id: \.self) { block in
                     BlockTile(block: block, inTab: nil, isFirst: true, isLast: true)
                         .onDrop(of: [UTType.text], isTargeted: nil) { providers in
@@ -339,32 +343,32 @@ private struct BlockTile: View {
     }
 
     private var tileContent: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Image(systemName: "line.3.horizontal")
+        HStack(spacing: 6) {
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(hovering ? PharosColor.textSecondary : PharosColor.textTertiary)
+                .frame(width: 12)
+            Image(systemName: block.icon)
+                .font(.system(size: 12))
+                .foregroundStyle(PharosColor.accent)
+                .frame(width: 16)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(l10n.blockName(block))
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(hovering ? PharosColor.textSecondary : PharosColor.textTertiary)
-                    .frame(width: 14)
-                Image(systemName: block.icon)
-                    .font(.system(size: 13))
-                    .foregroundStyle(PharosColor.accent)
-                    .frame(width: 18)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(l10n.blockName(block))
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(PharosColor.textPrimary)
-                        .lineLimit(1)
-                    Text(l10n.blockDescription(block))
-                        .font(.system(size: 10))
-                        .foregroundStyle(PharosColor.textSecondary)
-                        .lineLimit(1)
-                }
-                Spacer(minLength: 4)
-                if hovering { actions }
+                    .foregroundStyle(PharosColor.textPrimary)
+                    .lineLimit(1)
+                Text(l10n.blockDescription(block))
+                    .font(.system(size: 9))
+                    .foregroundStyle(PharosColor.textSecondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 2)
+            if hovering {
+                actions
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(Color(nsColor: .controlBackgroundColor))
@@ -377,19 +381,19 @@ private struct BlockTile: View {
     }
 
     private var dragPreview: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Image(systemName: "line.3.horizontal")
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(PharosColor.textSecondary)
             Image(systemName: block.icon)
-                .font(.system(size: 13))
+                .font(.system(size: 12))
                 .foregroundStyle(PharosColor.accent)
             Text(l10n.blockName(block))
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(PharosColor.textPrimary)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(Color(nsColor: .controlBackgroundColor))
@@ -404,20 +408,30 @@ private struct BlockTile: View {
     @ViewBuilder
     private var actions: some View {
         if inTab != nil {
-            IconButton(systemImage: "chevron.up", help: l10n.moveUp) { layoutStore.update { $0.move(block, by: -1) } }
+            HStack(spacing: 2) {
+                IconButton(systemImage: "chevron.up", help: l10n.moveUp, size: 18) {
+                    layoutStore.update { $0.move(block, by: -1) }
+                }
                 .disabled(isFirst)
-            IconButton(systemImage: "chevron.down", help: l10n.moveDown) { layoutStore.update { $0.move(block, by: 1) } }
+                IconButton(systemImage: "chevron.down", help: l10n.moveDown, size: 18) {
+                    layoutStore.update { $0.move(block, by: 1) }
+                }
                 .disabled(isLast)
-            IconButton(systemImage: "minus.circle", help: l10n.removeBlock, tint: .red.opacity(0.8)) {
-                layoutStore.update { $0.remove(block) }
+                IconButton(systemImage: "minus.circle", help: l10n.removeBlock, tint: .red.opacity(0.8), size: 18) {
+                    layoutStore.update { $0.remove(block) }
+                }
             }
         } else {
             Menu {
                 ForEach(PopoverTab.allCases, id: \.self) { tab in
-                    Button(l10n.addTo(l10n.popoverTabName(tab))) { layoutStore.update { $0.insert(block, into: tab) } }
+                    Button(l10n.addTo(l10n.popoverTabName(tab))) {
+                        layoutStore.update { $0.insert(block, into: tab) }
+                    }
                 }
             } label: {
-                Image(systemName: "plus.circle.fill").foregroundStyle(.green)
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.green)
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
