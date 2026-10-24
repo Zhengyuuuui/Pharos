@@ -11,7 +11,7 @@ struct BrowserSettingsForm: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(l10n.browsersSettings).font(.system(size: 12, weight: .semibold))
+            Text(l10n.browsersSettings).font(PharosFont.rowLabel)
 
             VStack(spacing: 0) {
                 ForEach(Array(ChromiumBrowser.allCases.enumerated()), id: \.element) { index, b in
@@ -26,12 +26,12 @@ struct BrowserSettingsForm: View {
                 Picker(l10n.defaultBrowserForNew, selection: $chrome.defaultBrowser) {
                     ForEach(chrome.installedBrowsers, id: \.self) { Text($0.appName).tag($0) }
                 }
-                .font(.system(size: 12))
+                .font(PharosFont.body)
                 .fixedSize()
             }
 
             Text(l10n.browsersSettingsHint)
-                .font(.system(size: 10))
+                .font(PharosFont.caption)
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -47,10 +47,10 @@ struct BrowserSettingsForm: View {
                 .labelsHidden()
                 .help(l10n.showInList)
             VStack(alignment: .leading, spacing: 1) {
-                Text(b.appName).font(.system(size: 12, weight: .medium))
+                Text(b.appName).font(PharosFont.rowLabel)
                     .foregroundStyle(installed ? .primary : .secondary)
                 Text(b.defaultUserDataDir.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-                    .font(.system(size: 9.5, design: .monospaced))
+                    .font(PharosFont.technical)
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -58,14 +58,14 @@ struct BrowserSettingsForm: View {
             Spacer()
             if installed {
                 if running > 0 {
-                    Text(l10n.runningCount(running)).font(.system(size: 10)).foregroundStyle(.green)
+                    Text(l10n.runningCount(running)).font(PharosFont.caption).foregroundStyle(.green)
                 }
                 if saved > 0 {
-                    Text(l10n.presetCount(saved)).font(.system(size: 10)).foregroundStyle(.secondary)
+                    Text(l10n.presetCount(saved)).font(PharosFont.caption).foregroundStyle(.secondary)
                 }
                 IconButton(systemImage: "folder", help: l10n.revealProfiles) { chrome.revealDefaultProfile(b) }
             } else {
-                Text(l10n.notInstalled).font(.system(size: 10)).foregroundStyle(.tertiary)
+                Text(l10n.notInstalled).font(PharosFont.caption).foregroundStyle(.tertiary)
             }
         }
         .padding(.horizontal, 8)
@@ -230,19 +230,16 @@ struct SettingsForm: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .center) {
-                    Text(l10n.motionPerformanceMode)
-                        .font(.system(size: 12))
-                    Spacer()
-                    Picker("", selection: $gauge3DAcceleration) {
-                        Text(l10n.motionModeSmooth).tag(true)
-                        Text(l10n.motionModeBalanced).tag(false)
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(width: 175)
-                    .disabled(systemReduceMotion)
+                Text(l10n.motionPerformanceMode)
+                    .font(.system(size: 12))
+                Picker("", selection: $gauge3DAcceleration) {
+                    Text(l10n.motionModeSmooth).tag(true)
+                    Text(l10n.motionModeBalanced).tag(false)
                 }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(maxWidth: .infinity)
+                .disabled(systemReduceMotion)
 
                 if systemReduceMotion {
                     Text(l10n.systemReduceMotionNotice)
@@ -392,7 +389,7 @@ struct MainSettingsView: View {
                     HStack(spacing: 16) {
                         VStack(alignment: .leading, spacing: 3) {
                             Text("Pharos v3.0")
-                                .font(.system(size: 13.5, weight: .bold))
+                                .font(PharosFont.sectionTitle)
                                 .foregroundStyle(PharosColor.textPrimary)
                             Text(l10n.openSourceSubtitle)
                                 .font(PharosFont.caption)
@@ -406,9 +403,9 @@ struct MainSettingsView: View {
                             HStack(spacing: 5) {
                                 Text(l10n.viewOnGitHub)
                                 Image(systemName: "arrow.up.forward.app")
-                                    .font(.system(size: 10.5))
+                                    .font(PharosFont.caption)
                             }
-                            .font(.system(size: 12, weight: .medium))
+                            .font(PharosFont.rowLabel)
                             .foregroundStyle(PharosColor.textPrimary)
                             .padding(.horizontal, 14)
                             .frame(height: 32)
@@ -568,7 +565,7 @@ struct MainSettingsView: View {
                             }
                             .labelsHidden()
                             .pickerStyle(.segmented)
-                            .frame(width: 160)
+                            .frame(minWidth: 240, maxWidth: 260)
                             .disabled(systemReduceMotion)
                         }
 
@@ -696,8 +693,24 @@ struct MainSettingsView: View {
         .alert(l10n.resetAllSettings, isPresented: $showResetAlert) {
             Button(l10n.cancel, role: .cancel) {}
             Button(l10n.resetAllSettings, role: .destructive) {
+                store.resetSettings()
+                l10n.resetLanguage()
                 PopoverLayoutStore.shared.reset()
-                MenuBarSettings.shared.reset()
+                menuBar.reset()
+                workspaces.resetSettings()
+                notifier.resetSettings()
+                chrome.resetSettings()
+                packageStore.resetSettings()
+                agentStore.resetSettings()
+                gauge3DAcceleration = true
+                popoverGaussianBlur = true
+                UserDefaults.standard.removeObject(forKey: "pharos.fanViewMode")
+                UserDefaults.standard.removeObject(forKey: "popoverTab")
+                if launchAtLogin {
+                    try? SMAppService.mainApp.unregister()
+                    launchAtLogin = SMAppService.mainApp.status == .enabled
+                }
+                loginError = nil
                 backupMessage = l10n.resetSettingsDone
             }
         } message: {
@@ -715,10 +728,10 @@ private struct SettingsSectionHeader: View {
     var body: some View {
         HStack(spacing: PharosSpacing.s) {
             Image(systemName: systemImage)
-                .font(.system(size: 13.5, weight: .semibold))
+                .font(PharosFont.sectionTitle)
                 .foregroundStyle(PharosColor.textPrimary)
             Text(title)
-                .font(.system(size: 13.5, weight: .bold))
+                .font(PharosFont.sectionTitle)
                 .foregroundStyle(PharosColor.textPrimary)
         }
         .padding(.horizontal, PharosSpacing.xs)
@@ -737,10 +750,10 @@ private struct CapsuleActionButton: View {
             HStack(spacing: 6) {
                 if let systemImage {
                     Image(systemName: systemImage)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(PharosFont.caption)
                 }
                 Text(title)
-                    .font(.system(size: 12.5, weight: .medium))
+                    .font(PharosFont.rowLabel)
                     .lineLimit(1)
             }
             .foregroundStyle(isDestructive ? PharosColor.error : PharosColor.textPrimary)

@@ -33,8 +33,47 @@ struct MainWindowView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            ScrollView {
+        HStack(spacing: 0) {
+            sidebarView
+                .frame(width: 236)
+                .background(PharosColor.surface)
+                .overlay(alignment: .trailing) {
+                    Rectangle()
+                        .fill(PharosColor.separator.opacity(0.35))
+                        .frame(width: 0.5)
+                }
+                .shadow(color: Color.black.opacity(0.04), radius: 3, x: 1, y: 0)
+                .shadow(color: Color.black.opacity(0.06), radius: 12, x: 4, y: 0)
+                .zIndex(1)
+
+            detailView
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(PharosColor.background)
+        }
+        .ignoresSafeArea()
+        .frame(minWidth: 920, minHeight: 600)
+        .onAppear {
+            store.viewAppeared()
+            if selection == nil { selection = initialSelection ?? .portsOverview }
+        }
+        .onDisappear { store.viewDisappeared() }
+        .onChange(of: router.request) { _, request in
+            guard let request else { return }
+            selection = request
+            router.request = nil
+        }
+        .onChange(of: store.lastScan) { _, _ in
+            workspaces.recordPorts(workspaces.running(in: store.projects))
+        }
+    }
+
+    private var sidebarView: some View {
+        VStack(spacing: 0) {
+            // macOS traffic lights area clearance
+            Color.clear
+                .frame(height: 42)
+
+            ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 2) {
                     // Top: Dashboard Hero Item
                     PharosSidebarRow(
@@ -201,16 +240,19 @@ struct MainWindowView: View {
                     }
                 }
                 .padding(.horizontal, 8)
-                .padding(.top, 10)
+                .padding(.top, 4)
                 .padding(.bottom, 12)
             }
-            .scrollContentBackground(.hidden)
-            .background(PharosColor.surface)
-            .navigationSplitViewColumnWidth(min: 205, ideal: 230, max: 270)
-            .safeAreaInset(edge: .bottom) {
-                sidebarBottomIsland
-            }
-        } detail: {
+
+            sidebarBottomIsland
+        }
+    }
+
+    private var detailView: some View {
+        VStack(spacing: 0) {
+            Color.clear
+                .frame(height: 28)
+
             Group {
                 switch selection {
                 case .systemMemory:
@@ -255,21 +297,6 @@ struct MainWindowView: View {
             }
             .buttonStyle(.pharos)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(PharosColor.background)
-        }
-        .frame(minWidth: 920, minHeight: 600)
-        .onAppear {
-            store.viewAppeared()
-            if selection == nil { selection = initialSelection ?? .portsOverview }
-        }
-        .onDisappear { store.viewDisappeared() }
-        .onChange(of: router.request) { _, request in
-            guard let request else { return }
-            selection = request
-            router.request = nil
-        }
-        .onChange(of: store.lastScan) { _, _ in
-            workspaces.recordPorts(workspaces.running(in: store.projects))
         }
     }
 

@@ -84,6 +84,11 @@ final class AgentChatStore: ObservableObject {
         didSet { UserDefaults.standard.set(chartCollapsed, forKey: "agentChartCollapsed") }
     }
 
+    func resetSettings() {
+        editorLayout = .grid
+        chartCollapsed = false
+    }
+
     private var hasScanned = false
     private var isHeavyCacheReleased = false
 

@@ -168,10 +168,11 @@ SF Symbols 统一使用线框、单色、与文字同色或次级色。
 
 ### 6.1 侧边栏规范（参考现代纯净分层与清晰领域分类）
 
-1. **纯净背景与窗口融合**：
-   - 浅色模式下侧边栏采用纯白/极淡无色杂质表面（`PharosColor.surface` / `surfaceSecondary`），与右侧内容区的温润浅灰底色（`PharosColor.background`）形成轻柔对比。
-   - 深色模式采用深沉石墨黑灰，杜绝强烈的毛玻璃杂乱透色。
-   - 窗口启用透明标题栏（`titlebarAppearsTransparent`），红黄绿交通灯自然留白，顶部不堆砌多余横条。
+1. **纯净背景与浮起分层（Floating Elevated Surface）**：
+   - 侧边栏不再受系统原生 `NavigationSplitView` 的 AppKit 裁剪与生硬分割条限制，采用无缝 `HStack(spacing: 0)` 的自适应浮动架构，侧边栏以 `.zIndex(1)` 浮动于主窗口内容画布之上。
+   - 浅色模式下侧边栏采用纯白表面（`PharosColor.surface` / `#FFFFFF`），右侧边缘向主画布（`PharosColor.background` / `#F2F3F5`）投射双层柔和弥散阴影（`radius: 3, x: 1, opacity: 0.04` + `radius: 12, x: 4, opacity: 0.06`）及极淡发丝线（0.5pt `separator.opacity(0.35)`），形成清晰且优雅的悬浮抬升感（Floating Island Effect）。
+   - 深色模式采用深沉石墨黑表面，与背景画布形成细腻明度差与边缘微光，杜绝强烈的毛玻璃杂乱透色。
+   - 窗口启用透明标题栏（`titlebarAppearsTransparent`）与内容全屏（`fullSizeContentView`），侧边栏顶部为系统红黄绿交通灯自然留出 42pt 空白，支持窗口自由拖拽。
 2. **顶部仪表盘英雄项（Dashboard Hero）**：
    - 顶部首项设立独立的「总览 / 仪表盘 (Dashboard)」，配备单色线框图标（`square.grid.2x2`），作为全局状态的核心入口。
    - 英雄项与下方子领域之间使用一条微妙发丝线（`PharosListDivider`）优雅分隔，形成稳定的锚点。

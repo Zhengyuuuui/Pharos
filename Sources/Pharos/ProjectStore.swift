@@ -59,6 +59,11 @@ final class ProjectStore: ObservableObject {
         static let showSystem = "showSystemProcesses"
     }
 
+    func resetSettings() {
+        refreshSeconds = 5
+        showSystem = false
+    }
+
     private let backgroundSeconds: TimeInterval = 30
     private var timer: Timer?
     private var viewers = 0

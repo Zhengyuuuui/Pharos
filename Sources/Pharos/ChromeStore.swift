@@ -67,6 +67,11 @@ final class ChromeStore: ObservableObject {
         if visible { hiddenBrowsers.remove(b) } else { hiddenBrowsers.insert(b) }
     }
 
+    func resetSettings() {
+        hiddenBrowsers = []
+        defaultBrowser = installedBrowsers.first ?? .chrome
+    }
+
     func revealDefaultProfile(_ b: ChromiumBrowser) {
         NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: b.defaultUserDataDir)
     }

@@ -32,6 +32,12 @@ final class Notifier: ObservableObject {
         favoriteExit = d.object(forKey: Keys.favoriteExit) as? Bool ?? false
     }
 
+    func resetSettings() {
+        memory = false
+        disk = false
+        favoriteExit = false
+    }
+
     var anyEnabled: Bool { memory || disk || favoriteExit }
 
     func start(observing store: ProjectStore) {

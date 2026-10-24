@@ -82,6 +82,10 @@ final class PackageStore: ObservableObject {
         // Lazy initialization: do not scan in init(). Scanned on-demand when PackageView appears.
     }
 
+    func resetSettings() {
+        projectDepsDisplayMode = .bundleOnly
+    }
+
     func scanIfNeeded() {
         if !hasScanned || isHeavyCacheReleased {
             isHeavyCacheReleased = false

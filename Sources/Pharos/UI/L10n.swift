@@ -35,9 +35,18 @@ final class L10n: ObservableObject {
            let lang = AppLanguage(rawValue: saved) {
             language = lang
         } else {
-            let preferred = Locale.preferredLanguages.first ?? "en"
-            language = preferred.hasPrefix("zh") ? .simplifiedChinese : .english
+            language = Self.systemDefaultLanguage()
         }
+    }
+
+    private static func systemDefaultLanguage() -> AppLanguage {
+        let preferred = Locale.preferredLanguages.first ?? "en"
+        return preferred.hasPrefix("zh") ? .simplifiedChinese : .english
+    }
+
+    func resetLanguage() {
+        UserDefaults.standard.removeObject(forKey: "appLanguage")
+        language = Self.systemDefaultLanguage()
     }
 
     private var en: Bool { language == .english }
@@ -1282,7 +1291,10 @@ final class L10n: ObservableObject {
     var openSourceSubtitle: String { en ? "100% Native Swift · Local Dev Lighthouse · Zero Network" : "100% 原生 Swift 构建 · 本地开发环境灯塔 · 纯净零网络请求" }
     var viewOnGitHub: String { en ? "GitHub Repo" : "访问 GitHub 仓库" }
     var resetAllSettings: String { en ? "Reset Settings" : "恢复默认设置" }
-    var resetAllSettingsConfirm: String { en ? "Are you sure you want to restore all settings and popover layout to default?" : "确定要将所有设置及下拉框布局恢复为默认值吗？" }
+    var resetAllSettingsConfirm: String {
+        en ? "Are you sure you want to restore all preferences and popover layout to default? Saved workspaces, browser presets, and hardware fan/battery controls will not be affected."
+           : "确定要将所有偏好设置及下拉框布局恢复为默认值吗？已收藏的工作区、浏览器预设及风扇/电池硬件控制不会受到影响。"
+    }
     var resetSettingsDone: String { en ? "All settings have been restored to defaults." : "所有设置已恢复为默认值。" }
     var launchAtLoginHelp: String { en ? "Automatically launch Pharos in the menu bar when you log into your Mac." : "在登录 Mac 时自动在菜单栏启动 Pharos。" }
     var footerCrafted: String { en ? "By zys with ♡" : "由 zys 精心打造 ♡" }

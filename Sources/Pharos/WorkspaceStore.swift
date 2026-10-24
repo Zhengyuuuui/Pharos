@@ -28,6 +28,10 @@ final class WorkspaceStore: ObservableObject {
         }
     }
 
+    func resetSettings() {
+        terminal = .terminal
+    }
+
     func favorite(id: String) -> Favorite? { favorites.first { $0.id == id } }
 
     func favorite(forDirectory dir: String?) -> Favorite? {

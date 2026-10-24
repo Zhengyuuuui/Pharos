@@ -68,12 +68,15 @@ final class MenuBarSettings: ObservableObject {
     private var hotkeyRef: EventHotKeyRef?
     private var handlerRef: EventHandlerRef?
 
+    private static let defaultMaxProjects = 25
+    private static let defaultMaxPorts = 30
+
     private init() {
         text = UserDefaults.standard.string(forKey: Keys.text).flatMap(MenuBarText.init) ?? .none
         let savedProjects = UserDefaults.standard.integer(forKey: Keys.maxProjects)
-        maxProjects = savedProjects > 0 ? savedProjects : 25
+        maxProjects = savedProjects > 0 ? savedProjects : Self.defaultMaxProjects
         let savedPorts = UserDefaults.standard.integer(forKey: Keys.maxPorts)
-        maxPorts = savedPorts > 0 ? savedPorts : 30
+        maxPorts = savedPorts > 0 ? savedPorts : Self.defaultMaxPorts
         hotkey = UserDefaults.standard.string(forKey: Keys.hotkey).flatMap(PopoverHotkey.init) ?? .none
         installHandler()
         registerHotkey()
@@ -116,8 +119,8 @@ final class MenuBarSettings: ObservableObject {
 
     func reset() {
         text = .none
-        maxProjects = 25
-        maxPorts = 50
+        maxProjects = Self.defaultMaxProjects
+        maxPorts = Self.defaultMaxPorts
         hotkey = .none
     }
 
