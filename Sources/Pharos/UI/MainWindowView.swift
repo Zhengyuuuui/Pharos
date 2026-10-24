@@ -39,13 +39,13 @@ struct MainWindowView: View {
             sidebarIsland
                 .frame(width: 236)
                 .frame(maxHeight: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .background(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(PharosColor.surface)
                         .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
                         .shadow(color: Color.black.opacity(0.07), radius: 14, x: 0, y: 6)
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .stroke(PharosColor.separator.opacity(0.35), lineWidth: 0.5)
@@ -80,7 +80,8 @@ struct MainWindowView: View {
                 sidebarContentList
             }
             .overlay(alignment: .top) {
-                sidebarTrafficLightsBlurHeader
+                TunableFrostedHeader(transparency: trafficLightGlassTransparency)
+                    .frame(height: 40)
                     .allowsHitTesting(false)
             }
 
@@ -257,12 +258,6 @@ struct MainWindowView: View {
         .padding(.horizontal, 8)
         .padding(.top, 38)
         .padding(.bottom, 12)
-    }
-
-    private var sidebarTrafficLightsBlurHeader: some View {
-        SidebarTrafficLightsFrostedGlass(transparency: trafficLightGlassTransparency)
-            .frame(width: 236, height: 42)
-            .shadow(color: Color.black.opacity(0.04), radius: 3, x: 0, y: 1)
     }
 
     private var detailView: some View {
@@ -542,26 +537,14 @@ struct ProjectDetailView: View {
     }
 }
 
-private struct SidebarTrafficLightsFrostedGlass: NSViewRepresentable {
-    var transparency: Double
-
-    func makeNSView(context: Context) -> FrostedGlassNSView {
-        let v = FrostedGlassNSView()
-        v.transparency = CGFloat(transparency)
-        return v
-    }
-
-    func updateNSView(_ nsView: FrostedGlassNSView, context: Context) {
-        nsView.transparency = CGFloat(transparency)
-    }
-}
-
-private final class FrostedGlassNSView: NSView {
-    private let effectView = NSVisualEffectView()
-    private let veilView = NSView()
-    private static let fadeMask: NSImage = {
-        let h: CGFloat = 42
-        let img = NSImage(size: NSSize(width: 1, height: h), flipped: true) { rect in
+/// Hardware-accelerated `CABackdropLayer` (`blendingMode = .withinWindow`) header
+/// that blurs scrolling sidebar content underneath the native traffic lights at 120 FPS
+/// with zero SwiftUI `@State` updates or view re-evaluations during scroll.
+private final class TunableFrostedEffectView: NSVisualEffectView {
+    private static let verticalMaskImage: NSImage = {
+        let height: CGFloat = 40
+        let size = NSSize(width: 1, height: height)
+        return NSImage(size: size, flipped: true) { rect in
             guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
             let colors = [
                 NSColor.black.cgColor,
@@ -569,48 +552,78 @@ private final class FrostedGlassNSView: NSView {
                 NSColor.black.withAlphaComponent(0.45).cgColor,
                 NSColor.clear.cgColor
             ] as CFArray
-            let locs: [CGFloat] = [0.0, 0.62, 0.85, 1.0]
-            if let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: locs) {
-                ctx.drawLinearGradient(grad, start: CGPoint(x: 0, y: 0), end: CGPoint(x: 0, y: h), options: [])
+            let locations: [CGFloat] = [0.0, 0.65, 0.85, 1.0]
+            if let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: locations) {
+                ctx.drawLinearGradient(grad, start: CGPoint(x: 0, y: 0), end: CGPoint(x: 0, y: rect.height), options: [])
             }
             return true
         }
-        img.capInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
-        img.resizingMode = .stretch
-        return img
     }()
 
-    var transparency: CGFloat = 0.75 {
-        didSet { updateAppearance() }
+    var transparency: Double = 0.75 {
+        didSet {
+            guard oldValue != transparency else { return }
+            needsDisplay = true
+            applyParameters()
+        }
     }
 
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        wantsLayer = true
-
-        effectView.blendingMode = .withinWindow
-        effectView.material = .headerView
-        effectView.state = .active
-        effectView.maskImage = Self.fadeMask
-        effectView.autoresizingMask = [.width, .height]
-        addSubview(effectView)
-
-        veilView.wantsLayer = true
-        veilView.autoresizingMask = [.width, .height]
-        addSubview(veilView)
-
-        updateAppearance()
+    override func updateLayer() {
+        super.updateLayer()
+        applyParameters()
     }
 
-    required init?(coder: NSCoder) { fatalError() }
+    override func layout() {
+        super.layout()
+        applyParameters()
+    }
 
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        applyParameters()
+    }
 
-    private func updateAppearance() {
+    func applyParameters() {
+        if maskImage == nil {
+            maskImage = Self.verticalMaskImage
+        }
         let t = min(1.0, max(0.0, transparency))
-        effectView.alphaValue = 0.5 + t * 0.5
-        let veilAlpha = (1.0 - t) * 0.72
-        veilView.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(veilAlpha).cgColor
+        let blurRadius = 0.8 + (1.0 - t) * 7.2
+        let veilOpacity = Float((1.0 - t) * 0.82)
+        guard let root = layer else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        Self.configureSublayers(of: root, blurRadius: blurRadius, veilOpacity: veilOpacity)
+        CATransaction.commit()
+    }
+
+    private static func configureSublayers(of layer: CALayer, blurRadius: Double, veilOpacity: Float) {
+        for sub in layer.sublayers ?? [] {
+            if sub.name == "backdrop" {
+                sub.setValue(blurRadius, forKeyPath: "filters.gaussianBlur.inputRadius")
+            } else if sub.name == "fill" {
+                sub.opacity = veilOpacity
+            }
+            configureSublayers(of: sub, blurRadius: blurRadius, veilOpacity: veilOpacity)
+        }
+    }
+}
+
+private struct TunableFrostedHeader: NSViewRepresentable {
+    var transparency: Double
+
+    func makeNSView(context: Context) -> TunableFrostedEffectView {
+        let v = TunableFrostedEffectView()
+        v.blendingMode = .withinWindow
+        v.material = .headerView
+        v.state = .active
+        v.transparency = transparency
+        return v
+    }
+
+    func updateNSView(_ nsView: TunableFrostedEffectView, context: Context) {
+        nsView.transparency = transparency
+        nsView.applyParameters()
     }
 }
 
