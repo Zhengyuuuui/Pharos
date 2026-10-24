@@ -73,7 +73,7 @@ struct SystemMemoryView: View {
             .frame(maxWidth: 900, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(PharosColor.background)
+        .background(Color.clear)
     }
 
     private static func level(_ p: MemoryPressure) -> PharosStatusIndicator.Level {

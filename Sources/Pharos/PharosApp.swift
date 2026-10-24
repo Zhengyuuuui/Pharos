@@ -52,7 +52,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             w.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
             w.titlebarAppearsTransparent = true
             w.titleVisibility = .hidden
+            w.toolbar = NSToolbar()
             w.toolbarStyle = .unified
+            w.titlebarSeparatorStyle = .none
             w.isMovableByWindowBackground = true
             w.minSize = NSSize(width: 920, height: 600)
             w.setContentSize(NSSize(width: 1040, height: 700))

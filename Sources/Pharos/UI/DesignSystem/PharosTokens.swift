@@ -10,6 +10,23 @@ enum PharosColor {
         light: 0.945, dark: 0.118,
         lightContrast: 0.915, darkContrast: 0.085
     )
+    static let backgroundTop = dynamic(
+        light: 0.995, dark: 0.148,
+        lightContrast: 1.0, darkContrast: 0.165
+    )
+    static let backgroundBottom = dynamic(
+        light: 0.915, dark: 0.095,
+        lightContrast: 0.885, darkContrast: 0.075
+    )
+
+    /// Global subtle vertical gradient (top pure white → bottom soft silver-gray).
+    static var windowGradient: LinearGradient {
+        LinearGradient(
+            colors: [backgroundTop, backgroundBottom],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
     static let surface = dynamic(
         light: 1.0, dark: 0.173,
         lightContrast: 1.0, darkContrast: 0.195

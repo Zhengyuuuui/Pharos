@@ -90,7 +90,7 @@ struct PharosPage<Header: View, Content: View>: View {
             .frame(maxWidth: maxWidth, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(PharosColor.background)
+        .background(Color.clear)
     }
 }
 

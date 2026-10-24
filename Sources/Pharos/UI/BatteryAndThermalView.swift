@@ -43,7 +43,7 @@ struct BatteryAndThermalView: View {
             .padding(.horizontal, PharosSpacing.page)
             .padding(.top, PharosSpacing.l)
             .padding(.bottom, PharosSpacing.m)
-            .background(PharosColor.background)
+            .background(Color.clear)
 
             PharosListDivider()
 
