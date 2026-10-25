@@ -156,13 +156,37 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 
 ## 安装
 
-需要 **macOS 14+** 与 Swift 工具链（Command Line Tools 即可，无需 Xcode）。
+运行环境要求：**macOS 14+**（Sonoma / Sequoia）。
+
+### 方式一：Homebrew 安装（推荐）
+
+通过 Homebrew Cask 单行命令一键安装：
 
 ```sh
-git clone https://github.com/Zhengyuuuui/pharos.git
-cd pharos
+brew install --cask https://raw.githubusercontent.com/Zhengyuuuui/Pharos/main/Casks/pharos.rb
+```
+
+或通过专属 Tap 源安装：
+
+```sh
+brew tap zhengyuuuui/tap
+brew install --cask pharos
+```
+
+### 方式二：直接下载 DMG 安装包
+
+前往 [GitHub Releases](https://github.com/Zhengyuuuui/Pharos/releases/latest) 下载最新的 `Pharos-3.0.0.dmg`，双击打开后将 `Pharos.app` 拖入 `/Applications` 应用程序文件夹即可。
+
+### 方式三：源码编译安装
+
+需要 Swift 工具链（macOS 自带的 Command Line Tools 即可，无需完整 Xcode）：
+
+```sh
+git clone https://github.com/Zhengyuuuui/Pharos.git
+cd Pharos
 make test      # 运行测试（含真实监听端口扫描）
 make install   # 编译 release、打包 Pharos.app、安装到 /Applications 并启动
+# 或执行: make dmg # 编译并打包出独立的 DMG 安装包至 dist/Pharos.dmg
 ```
 
 从旧版 **UsageBar** 升级：首次启动时会自动迁移设置（语言、常用项目、Chrome 预设、清理保留期等）。之后可删除 `/Applications/UsageBar.app`，并在设置里重新打开「登录时启动」。

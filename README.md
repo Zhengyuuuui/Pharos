@@ -156,13 +156,37 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 
 ## Install
 
-Requires **macOS 14+** and the Swift toolchain (Command Line Tools are enough, no Xcode needed).
+Requires **macOS 14+** (Sonoma / Sequoia).
+
+### Option 1: Homebrew (Recommended)
+
+Install via Homebrew Cask with a single command:
 
 ```sh
-git clone https://github.com/Zhengyuuuui/pharos.git
-cd pharos
+brew install --cask https://raw.githubusercontent.com/Zhengyuuuui/Pharos/main/Casks/pharos.rb
+```
+
+Or via Homebrew Tap:
+
+```sh
+brew tap zhengyuuuui/tap
+brew install --cask pharos
+```
+
+### Option 2: Direct DMG Download
+
+Download the latest `Pharos-3.0.0.dmg` from [GitHub Releases](https://github.com/Zhengyuuuui/Pharos/releases/latest), open the disk image, and drag `Pharos.app` to your `/Applications` folder.
+
+### Option 3: Build from Source
+
+Requires the Swift toolchain (Command Line Tools are enough, no Xcode needed):
+
+```sh
+git clone https://github.com/Zhengyuuuui/Pharos.git
+cd Pharos
 make test      # run the test suite (includes a real listening-socket scan)
 make install   # build release, bundle Pharos.app, copy to /Applications, launch
+# or: make dmg # build standalone signed DMG into dist/Pharos.dmg
 ```
 
 Upgrading from the old **UsageBar** build: your settings (language, favorites, Chrome presets, cleanup retention…) are copied over on first launch. Delete `/Applications/UsageBar.app` afterwards, and re-enable “Launch at login” in Settings.
