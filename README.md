@@ -19,9 +19,27 @@
   <img src="https://img.shields.io/badge/updated-2026--10--24-informational" alt="Last updated 2026-10-24">
 </p>
 
-<p align="center"><sub>Last updated / 最后更新：2026-10-24 10:46 (UTC+8) · v3.0 · Author / 作者：zys · Model / 模型：Gemini 4 Argon</sub></p>
+<p align="center"><sub>Last updated / 最后更新：2026-10-25 · v3.0 · Author / 作者：zys · Model / 模型：Gemini 4 Argon</sub></p>
 
 <p align="center"><b>English</b> · <a href="README_CN.md">简体中文</a> · <a href="CHANGELOG.md">Changelog / 更新记录</a></p>
+
+---
+
+## ⚡ Quick Install
+
+Requires **macOS 14+** (Sonoma / Sequoia · Apple Silicon & Intel).
+
+### Option 1: Direct Download (DMG)
+Download the latest [**Pharos-3.0.0.dmg**](https://github.com/Zhengyuuuui/Pharos/releases/latest) from GitHub Releases, open it, and drag `Pharos.app` to your `/Applications` folder.
+
+### Option 2: Homebrew
+```sh
+brew install --cask https://raw.githubusercontent.com/Zhengyuuuui/Pharos/main/Casks/pharos.rb
+```
+Or via tap:
+```sh
+brew tap zhengyuuuui/tap && brew install --cask pharos
+```
 
 ---
 
@@ -154,30 +172,7 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 
 ---
 
-## Install
-
-Requires **macOS 14+** (Sonoma / Sequoia).
-
-### Option 1: Homebrew (Recommended)
-
-Install via Homebrew Cask with a single command:
-
-```sh
-brew install --cask https://raw.githubusercontent.com/Zhengyuuuui/Pharos/main/Casks/pharos.rb
-```
-
-Or via Homebrew Tap:
-
-```sh
-brew tap zhengyuuuui/tap
-brew install --cask pharos
-```
-
-### Option 2: Direct DMG Download
-
-Download the latest `Pharos-3.0.0.dmg` from [GitHub Releases](https://github.com/Zhengyuuuui/Pharos/releases/latest), open the disk image, and drag `Pharos.app` to your `/Applications` folder.
-
-### Option 3: Build from Source
+## Build from Source (Optional)
 
 Requires the Swift toolchain (Command Line Tools are enough, no Xcode needed):
 

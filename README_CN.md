@@ -19,9 +19,28 @@
   <img src="https://img.shields.io/badge/updated-2026--10--24-informational" alt="Last updated 2026-10-24">
 </p>
 
-<p align="center"><sub>最后更新 / Last updated：2026-10-24 10:46 (UTC+8) · v3.0 · 作者 / Author：zys · 模型 / Model：Gemini 4 Argon</sub></p>
+<p align="center"><sub>最后更新 / Last updated：2026-10-25 · v3.0 · 作者 / Author：zys · 模型 / Model：Gemini 4 Argon</sub></p>
 
 <p align="center"><a href="README.md">English</a> · <b>简体中文</b> · <a href="CHANGELOG.md">更新记录 / Changelog</a></p>
+
+---
+
+## ⚡ 快速安装
+
+运行环境要求：**macOS 14+**（Sonoma / Sequoia · 支持 Apple Silicon 与 Intel）。
+
+### 方式一：直接下载 DMG 安装包（推荐）
+前往 GitHub Releases 下载最新的 [**Pharos-3.0.0.dmg**](https://github.com/Zhengyuuuui/Pharos/releases/latest)，双击打开后将 `Pharos.app` 拖入 `/Applications` 文件夹即可。
+
+### 方式二：Homebrew 一键安装
+通过 Homebrew Cask 单行命令安装：
+```sh
+brew install --cask https://raw.githubusercontent.com/Zhengyuuuui/Pharos/main/Casks/pharos.rb
+```
+或通过专属 Tap 源安装：
+```sh
+brew tap zhengyuuuui/tap && brew install --cask pharos
+```
 
 ---
 
@@ -154,30 +173,7 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 
 ---
 
-## 安装
-
-运行环境要求：**macOS 14+**（Sonoma / Sequoia）。
-
-### 方式一：Homebrew 安装（推荐）
-
-通过 Homebrew Cask 单行命令一键安装：
-
-```sh
-brew install --cask https://raw.githubusercontent.com/Zhengyuuuui/Pharos/main/Casks/pharos.rb
-```
-
-或通过专属 Tap 源安装：
-
-```sh
-brew tap zhengyuuuui/tap
-brew install --cask pharos
-```
-
-### 方式二：直接下载 DMG 安装包
-
-前往 [GitHub Releases](https://github.com/Zhengyuuuui/Pharos/releases/latest) 下载最新的 `Pharos-3.0.0.dmg`，双击打开后将 `Pharos.app` 拖入 `/Applications` 应用程序文件夹即可。
-
-### 方式三：源码编译安装
+## 源码编译（可选）
 
 需要 Swift 工具链（macOS 自带的 Command Line Tools 即可，无需完整 Xcode）：
 
