@@ -1,7 +1,11 @@
 APP = Pharos
 DIST = dist/$(APP).app
+VERSION ?= 3.0.0
+DMG_NAME = $(APP)-$(VERSION).dmg
+DMG_PATH = dist/$(DMG_NAME)
+DMG_STAGE = dist/dmg-stage
 
-.PHONY: build test app install clean icon assets
+.PHONY: build test app install clean icon assets dmg
 
 build:
 	swift build -c release
@@ -46,6 +50,18 @@ app: build assets
 	cp Resources/Pharos.icns $(DIST)/Contents/Resources/Pharos.icns
 	if [ -f .build/icon-assets/Assets.car ]; then cp .build/icon-assets/Assets.car $(DIST)/Contents/Resources/Assets.car; fi
 	codesign --force --sign - $(DIST)
+
+dmg: app
+	rm -rf $(DMG_STAGE) $(DMG_PATH) dist/$(APP).dmg
+	mkdir -p $(DMG_STAGE)
+	cp -R $(DIST) $(DMG_STAGE)/
+	ln -s /Applications $(DMG_STAGE)/Applications
+	hdiutil create -volname "$(APP)" -srcfolder $(DMG_STAGE) -ov -format UDZO $(DMG_PATH)
+	rm -rf $(DMG_STAGE)
+	cp $(DMG_PATH) dist/$(APP).dmg
+	shasum -a 256 $(DMG_PATH) > $(DMG_PATH).sha256
+	@echo "Built $(DMG_PATH) with SHA256:"
+	@cat $(DMG_PATH).sha256
 
 install: app
 	-pkill -x $(APP)
