@@ -76,7 +76,7 @@ struct PharosActionButton: View {
 /// Standard scrolling page: title row, then sections spaced by `PharosSpacing.section`,
 /// on the shared window background.
 struct PharosPage<Header: View, Content: View>: View {
-    var maxWidth: CGFloat = 960
+    var maxWidth: CGFloat = .infinity
     @ViewBuilder var header: Header
     @ViewBuilder let content: Content
 

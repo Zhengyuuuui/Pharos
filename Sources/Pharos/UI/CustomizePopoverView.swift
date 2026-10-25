@@ -14,7 +14,7 @@ struct CustomizePopoverView: View {
 
     var body: some View {
         let layout = layoutStore.layout
-        PharosPage(maxWidth: 1200) {
+        PharosPage {
             PharosPageHeader(title: l10n.customizeTitle, subtitle: l10n.customizeIntro) {
                 if armedReset {
                     HStack(spacing: PharosSpacing.xs) {

@@ -1282,6 +1282,24 @@ final class L10n: ObservableObject {
     var batteryStatusNotInstalled: String { en ? "Not Installed" : "未安装" }
     var batteryStatusNotResponding: String { en ? "Not Responding" : "未响应" }
     var batteryStatusRunning: String { en ? "Running" : "运行正常" }
+    var batteryStatusNeedsUpdate: String { en ? "Update Required" : "需要更新" }
+    var batteryHelperUpToDate: String { en ? "Up to Date" : "已是最新版本" }
+    func batteryHelperVersionDisplay(current: Int, target: Int) -> String {
+        if current < target {
+            return en ? "Helper version: v\(current) (v\(target) available)" : "特权组件版本: v\(current)（可升级至 v\(target)）"
+        } else {
+            return en ? "Helper version: v\(current) (Latest)" : "特权组件版本: v\(current)（最新版本）"
+        }
+    }
+    var openSystemBatterySettings: String { en ? "macOS Battery Settings" : "系统电池设置" }
+    var batteryHelperNeedsUpdateNotice: String {
+        en ? "Outdated background service (v1) detected. Please click 'Update Helper' to enable persistent background charging limit guard."
+           : "检测到后台守护进程为旧版本（v1），缺少「常驻防接管」特性。请点击下方「更新特权组件」输入密码完成升级，以防系统强行接管。"
+    }
+    var optimizedChargingEngagedWarning: String {
+        en ? "macOS 'Optimized Battery Charging' is currently enabled in System Settings, which may conflict with Pharos charge limits. Turning it off in System Settings > Battery is recommended."
+           : "提示：macOS 系统「优化电池充电」处于开启状态，可能会与 Pharos 充电限制发生冲突。建议在「系统设置 → 电池」中关闭「优化电池充电」以确保 80% 阈值绝对锁定。"
+    }
 
     // MARK: - Settings Modern Redesign (Target App Alignment)
     var quickActions: String { en ? "Quick Action" : "快捷动作" }
@@ -1307,6 +1325,218 @@ final class L10n: ObservableObject {
     var trafficLightGlassPreviewLabel: String { en ? "LIVE PREVIEW" : "实时预览" }
     var trafficLightGlassFrosted: String { en ? "Frosted" : "浓雾" }
     var trafficLightGlassClear: String { en ? "Clear" : "通透" }
+
+    // MARK: - Ambient Context Rail (Inspector)
+    var inspectorTitle: String { en ? "Inspector" : "实时伴随" }
+    var toggleInspector: String { en ? "Toggle Inspector" : "折叠/展开伴随栏" }
+    var ambientPulse: String { en ? "Ambient Pulse" : "环境脉搏" }
+    var insights: String { en ? "Key Insights" : "高价值洞察" }
+    var quickActionsTitle: String { en ? "Quick Actions" : "快捷动作" }
+
+    // Page 1: Ports Overview
+    var lanDebugStation: String { en ? "LAN Debug Station" : "局域网联调站" }
+    var copyLanUrl: String { en ? "Copy LAN URL" : "复制局域网联调链接" }
+    var exposureRadar: String { en ? "Exposure Radar" : "网络暴露状态审计" }
+    var bgDaemons: String { en ? "Background Services" : "常用后台服务" }
+    func allServicesStableExposed(_ n: Int) -> String {
+        en ? "All local services running stably; detected \(n) service(s) exposed to LAN."
+           : "所有本地服务运行稳定；检测到 \(n) 个服务已暴露于局域网。"
+    }
+    var allServicesStableLoopback: String {
+        en ? "All local services running stably; all ports are loopback-only (127.0.0.1)."
+           : "所有本地服务运行稳定；所有端口均仅限本机访问 (127.0.0.1)。"
+    }
+    var noListeningServicesPulse: String {
+        en ? "No listening services; local ports and dev network are idle."
+           : "当前无监听服务；本地端口与开发网络处于休眠状态。"
+    }
+    func localOnlyCount(_ n: Int) -> String { en ? "\(n) local only" : "\(n) 仅限本机" }
+    func lanExposedCount(_ n: Int) -> String { en ? "\(n) LAN exposed" : "\(n) 局域网开放" }
+
+    // Page 2: System Memory
+    var domainBreakdown: String { en ? "Domain Breakdown" : "领域占用归因" }
+    var domainDevTools: String { en ? "Dev Tools & Runtimes" : "开发工具与运行时" }
+    var domainBrowsers: String { en ? "Browser Ecosystem" : "浏览器生态" }
+    var domainSystem: String { en ? "System & Other Apps" : "系统其他应用" }
+    var pagingActivity: String { en ? "Paging & SSD Activity" : "换页与 SSD 磨损监测" }
+    var pagingQuiet: String { en ? "SSD Paging Idle / Light" : "SSD 处于静止/轻载" }
+    var pagingActive: String { en ? "Active Paging (SSD Writes)" : "高频换页中 (有 SSD 写入)" }
+    var trendWatch: String { en ? "Memory Trend Watch" : "内存单调增长观察" }
+    var openActivityMonitor: String { en ? "Open Activity Monitor" : "打开活动监视器" }
+    var memoryPulseNormal: String {
+        en ? "Memory pressure is nominal; swap paging is minimal, zero thrashing risk."
+           : "内存压力处于正常绿区；Swap 换页极低，系统无颠簸风险。"
+    }
+    var memoryPulseWarning: String {
+        en ? "Memory pressure is elevated; active paging detected, consider freeing memory."
+           : "内存压力处于预警状态；检测到换页活动，建议释放大应用。"
+    }
+
+    // Page 3: Disk Usage
+    var runwayHealth: String { en ? "Runway Health" : "空间余量健康度" }
+    var quickJumpers: String { en ? "Quick Jumpers" : "大容量集水区跳转" }
+    var externalStorage: String { en ? "External Storage" : "外接设备安全快照" }
+    var noExternalStorage: String { en ? "No External Storage Mounted" : "无外接存储挂载" }
+    var diskPulseHealthy: String {
+        en ? "Startup volume has ample space; all mounted volumes are healthy."
+           : "系统盘空间充足；外接 APFS 卷与存储设备均安全就绪。"
+    }
+    var diskPulseWarning: String {
+        en ? "Startup volume is under 20% available; disk cleanup recommended."
+           : "系统盘可用空间低于 20%；建议进入深度清理以释放冗余缓存。"
+    }
+    var jumpDownloads: String { en ? "Downloads Folder" : "下载文件夹" }
+    var jumpCaches: String { en ? "User Caches" : "用户缓存目录" }
+    var jumpXcode: String { en ? "Xcode DerivedData" : "Xcode 衍生数据" }
+    var quickCleanupSuggest: String { en ? "Clean Disk" : "快速清理建议" }
+
+    // Page 4: Battery & Thermals
+    var thermalHeadroomTitle: String { en ? "Thermal Headroom" : "散热节流安全裕度" }
+    func headroomDegrees(_ deg: Int) -> String {
+        en ? "+\(deg)°C safety margin before 100°C throttling"
+           : "距 100°C 保护阈值还有 +\(deg)°C 安全裕度"
+    }
+    var powerDraw: String { en ? "Power Draw & Flow" : "实时充放电能效" }
+    var throttlingStatus: String { en ? "Throttling Status" : "热节流状态" }
+    var throttlingNone: String { en ? "None (Unthrottled)" : "未受限 (None)" }
+    var throttlingActive: String { en ? "Throttling Active" : "受限降频中" }
+    func batteryPulseRunning(_ watts: String) -> String {
+        en ? "System drawing \(watts)W; thermal headroom ample, fans at quiet RPM."
+           : "整机功耗 \(watts)W，散热裕度极高；风扇目前处于静音转速。"
+    }
+    var batteryPulseCharging: String {
+        en ? "Battery charging; power management optimizing lifespan and temps."
+           : "正在充电中；电池管理芯片正在优化循环寿命与温度。"
+    }
+    var fanControlAction: String { en ? "Fan & Power Mode" : "切换至静音/系统模式" }
+
+    // Page 5: Packages
+    var ecosystemProportions: String { en ? "Ecosystem Distribution" : "包生态体积分布" }
+    var staleCliWatch: String { en ? "Stale CLI Tools" : "休眠/孤儿工具提示" }
+    var cliSnippets: String { en ? "CLI Quick Snippets" : "官方维护清理命令" }
+    var copyCleanCmd: String { en ? "Copy Prune Command" : "复制推荐清理指令" }
+    func packagesPulse(nodePct: Int, count: Int) -> String {
+        en ? "Node ecosystem accounts for \(nodePct)% of caches; \(count) global dev tools tracked."
+           : "Node 生态占依赖总量 \(nodePct)%；共管理 \(count) 个全局开发工具。"
+    }
+
+    // Page 6: Chrome
+    var activeDevToolsPorts: String { en ? "Active DevTools Endpoints" : "活跃调试端点" }
+    var sandboxIsolation: String { en ? "Sandbox Isolation" : "沙箱隔离健康度" }
+    var sandboxFullyIsolated: String { en ? "Strictly Isolated" : "严格独立 (--user-data-dir)" }
+    var browserFootprint: String { en ? "Browser Memory Footprint" : "浏览器总内存占用" }
+    var openDevToolsPage: String { en ? "Open DevTools Page" : "打开 DevTools 调试页" }
+    func chromePulseRunning(_ n: Int) -> String {
+        en ? "\(n) independent instance(s) running; CDP debugging endpoints ready."
+           : "\(n) 个独立实例运行中，CDP 远程调试端点均已就绪。"
+    }
+    var chromePulseNone: String {
+        en ? "No custom browser profile instances running; launch from presets."
+           : "当前未运行独立配置浏览器实例；可从预设一键启动。"
+    }
+
+    // Page 7: Agent Chats
+    var contextBloatWatch: String { en ? "Context Bloat Watch" : "超长会话膨胀预警" }
+    var contextBloatNormal: String { en ? "Normal (No oversized DB)" : "正常 (未超标)" }
+    func contextBloatAlert(_ n: Int) -> String {
+        en ? "\(n) large database(s) (>15MB)" : "发现 \(n) 个大体积数据库 (>15MB)"
+    }
+    var editorDistribution: String { en ? "Editor Distribution" : "各编辑器使用比重" }
+    var snapshotFreshness: String { en ? "Integrity & Freshness" : "数据完整度与备份" }
+    func orphanedDbCount(_ n: Int) -> String {
+        en ? "\(n) orphaned database(s)" : "\(n) 个失效工作区数据库"
+    }
+    var agentPulseHealthy: String {
+        en ? "All editor databases verified intact; recent backup recommended."
+           : "所有编辑器数据库已验证，未发现损坏；建议备份近一周成果。"
+    }
+    var quickExportDb: String { en ? "Export Selected DB" : "导出当前数据库" }
+
+    // Page 8: Disk Cleanup
+    var beforeAndAfter: String { en ? "Before & After Preview" : "释放前后对比预演" }
+    var lifetimeSpaceSaved: String { en ? "Reclaimable Space" : "累计可回收空间" }
+    var safetyPrinciples: String { en ? "Local Safety Principles" : "纯本地安全准则" }
+    var safetyPrinciplesDetail: String {
+        en ? "Expired files only · Locked handles kept · Sources protected"
+           : "只删过期文件 · 不删运行中句柄 · 源码与配置受保护"
+    }
+    func cleanupPulse(_ size: String) -> String {
+        en ? "Cleaning can reclaim \(size); safety retention policy active."
+           : "清理可立即腾出 \(size)；当前策略已开启‘安全保留期’。"
+    }
+    var cleanAiTempOnly: String { en ? "Clean AI Temp Files" : "一键清理 AI 临时文件" }
+
+    // Page 9: Project Detail & Favorites
+    var techStackFingerprint: String { en ? "Tech Stack Fingerprint" : "技术栈自动识别" }
+    var localJumpers: String { en ? "Local Jumpers" : "快捷访问直达" }
+    var processUptimeThreads: String { en ? "Process Health & Threads" : "进程健康与线程" }
+    func projectPulse(name: String, mem: String) -> String {
+        en ? "\"\(name)\" running smoothly; process tree using \(mem) memory."
+           : "「\(name)」运行良好；子进程树共消耗 \(mem) 内存。"
+    }
+    var openProjectInTerminal: String { en ? "Launch in Terminal" : "在终端中启动" }
+
+    // Page 10: Customize Popover
+    var densityHeightMeter: String { en ? "Density & Height Meter" : "高度仪表与适配" }
+    var heightComfortable: String { en ? "Fits Comfortably" : "舒适契合 (无遮挡)" }
+    var recommendedPresets: String { en ? "Recommended Presets" : "布局风格推荐" }
+    var presetMinimal: String { en ? "Minimal Hardware" : "极简极速版" }
+    var presetFull: String { en ? "Full Developer" : "全能开发版" }
+    var renderingFootprint: String { en ? "Rendering Energy Impact" : "渲染能效评估" }
+    var renderingLow: String { en ? "Ultra Low · On-Demand" : "极低能耗 · 按需唤醒" }
+    func customizePulse(_ h: Int) -> String {
+        en ? "Current popover height ~\(h)pt; ideal for 13~16\" displays."
+           : "当前布局总高度约 \(h)pt，契合 13~16 寸屏幕。"
+    }
+    var applyMinimalPreset: String { en ? "Apply Minimal Preset" : "应用极简预设" }
+
+    // Page 11: Settings
+    var daemonHealthcheck: String { en ? "Daemon Healthcheck" : "特权守护服务自检" }
+    var daemonFand: String { en ? "Fan Control (pharos-fand)" : "风扇控温服务 (pharos-fand)" }
+    var daemonBattd: String { en ? "Battery (pharos-battd)" : "电池养护服务 (pharos-battd)" }
+    var cheatsheet: String { en ? "Shortcuts Cheatsheet" : "快捷键速览" }
+    var zeroTelemetrySeal: String { en ? "Zero-Telemetry Seal" : "100% 纯本地运行认证" }
+    var zeroTelemetryDesc: String {
+        en ? "100% Native Swift · Zero Network · Zero Telemetry · Sandboxed"
+           : "100% Native Swift · 零网络请求 · 零遥测 · 本地沙盒保护"
+    }
+    var settingsPulse: String {
+        en ? "All privileged helper daemons healthy; hotkeys listening."
+           : "所有特权守护进程连接正常；本地快捷键监听生效中。"
+    }
+    var recheckDaemons: String { en ? "Recheck Connections" : "重新自检通信" }
+
+    // Bento Modular Rail v2.2 Tokens
+    var activePorts: String { en ? "Active Ports" : "活跃端口" }
+    var normalListening: String { en ? "Normal Listening" : "正常监听" }
+    var publicExposure: String { en ? "Public Exposure" : "公网暴露" }
+    var openBroadcasting: String { en ? "0.0.0.0 Open" : "0.0.0.0 开放" }
+    var copyMobileLanUrl: String { en ? "Copy Mobile Debug URL" : "复制移动端联调 URL" }
+    var exposureAuditTitle: String { en ? "Exposure Safety Audit" : "暴露安全审计" }
+    var allLoopbackSafe: String { en ? "All ports safely bound to 127.0.0.1" : "全部端口安全绑定本机回环" }
+    func lanExposedWarning(_ n: Int) -> String {
+        en ? "\(n) port(s) broadcast on all interfaces (0.0.0.0); bind 127.0.0.1 for local dev."
+           : "有 \(n) 个端口已全网卡广播；若仅本机开发，建议绑定 127.0.0.1。"
+    }
+    var systemDiskMargin: String { en ? "Startup Disk Margin" : "系统盘余量" }
+    var externalStorageTile: String { en ? "External Storage" : "外接存储" }
+    func mountedCount(_ n: Int) -> String { en ? "\(n) Mounted" : "\(n) 个已挂载" }
+    func ampleAvailable(_ pct: Int) -> String { en ? "\(pct)% Ample" : "\(pct)% 充裕" }
+    var runningInstances: String { en ? "Running Instances" : "运行实例" }
+    var isolatedProfiles: String { en ? "Profiles Isolated" : "配置严格隔离" }
+    var cdpEndpoints: String { en ? "CDP Endpoints" : "CDP 端点" }
+    var remoteDebugReady: String { en ? "Remote Debug Ready" : "远程调试就绪" }
+    var newCleanProfile: String { en ? "New Clean Profile" : "新建纯净无插件环境" }
+    var uptimeTitle: String { en ? "Uptime" : "运行时长" }
+    var activeThreads: String { en ? "Active Threads" : "活跃线程" }
+    var runningStable: String { en ? "Running Stably" : "运行平稳" }
+    var resourceModerate: String { en ? "Moderate Resources" : "资源占用适中" }
+    func savedCumulative(_ gb: String) -> String { en ? "Saved \(gb) for this Mac" : "已为这台 Mac 节省 \(gb)" }
+    var fanSystemManaged: String { en ? "System Managed" : "系统托管" }
+    var fanFullSpeed: String { en ? "Full Speed" : "全速散热" }
+    var cleanTempCachesOnly: String { en ? "Clean Temp Caches Only" : "仅清理临时缓存" }
+    var openDerivedData: String { en ? "DerivedData Folder" : "Xcode 衍生数据" }
+    var openDockerVm: String { en ? "Docker VM Cache" : "Docker 虚拟缓存" }
 }
 
 

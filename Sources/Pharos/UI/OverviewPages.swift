@@ -9,71 +9,64 @@ struct SystemMemoryView: View {
     private let metricColumns = [GridItem(.adaptive(minimum: 150), spacing: PharosSpacing.l, alignment: .top)]
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: PharosSpacing.section) {
-                HStack(alignment: .center) {
-                    Text(l10n.systemMemory).font(PharosFont.pageTitle)
-                    Spacer()
-                    if let s = store.system {
-                        PharosStatusIndicator(level: Self.level(s.pressure),
-                                              text: "\(l10n.pressure): \(l10n.pressureLabel(s.pressure))")
-                    }
-                }
-                .padding(.horizontal, PharosSpacing.xs)
-
+        PharosPage {
+            HStack(alignment: .center) {
+                Text(l10n.systemMemory).font(PharosFont.pageTitle)
+                Spacer()
                 if let s = store.system {
-                    PharosSection(title: l10n.overview, systemImage: "gauge.with.dots.needle.33percent") {
-                        LazyVGrid(columns: metricColumns, alignment: .leading, spacing: PharosSpacing.l) {
-                            PharosMetricValue(title: l10n.memoryUsed,
-                                              value: ByteFormat.short(s.used),
-                                              detail: "/ \(ByteFormat.short(s.total)) · \(Int((s.usedFraction * 100).rounded()))%",
-                                              systemImage: "memorychip")
-                            PharosMetricValue(title: l10n.availableMemory,
-                                              value: ByteFormat.short(s.available),
-                                              detail: "\(l10n.cachedReclaimable) \(ByteFormat.short(s.cachedFiles))",
-                                              systemImage: "checkmark.circle")
-                            PharosMetricValue(title: l10n.swapUsed,
-                                              value: ByteFormat.short(s.swapUsed),
-                                              detail: s.swapTotal > 0 ? "/ \(ByteFormat.short(s.swapTotal))" : nil,
-                                              systemImage: "arrow.left.arrow.right")
-                            PharosMetricValue(title: l10n.devProjects,
-                                              value: ByteFormat.short(store.totalMemory),
-                                              detail: s.used > 0 ? "\(Int((Double(store.totalMemory) / Double(s.used) * 100).rounded()))% \(l10n.shareOfSystem)" : nil,
-                                              systemImage: "shippingbox")
-                        }
-                    }
-
-                    PharosSection(title: l10n.physicalMemory, systemImage: "memorychip") {
-                        MemoryCompositionBar(stats: s, height: 16)
-                    }
-
-                    PharosSection(title: l10n.memoryTrend, systemImage: "chart.xyaxis.line") {
-                        Text(l10n.lastHour)
-                            .font(PharosFont.caption)
-                            .foregroundStyle(PharosColor.textTertiary)
-                    } content: {
-                        if store.history.samples.count < 2 {
-                            CollectingHint()
-                        } else {
-                            SystemTrendChart(samples: store.history.samples, total: s.total)
-                                .frame(height: 170)
-                        }
-                    }
-                } else {
-                    PharosCard {
-                        ProgressView().frame(maxWidth: .infinity).padding(PharosSpacing.xxl)
-                    }
-                }
-
-                PharosSection(title: l10n.topApps, systemImage: "square.stack.3d.up") {
-                    TopAppsChart(apps: Array(store.apps.prefix(12)))
+                    PharosStatusIndicator(level: Self.level(s.pressure),
+                                          text: "\(l10n.pressure): \(l10n.pressureLabel(s.pressure))")
                 }
             }
-            .padding(PharosSpacing.page)
-            .frame(maxWidth: 900, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        } content: {
+            if let s = store.system {
+                PharosSection(title: l10n.overview, systemImage: "gauge.with.dots.needle.33percent") {
+                    LazyVGrid(columns: metricColumns, alignment: .leading, spacing: PharosSpacing.l) {
+                        PharosMetricValue(title: l10n.memoryUsed,
+                                          value: ByteFormat.short(s.used),
+                                          detail: "/ \(ByteFormat.short(s.total)) · \(Int((s.usedFraction * 100).rounded()))%",
+                                          systemImage: "memorychip")
+                        PharosMetricValue(title: l10n.availableMemory,
+                                          value: ByteFormat.short(s.available),
+                                          detail: "\(l10n.cachedReclaimable) \(ByteFormat.short(s.cachedFiles))",
+                                          systemImage: "checkmark.circle")
+                        PharosMetricValue(title: l10n.swapUsed,
+                                          value: ByteFormat.short(s.swapUsed),
+                                          detail: s.swapTotal > 0 ? "/ \(ByteFormat.short(s.swapTotal))" : nil,
+                                          systemImage: "arrow.left.arrow.right")
+                        PharosMetricValue(title: l10n.devProjects,
+                                          value: ByteFormat.short(store.totalMemory),
+                                          detail: s.used > 0 ? "\(Int((Double(store.totalMemory) / Double(s.used) * 100).rounded()))% \(l10n.shareOfSystem)" : nil,
+                                          systemImage: "shippingbox")
+                    }
+                }
+
+                PharosSection(title: l10n.physicalMemory, systemImage: "memorychip") {
+                    MemoryCompositionBar(stats: s, height: 16)
+                }
+
+                PharosSection(title: l10n.memoryTrend, systemImage: "chart.xyaxis.line") {
+                    Text(l10n.lastHour)
+                        .font(PharosFont.caption)
+                        .foregroundStyle(PharosColor.textTertiary)
+                } content: {
+                    if store.history.samples.count < 2 {
+                        CollectingHint()
+                    } else {
+                        SystemTrendChart(samples: store.history.samples, total: s.total)
+                            .frame(height: 170)
+                    }
+                }
+            } else {
+                PharosCard {
+                    ProgressView().frame(maxWidth: .infinity).padding(PharosSpacing.xxl)
+                }
+            }
+
+            PharosSection(title: l10n.topApps, systemImage: "square.stack.3d.up") {
+                TopAppsChart(apps: Array(store.apps.prefix(12)))
+            }
         }
-        .background(Color.clear)
     }
 
     private static func level(_ p: MemoryPressure) -> PharosStatusIndicator.Level {

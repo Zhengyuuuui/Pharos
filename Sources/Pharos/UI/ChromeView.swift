@@ -445,7 +445,7 @@ private struct LaunchCommandRow: View {
             }
         }
         .padding(8)
-        .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.04)))
+        .background(RoundedRectangle(cornerRadius: 6).fill((Color.primary as Color).opacity(0.04)))
     }
 }
 

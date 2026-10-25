@@ -6,6 +6,12 @@ public struct AppUsage: Hashable, Sendable, Identifiable {
     public let memoryBytes: UInt64
     public let processCount: Int
     public var id: String { name }
+
+    public init(name: String, memoryBytes: UInt64, processCount: Int) {
+        self.name = name
+        self.memoryBytes = memoryBytes
+        self.processCount = processCount
+    }
 }
 
 public enum AppGrouper {

@@ -56,7 +56,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             w.toolbarStyle = .unified
             w.titlebarSeparatorStyle = .none
             w.isMovableByWindowBackground = true
-            w.minSize = NSSize(width: 920, height: 600)
+            w.isOpaque = false
+            w.backgroundColor = .clear
+            w.minSize = NSSize(width: 940, height: 620)
             w.setContentSize(NSSize(width: 1040, height: 700))
             w.isReleasedWhenClosed = false
             w.center()
@@ -66,6 +68,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if window?.isMiniaturized == true { window?.deminiaturize(nil) }
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func windowWillEnterFullScreen(_ notification: Notification) {
+        window?.toolbar = nil
+    }
+
+    func windowDidExitFullScreen(_ notification: Notification) {
+        let tb = NSToolbar()
+        window?.toolbar = tb
+    }
+
+    func window(_ window: NSWindow, willUseFullScreenPresentationOptions proposedOptions: NSApplication.PresentationOptions = []) -> NSApplication.PresentationOptions {
+        return [.autoHideToolbar, .autoHideMenuBar, .fullScreen]
     }
 
     /// Drop the window entirely instead of hiding it: a hidden window keeps its

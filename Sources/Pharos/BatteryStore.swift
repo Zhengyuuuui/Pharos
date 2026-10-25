@@ -17,6 +17,8 @@ final class BatteryStore: ObservableObject {
     @Published private(set) var reading: BatteryReading = BatteryReading()
     @Published private(set) var capabilities: BatteryHardwareCapabilities = BatteryHardwareCapabilities()
     @Published private(set) var helper: HelperState = .notInstalled
+    @Published private(set) var helperNeedsUpdate: Bool = false
+    @Published private(set) var helperVersion: Int? = nil
     @Published private(set) var mode: BatteryMode = .system
     @Published private(set) var isHolding: Bool = false
     @Published private(set) var isAdapterBypassed: Bool = false
@@ -67,6 +69,7 @@ final class BatteryStore: ObservableObject {
 
     private var heartbeatTimer: Timer?
     private var telemetryTimer: Timer?
+    private var wakeObserver: Any?
     private var hasViewers: Bool = false
 
     func updateVisibility(hasViewers: Bool) {
@@ -93,12 +96,12 @@ final class BatteryStore: ObservableObject {
         }
 
         // Heartbeat interval:
-        // When UI is showing: 5s.
-        // When backgrounded:
+        // When UI is showing or helper is outdated (v1 requires <=15s heartbeat): 5s.
+        // When backgrounded with updated v2 helper:
         // - 30s if persistentGuard is active or in system mode;
         // - 5s only if strict heartbeat mode is active (!persistentGuard && mode != .system).
         let heartbeatInterval: TimeInterval
-        if hasViewers {
+        if hasViewers || helperNeedsUpdate {
             heartbeatInterval = 5
         } else {
             if persistentGuard || mode == .system {
@@ -133,9 +136,27 @@ final class BatteryStore: ObservableObject {
                 }
             }
         }
+
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.refreshTelemetry()
+                self.refreshHelperState()
+                if self.limitEnabled, self.persistentGuard, !self.busy {
+                    self.apply(.limit(maxPercent: self.targetLimit))
+                }
+            }
+        }
     }
 
     deinit {
+        if let wakeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
+        }
         heartbeatTimer?.invalidate()
         telemetryTimer?.invalidate()
     }
@@ -233,16 +254,20 @@ final class BatteryStore: ObservableObject {
     private func handle(_ reply: BatteryProtocol.Reply?, failure: String?) {
         guard let reply else {
             helper = isInstalled ? .notResponding : .notInstalled
+            helperVersion = nil
             if let failure { errorMessage = failure }
             return
         }
         helper = .ready
+        helperVersion = reply.version
         let oldMode = mode
+        let oldNeedsUpdate = helperNeedsUpdate
+        helperNeedsUpdate = (reply.version < BatteryProtocol.version)
         mode = reply.mode
         isHolding = reply.isHolding
         isAdapterBypassed = reply.isAdapterBypassed
         unsupported = reply.unsupported
-        if oldMode != mode {
+        if oldMode != mode || oldNeedsUpdate != helperNeedsUpdate {
             scheduleTimers()
         }
         if !reply.ok, let failure {
@@ -261,6 +286,10 @@ final class BatteryStore: ObservableObject {
             if limitEnabled, reply.mode == .system, !reply.unsupported {
                 apply(.limit(maxPercent: targetLimit))
             }
+        } else if limitEnabled, persistentGuard, reply.mode == .system, !reply.unsupported, !busy {
+            // Guard against inadvertent system takeover (e.g. heartbeat timeout or wake reset):
+            // Re-apply the user's explicit limit if persistentGuard is active.
+            apply(.limit(maxPercent: targetLimit))
         }
     }
 
@@ -330,6 +359,15 @@ final class BatteryStore: ObservableObject {
             self?.mode = .system
             self?.isHolding = false
             self?.isAdapterBypassed = false
+        }
+    }
+
+    /// One-click launcher to open macOS System Settings -> Battery pane directly.
+    func openSystemBatterySettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Battery-Settings.extension") {
+            NSWorkspace.shared.open(url)
+        } else if let fallback = URL(string: "x-apple.systempreferences:com.apple.preference.battery") {
+            NSWorkspace.shared.open(fallback)
         }
     }
 

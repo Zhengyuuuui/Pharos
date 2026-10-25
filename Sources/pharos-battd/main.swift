@@ -209,7 +209,8 @@ final class BatteryDaemon: @unchecked Sendable {
                 let inhibit: UInt8 = decision.action == .inhibitCharge ? 1 : 0
                 if hasCHTE {
                     write("CHTE", [inhibit, 0, 0, 0])
-                } else if hasCH0C {
+                }
+                if hasCH0C {
                     write("CH0C", [inhibit])
                 }
                 if hasCHIE { write("CHIE", [0]) }

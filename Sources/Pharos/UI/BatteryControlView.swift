@@ -38,6 +38,11 @@ struct BatteryControlView: View {
                 if battery.busy {
                     ProgressView().controlSize(.small)
                 }
+                PharosActionButton(l10n.openSystemBatterySettings, systemImage: "arrow.up.forward.app", role: .standard) {
+                    battery.openSystemBatterySettings()
+                }
+                .controlSize(.small)
+
                 PharosActionButton(l10n.refreshNow, systemImage: "arrow.clockwise", role: .standard) {
                     battery.refreshTelemetry()
                     battery.refreshHelperState()
@@ -306,6 +311,18 @@ struct BatteryControlView: View {
                 // Safe design explanation
                 PharosBanner(kind: .success, text: l10n.batterySafeLimitTip)
 
+                if battery.reading.optimizedChargingEngaged {
+                    PharosBanner(kind: .warning, text: l10n.optimizedChargingEngagedWarning) {
+                        Button {
+                            battery.openSystemBatterySettings()
+                        } label: {
+                            Label(l10n.openSystemBatterySettings, systemImage: "arrow.up.forward.app")
+                        }
+                        .buttonStyle(.pharos)
+                        .controlSize(.small)
+                    }
+                }
+
                 // Persistent Guard toggle (Sleep & Lid-close protection)
                 PharosListDivider()
                 Toggle(isOn: $battery.persistentGuard) {
@@ -388,11 +405,22 @@ struct BatteryControlView: View {
     private var helperManagementCard: some View {
         PharosCard {
             VStack(alignment: .leading, spacing: PharosSpacing.m) {
-                HStack {
-                    Label(l10n.batteryHelperInstalled, systemImage: "shield.lefthalf.filled")
-                        .font(PharosFont.rowLabel)
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: PharosSpacing.xxs) {
+                        Label(l10n.batteryHelperInstalled, systemImage: "shield.lefthalf.filled")
+                            .font(PharosFont.rowLabel)
+                        if let v = battery.helperVersion {
+                            Text(l10n.batteryHelperVersionDisplay(current: v, target: BatteryProtocol.version))
+                                .font(PharosFont.caption)
+                                .foregroundStyle(battery.helperNeedsUpdate ? PharosColor.warning : PharosColor.textTertiary)
+                        }
+                    }
                     Spacer()
                     statusBadge
+                }
+
+                if battery.helperNeedsUpdate {
+                    PharosBanner(kind: .warning, text: l10n.batteryHelperNeedsUpdateNotice)
                 }
 
                 if let message = battery.errorMessage {
@@ -449,12 +477,12 @@ struct BatteryControlView: View {
                                 .controlSize(.small)
                                 .disabled(battery.busy)
 
-                                Button(l10n.reinstallHelper) {
+                                Button(battery.helperNeedsUpdate ? l10n.reinstallHelper : l10n.batteryHelperUpToDate) {
                                     battery.install()
                                 }
-                                .buttonStyle(.pharos)
+                                .buttonStyle(battery.helperNeedsUpdate ? .pharosPrimary : .pharos)
                                 .controlSize(.small)
-                                .disabled(battery.busy)
+                                .disabled(battery.busy || !battery.helperNeedsUpdate)
                             }
                         }
                     }
@@ -472,7 +500,11 @@ struct BatteryControlView: View {
         case .notResponding:
             PharosTag(text: l10n.batteryStatusNotResponding, systemImage: "exclamationmark.triangle.fill", tint: PharosColor.warning)
         case .ready:
-            PharosTag(text: l10n.batteryStatusRunning, systemImage: "checkmark.circle.fill", tint: PharosColor.success)
+            if battery.helperNeedsUpdate {
+                PharosTag(text: l10n.batteryStatusNeedsUpdate, systemImage: "arrow.triangle.2.circlepath", tint: PharosColor.warning)
+            } else {
+                PharosTag(text: l10n.batteryStatusRunning, systemImage: "checkmark.circle.fill", tint: PharosColor.success)
+            }
         }
     }
 }

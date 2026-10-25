@@ -4,7 +4,7 @@ import Foundation
 /// One request line in, one JSON response line out.
 public enum BatteryProtocol {
     public static let socketPath = "/var/run/pharos-battd.sock"
-    public static let version = 1
+    public static let version = 2
     /// Requests longer than this are rejected unread.
     public static let maxLineBytes = 256
 

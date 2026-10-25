@@ -10,6 +10,7 @@ struct MainWindowView: View {
     @ObservedObject private var router = WindowRouter.shared
     @ObservedObject private var l10n = L10n.shared
     @AppStorage("pharos.trafficLightGlassTransparency") private var trafficLightGlassTransparency: Double = 0.75
+    @AppStorage("pharos.showInspector") private var showInspector: Bool = true
     @State private var selection: SidebarItem?
     /// Entry point from the menu-bar popover (e.g. "Disk Cleanup").
     private let initialSelection: SidebarItem?
@@ -34,31 +35,74 @@ struct MainWindowView: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            // 1. Floating Sidebar Island (圆角矩形悬浮浮岛，内置交通灯)
-            sidebarIsland
-                .frame(width: 236)
-                .frame(maxHeight: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .background(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(PharosColor.surface)
-                        .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
-                        .shadow(color: Color.black.opacity(0.07), radius: 14, x: 0, y: 6)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(PharosColor.separator.opacity(0.35), lineWidth: 0.5)
-                )
+        GeometryReader { proxy in
+            let isWideScreen = proxy.size.width >= 1180
+            let isInspectorVisible = isWideScreen && showInspector
 
-            // 2. Detail Canvas
-            detailView
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            HStack(alignment: .top, spacing: 0) {
+                // 1. Floating Sidebar Island (圆角矩形悬浮浮岛，内置交通灯)
+                sidebarIsland(isWideScreen: isWideScreen)
+                    .frame(width: 236)
+                    .frame(maxHeight: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .background(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(PharosColor.surface)
+                            .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
+                            .shadow(color: Color.black.opacity(0.07), radius: 14, x: 0, y: 6)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(PharosColor.separator.opacity(0.35), lineWidth: 0.5)
+                    )
+                    .padding(.trailing, 14) // 14pt 导航与中间区隔离带
+
+                // 2. Detail Canvas (Fluid Flex)
+                detailView
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .overlay(alignment: .topTrailing) {
+                        if isWideScreen && !showInspector {
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    showInspector = true
+                                }
+                            } label: {
+                                Image(systemName: "sidebar.trailing")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(PharosColor.textSecondary)
+                                    .frame(width: 28, height: 28)
+                                    .background(Circle().fill(PharosColor.surface))
+                                    .overlay(Circle().stroke(PharosColor.separator.opacity(0.35), lineWidth: 0.5))
+                                    .shadow(color: Color.black.opacity(0.06), radius: 4, x: 0, y: 2)
+                            }
+                            .buttonStyle(.plain)
+                            .help(l10n.toggleInspector)
+                            .padding(14)
+                            .transition(.opacity)
+                        }
+                    }
+
+                // 3. Floating Bento Context Rail (260pt，三维安全隔离区)
+                if isInspectorVisible {
+                    PharosInspectorIsland(selection: selection) {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            showInspector = false
+                        }
+                    }
+                    .padding(.leading, 16) // 16pt 中间与右卡片安全区 (Center-to-Right Safe Gutter)
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .move(edge: .trailing)),
+                        removal: .opacity.combined(with: .move(edge: .trailing))
+                    ))
+                }
+            }
+            .padding(10)
+            .frame(width: proxy.size.width, height: proxy.size.height)
         }
-        .padding(10)
         .background(PharosColor.windowGradient)
         .ignoresSafeArea()
         .frame(minWidth: 940, minHeight: 620)
+        .animation(.easeInOut(duration: 0.25), value: showInspector)
         .onAppear {
             store.viewAppeared()
             if selection == nil { selection = initialSelection ?? .portsOverview }
@@ -74,7 +118,7 @@ struct MainWindowView: View {
         }
     }
 
-    private var sidebarIsland: some View {
+    private func sidebarIsland(isWideScreen: Bool) -> some View {
         VStack(spacing: 0) {
             ScrollView(showsIndicators: false) {
                 sidebarContentList
@@ -85,7 +129,7 @@ struct MainWindowView: View {
                     .allowsHitTesting(false)
             }
 
-            sidebarBottomIsland
+            sidebarBottomIsland(isWideScreen: isWideScreen)
         }
     }
 
@@ -307,7 +351,7 @@ struct MainWindowView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var sidebarBottomIsland: some View {
+    private func sidebarBottomIsland(isWideScreen: Bool) -> some View {
         HStack(spacing: PharosSpacing.s) {
             // Circle button 1: Quick refresh
             Button {
@@ -336,6 +380,24 @@ struct MainWindowView: View {
             }
             .buttonStyle(.plain)
             .help(l10n.settings)
+
+            // Circle button 3: Inspector Toggle (Visible on wide screen)
+            if isWideScreen {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        showInspector.toggle()
+                    }
+                } label: {
+                    Image(systemName: "sidebar.trailing")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(showInspector ? PharosColor.accent : PharosColor.textSecondary)
+                        .frame(width: 32, height: 32)
+                        .background(Circle().fill(showInspector ? PharosColor.accent.opacity(0.14) : PharosColor.fill))
+                        .overlay(Circle().stroke(showInspector ? PharosColor.accent.opacity(0.4) : PharosColor.separator.opacity(0.35), lineWidth: 0.5))
+                }
+                .buttonStyle(.plain)
+                .help(l10n.toggleInspector)
+            }
 
             Spacer(minLength: 4)
 

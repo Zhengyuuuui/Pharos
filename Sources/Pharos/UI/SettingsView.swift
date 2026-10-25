@@ -353,7 +353,7 @@ struct MainSettingsView: View {
     @State private var showResetAlert = false
 
     var body: some View {
-        PharosPage(maxWidth: 680) {
+        PharosPage {
             PharosPageHeader(title: l10n.settings)
         } content: {
             // 1. Quick Actions (Rabbit / Hare icon)
