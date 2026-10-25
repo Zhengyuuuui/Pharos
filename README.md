@@ -60,7 +60,7 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 | **Battery charge limit** | macOS 15 native-style "Not Charging" plug state: hold the battery at 80 / 85 / 90 / 95 / 100 %, adapter powers the Mac directly (0 mA cell current), never cuts the adapter; optional **Persistent Lid-Closed & Background Guard** survives lid sleep, app exit, and reboots via state-persisted root daemon; one click back to macOS |
 | **Fans & temperature** | Fan speeds and CPU / GPU / memory / SSD / battery temperatures; automotive cockpit speedometer dials (60 FPS mechanical inertia engine & dynamic motion blur) & classic horizontal bars; optional fan control (fixed speed or max) with built-in safety rules |
 | **Stop processes** | `SIGTERM` first, `SIGKILL` only if it refuses; never system or other users' processes |
-| **Disk cleanup** | Temp folders and dev caches, file by file, with a retention window; the size shown is exactly what gets freed |
+| **Disk cleanup** | 4 specialized cleaning hubs: System & Caches (with sub-directory inspection & single-item clean), Orphaned App Leftovers scanner, npkill-style Project Purge (dormancy detection & batch release), and Dev & AI Tools (Homebrew multi-versions, Ollama/HuggingFace model weights with layer blob GC, Docker.raw & Xcode simulators) |
 | **Favorite projects** | Save project folders, start commands detected automatically, open in Terminal with one click |
 | **Browser instances** | Chrome, Chrome Beta / Canary, Chromium, Edge and Brave — every profile folder with its debug port, proxy and memory; save favorites that stay listed with their launch command after quitting; start and quit |
 | **AI agent chat databases** | Inspect, clean and backup local chat / session databases from 23+ AI IDEs and editors (Cursor, Trae, Windsurf, VS Code, Antigravity, OpenCode, Claude Code, MiniMax…); nanosecond-precision incremental fingerprint cache (`DB + WAL` size/mtime) skips unchanged databases; detect orphaned workspaces; manually add and scan any custom application under `/Applications` |
@@ -131,12 +131,27 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 - 🐞 opens `http://127.0.0.1:<port>` (DevTools target list) in your default browser. Pharos itself never connects to debug ports
 
 ### Disk cleanup
-- **Pinned “Temp files” group**: `/tmp`, `/var/tmp`, and your `/var/folders/…/T` and `…/C` — where AI agents, CLIs and build tools constantly write scratch files. One **Clean Temp Files** button with an adjustable retention (keep files newer than none / 1 h / 6 h / 1 day / 3 days; default 1 day), meant for cleaning every day or two
-- Other caches in collapsible groups, each with its own **Clean Group** button: App caches (`~/Library/Caches`), Xcode & Apple toolchain (DerivedData, Archives, DeviceSupport, Simulator, SwiftPM, CocoaPods), package managers (npm, pnpm, uv, pip, Gradle, Maven, Cargo, rustup, Go, Homebrew)
-- Per-location **Clean** buttons and **Clean Everything**; every destructive button needs a second click
-- Decided file by file: only your own regular files older than the retention window are deleted; sockets, FIFOs, symlinks and other users' files are left alone; emptied subfolders are removed, the target folder itself is kept
-- The size shown uses the exact same rule as the clean, so it's what you'll actually get back; a result banner reports freed space or why nothing could be freed
-- Nested dev caches under `~/Library/Caches` get their own rows and are excluded from the parent's size — no double counting
+Four dedicated cleaning modules engineered in pure Apple Swift to deliver all major capabilities of CleanMyMac and Mole, tailored specifically for modern AI agents and developer workflows:
+- **System & Caches**:
+  - **Pinned “Temp files” group**: `/tmp`, `/var/tmp`, and `/var/folders/…/T` and `…/C` — where AI agents, CLIs and build tools constantly write scratch files. One **Clean Temp Files** button with adjustable retention (none / 1 h / 6 h / 1 day / 3 days).
+  - **System & Application Logs**: `~/Library/Logs` and crash diagnostics in `/Library/Logs/DiagnosticReports`.
+  - **Trash Bins**: Rapid size calculation and one-click emptying of user Trash (`~/.Trash`).
+  - **Browser Deep Caches**: Reclaim gigabytes from Chrome, Edge, Brave, and Safari JavaScript Code Cache, GPUCache, and WebKit temporary runtimes.
+  - **App & Toolchain Caches**: `~/Library/Caches`, Xcode DerivedData, Archives, SwiftPM, CocoaPods, and language package managers (npm, pnpm, uv, pip, Gradle, Maven, Cargo, rustup, Go).
+  - **Sub-Directory Details & Single-Item Clean**: Click "Details" on any target row to reveal top 15 subfolders and files sorted by size (see exactly which app in `Caches` is taking 5GB), with single-item clean or group clean.
+- **Orphaned App Leftovers Scanner**:
+  - Automatically identifies installed applications across `/Applications`, `/System/Applications`, and `~/Applications`.
+  - Deep-scans `~/Library/Application Support`, `~/Library/Saved Application State`, `~/Library/Containers`, `~/Library/WebKit`, and `~/Library/HTTPStorages`.
+  - Whitelists Apple system services and developer CLI tools, identifying orphaned folders left behind by uninstalled apps; supports safe removal to Trash.
+- **Project Build & Dependencies Purge (npkill style)**:
+  - Traverses developer workspaces to find heavy `node_modules`, Cargo `target`, SwiftPM `.build`, Python `.venv`, Next.js `.next`, Nuxt `.nuxt`, and `dist` build directories.
+  - Automatically checks modification times to flag dormant projects (> 14 days); provides one-click batch purging of all dormant dependencies, freeing 20–50GB+ easily.
+- **Developer & AI Specialized Cleanup**:
+  - **Homebrew Deep Cleanup**: Safely scans `/opt/homebrew/Cellar` and `Caskroom` for obsolete formula/cask versions, keeps active versions, and purges `~/Library/Caches/Homebrew/downloads` bottle archives.
+  - **Local AI Model Weights & Blob GC**: Parses Ollama JSON manifests with exact layer byte sizes, Hugging Face Hub snapshots, LM Studio GGUFs, and PyTorch checkpoints; performs automated layer blob garbage collection when an Ollama model is deleted.
+  - **Containers & Simulators**: Inspects Docker Desktop `Docker.raw` VM disk images, Colima diff disks, Xcode CoreSimulator data partitions (with device names and iOS runtimes), and `iOS DeviceSupport` physical device debug symbols.
+- **Safety & Transparency**:
+  - Scans and deletes with the identical rule; regular files only, no symlinks/sockets/FIFOs, skips active files, empties clean subdirectories, and never modifies system paths.
 
 ### AI agent chat databases
 - Scans local SQLite and state databases across 23+ AI IDEs and assistants (Cursor, Trae, Windsurf, VS Code, Antigravity, Qoder, Cherry Studio, CodeBuddy, Kiro, OpenCode, Claude Code, Zed, MiniMax Code, Doubao, etc.)

@@ -1,16 +1,27 @@
 import SwiftUI
 import PharosCore
 
-/// Main window page. The temp group (where AI agents and CLIs keep writing) is
-/// pinned on top with its own clean button and retention setting; the
-/// long-lived caches follow in collapsible groups.
+/// Main window cleanup hub.
+/// Provides four specialized cleaning modules:
+/// 1. System & Caches (Pinned temp + system logs, trash, browser caches, app caches, toolchains)
+/// 2. App Leftovers (Uninstalled application data in Application Support, Containers, Saved State)
+/// 3. Project Purge (Developer dependencies & build artifacts purge — npkill style)
+/// 4. Dev & AI Tools (Homebrew deep clean, Local AI models & blob GC, Docker VM & Xcode simulators)
 struct CleanupView: View {
+    enum CleanupTab: String, CaseIterable, Identifiable {
+        case caches, leftovers, purges, devAI
+        var id: String { rawValue }
+    }
+
     @ObservedObject private var cleanup = CleanupStoreHolder.shared
     @ObservedObject private var l10n = L10n.shared
     @ObservedObject private var router = WindowRouter.shared
 
+    @State private var activeTab: CleanupTab = .caches
     @State private var selectedGroup: DiskCleaner.Group? = nil
-    private let otherGroups: [DiskCleaner.Group] = [.appCaches, .apple, .packages]
+    private let otherGroups: [DiskCleaner.Group] = [
+        .systemLogs, .trashBins, .browserCaches, .appCaches, .apple, .packages
+    ]
 
     var body: some View {
         PharosPage {
@@ -31,19 +42,19 @@ struct CleanupView: View {
             if let targetGroup = selectedGroup {
                 groupFocusedContent(targetGroup)
             } else {
-                PinnedTempSection(onSelectDetail: { group in
-                    withAnimation(.easeInOut(duration: 0.2)) { selectedGroup = group }
-                })
+                // Tab Selection Bar
+                tabPicker
+                    .padding(.bottom, PharosSpacing.s)
 
-                PharosSectionHeader(title: l10n.otherCaches, systemImage: "archivebox")
-                    .padding(.horizontal, PharosSpacing.xs)
-
-                VStack(spacing: PharosSpacing.m) {
-                    ForEach(otherGroups, id: \.self) { group in
-                        CacheGroupSection(group: group) { selected in
-                            withAnimation(.easeInOut(duration: 0.2)) { selectedGroup = selected }
-                        }
-                    }
+                switch activeTab {
+                case .caches:
+                    cachesContent
+                case .leftovers:
+                    AppLeftoversView()
+                case .purges:
+                    ProjectPurgeView()
+                case .devAI:
+                    DevAndAIView()
                 }
             }
         }
@@ -51,6 +62,7 @@ struct CleanupView: View {
         .onAppear {
             cleanup.viewAppeared()
             if let target = router.cleanupTargetGroup {
+                activeTab = .caches
                 selectedGroup = target
                 router.cleanupTargetGroup = nil
             }
@@ -58,9 +70,40 @@ struct CleanupView: View {
         .onChange(of: router.cleanupTargetGroup) { _, target in
             if let target {
                 withAnimation(.easeInOut(duration: 0.2)) {
+                    activeTab = .caches
                     selectedGroup = target
                 }
                 router.cleanupTargetGroup = nil
+            }
+        }
+    }
+
+    private var tabPicker: some View {
+        Picker("", selection: $activeTab) {
+            Label(l10n.tabSystemCaches, systemImage: "archivebox").tag(CleanupTab.caches)
+            Label(l10n.tabAppLeftovers, systemImage: "app.badge.xmark").tag(CleanupTab.leftovers)
+            Label(l10n.tabProjectPurge, systemImage: "wrench.and.screwdriver").tag(CleanupTab.purges)
+            Label(l10n.tabDevAndAI, systemImage: "cpu").tag(CleanupTab.devAI)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+    }
+
+    private var cachesContent: some View {
+        VStack(spacing: PharosSpacing.m) {
+            PinnedTempSection(onSelectDetail: { group in
+                withAnimation(.easeInOut(duration: 0.2)) { selectedGroup = group }
+            })
+
+            PharosSectionHeader(title: l10n.otherCaches, systemImage: "archivebox")
+                .padding(.horizontal, PharosSpacing.xs)
+
+            VStack(spacing: PharosSpacing.m) {
+                ForEach(otherGroups, id: \.self) { group in
+                    CacheGroupSection(group: group) { selected in
+                        withAnimation(.easeInOut(duration: 0.2)) { selectedGroup = selected }
+                    }
+                }
             }
         }
     }
@@ -88,6 +131,18 @@ struct CleanupView: View {
             title = l10n.tempCleanupTitle
             subtitle = l10n.tempCleanupSubtitle
             cleanBtnTitle = l10n.cleanTemp
+        case .systemLogs:
+            title = l10n.systemLogsCleanupTitle
+            subtitle = l10n.systemLogsCleanupSubtitle
+            cleanBtnTitle = l10n.cleanGroup
+        case .trashBins:
+            title = l10n.trashBinsCleanupTitle
+            subtitle = l10n.trashBinsCleanupSubtitle
+            cleanBtnTitle = l10n.cleanGroup
+        case .browserCaches:
+            title = l10n.browserCachesCleanupTitle
+            subtitle = l10n.browserCachesCleanupSubtitle
+            cleanBtnTitle = l10n.cleanGroup
         }
 
         return VStack(alignment: .leading, spacing: 12) {
@@ -371,7 +426,6 @@ private struct CacheGroupSection: View {
     }
 }
 
-
 private struct RowList: View {
     let rows: [CleanupStore.Row]
 
@@ -412,54 +466,105 @@ private struct ReportBanner: View {
         case .all: return l10n.cleanEverything
         case .group(let g): return l10n.groupTitle(g)
         case .row(let id): return l10n.cleanupTargetTitle(id)
+        case .subItem(let path): return (path as NSString).lastPathComponent
+        case .leftovers: return l10n.tabAppLeftovers
+        case .projectPurge: return l10n.tabProjectPurge
+        case .homebrew: return l10n.homebrewSectionTitle
+        case .aiModel(let name): return name
+        case .toolchain(let name): return name
         }
     }
 }
 
-/// One target row with its own clean button.
+/// One target row with expandable sub-item inspection and its own clean button.
 private struct CleanupRowView: View {
     @ObservedObject private var cleanup = CleanupStoreHolder.shared
     @ObservedObject private var l10n = L10n.shared
     let row: CleanupStore.Row
 
     private var bytes: UInt64 { row.bytes ?? 0 }
+    private var isExpanded: Bool { cleanup.expandedRowIds.contains(row.id) }
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: bytes == 0 ? "circle.dashed" : "folder")
-                .font(.system(size: 11))
-                .foregroundStyle(.tertiary)
-                .frame(width: 16)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(l10n.cleanupTargetTitle(row.id))
-                    .font(.system(size: 12, weight: .medium))
-                Text(row.target.path)
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-                    .truncationMode(.head)
-                    .textSelection(.enabled)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 10) {
+                if bytes > 0 {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            cleanup.toggleSubItems(for: row.target)
+                        }
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 9, weight: .semibold))
+                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                            .foregroundStyle(PharosColor.accent)
+                            .frame(width: 16, height: 16)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(isExpanded ? l10n.hideSubItems : l10n.viewSubItems)
+                } else {
+                    Image(systemName: "circle.dashed")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 16)
+                }
+
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 4) {
+                        Text(l10n.cleanupTargetTitle(row.id))
+                            .font(.system(size: 12, weight: .medium))
+
+                        if bytes > 0 {
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    cleanup.toggleSubItems(for: row.target)
+                                }
+                            } label: {
+                                Text(isExpanded ? l10n.hideSubItems : l10n.viewSubItems)
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(PharosColor.accent.opacity(0.8))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    Text(row.target.path)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.head)
+                        .textSelection(.enabled)
+                }
+
+                Spacer(minLength: 8)
+
+                Text(row.bytes.map { ByteFormat.short($0) } ?? "–")
+                    .font(.system(size: 11, weight: .medium).monospacedDigit())
+                    .foregroundStyle(bytes == 0 ? Color.secondary : Color.primary)
+                    .frame(width: 48, alignment: .trailing)
+                    .contentTransition(.numericText())
+                    .animation(.easeInOut(duration: 0.25), value: bytes)
+
+                ConfirmButton(title: l10n.cleanRow, icon: "trash", small: true,
+                              busy: cleanup.cleaning == .row(row.id),
+                              disabled: cleanup.isBusy || bytes == 0) {
+                    cleanup.cleanOne(id: row.id)
+                }
+                .frame(width: 96, alignment: .trailing)
             }
-            Spacer(minLength: 8)
-            Text(row.bytes.map { ByteFormat.short($0) } ?? "–")
-                .font(.system(size: 11, weight: .medium).monospacedDigit())
-                .foregroundStyle(bytes == 0 ? Color.secondary : Color.primary)
-                .frame(width: 48, alignment: .trailing)
-                .contentTransition(.numericText())
-                .animation(.easeInOut(duration: 0.25), value: bytes)
-            ConfirmButton(title: l10n.cleanRow, icon: "trash", small: true,
-                          busy: cleanup.cleaning == .row(row.id),
-                          disabled: cleanup.isBusy || bytes == 0) {
-                cleanup.cleanOne(id: row.id)
+
+            if isExpanded {
+                SubItemsListView(target: row.target)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
-            .frame(width: 96, alignment: .trailing)
         }
     }
 }
 
 /// Two-step destructive button: first click arms (turns red), second click
 /// runs. Disarms after a few seconds or as soon as another operation starts.
-private struct ConfirmButton: View {
+struct ConfirmButton: View {
     @ObservedObject private var cleanup = CleanupStoreHolder.shared
     @ObservedObject private var l10n = L10n.shared
     let title: String

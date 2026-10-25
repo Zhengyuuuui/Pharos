@@ -15,7 +15,7 @@ public enum DiskCleaner {
     /// agents and build tools write into constantly — the ones worth cleaning
     /// every day or two; the rest are long-lived caches cleaned rarely.
     public enum Group: String, CaseIterable, Sendable {
-        case temp, appCaches, apple, packages
+        case temp, systemLogs, trashBins, browserCaches, appCaches, apple, packages
     }
 
     /// One cleanable directory. Cleaning removes eligible files inside it,
@@ -52,6 +52,24 @@ public enum DiskCleaner {
         }
     }
 
+    /// A detailed direct sub-item (file or sub-directory) inside a Target directory.
+    public struct SubItem: Identifiable, Hashable, Sendable {
+        public var id: String { path }
+        public let name: String
+        public let path: String
+        public let size: UInt64
+        public let isDirectory: Bool
+        public let mtime: Date?
+
+        public init(name: String, path: String, size: UInt64, isDirectory: Bool, mtime: Date?) {
+            self.name = name
+            self.path = path
+            self.size = size
+            self.isDirectory = isDirectory
+            self.mtime = mtime
+        }
+    }
+
     public static let home = NSHomeDirectory()
 
     /// The default target list. Temp group first: it's the one cleaned often.
@@ -61,7 +79,23 @@ public enum DiskCleaner {
         Target(id: "var-tmp", path: "/private/var/tmp", title: "varTemp", group: .temp, maxAgeDays: 1),
         Target(id: "user-temp", path: darwinUserDir(isCache: false), title: "userTemp", group: .temp, maxAgeDays: 1),
         Target(id: "user-cache", path: darwinUserDir(isCache: true), title: "userCache", group: .temp, maxAgeDays: 1),
+
+        // System & Application Logs, Crash Diagnostics
+        Target(id: "user-logs", path: home + "/Library/Logs", title: "userLogs", group: .systemLogs, maxAgeDays: 7),
+        Target(id: "diagnostic-reports", path: "/Library/Logs/DiagnosticReports", title: "diagnosticReports", group: .systemLogs, maxAgeDays: 7),
+
+        // Trash Bins
+        Target(id: "user-trash", path: home + "/.Trash", title: "userTrash", group: .trashBins, maxAgeDays: nil),
+
+        // Browser Caches (Chromium Code Cache, WebKit, etc.)
+        Target(id: "chrome-cache", path: home + "/Library/Caches/Google/Chrome", title: "chromeCache", group: .browserCaches, maxAgeDays: 7),
+        Target(id: "edge-cache", path: home + "/Library/Caches/Microsoft Edge", title: "edgeCache", group: .browserCaches, maxAgeDays: 7),
+        Target(id: "brave-cache", path: home + "/Library/Caches/BraveSoftware", title: "braveCache", group: .browserCaches, maxAgeDays: 7),
+        Target(id: "safari-cache", path: home + "/Library/Caches/com.apple.Safari", title: "safariCache", group: .browserCaches, maxAgeDays: 7),
+
+        // General Application Caches
         Target(id: "app-caches", path: home + "/Library/Caches", title: "appCaches", group: .appCaches, maxAgeDays: 7),
+
         // Xcode / Apple toolchain.
         Target(id: "xcode-derived", path: home + "/Library/Developer/Xcode/DerivedData", title: "xcodeDerived", group: .apple),
         Target(id: "xcode-archives", path: home + "/Library/Developer/Xcode/Archives", title: "xcodeArchives", group: .apple),
@@ -71,6 +105,7 @@ public enum DiskCleaner {
         // sizes don't double count, but get their own rows.
         Target(id: "spm", path: home + "/Library/Caches/org.swift.swiftpm", title: "spm", group: .apple),
         Target(id: "cocoapods", path: home + "/Library/Caches/CocoaPods", title: "cocoapods", group: .apple),
+
         // Package managers / language toolchains.
         Target(id: "npm", path: home + "/.npm/_cacache", title: "npm"),
         Target(id: "pnpm-store", path: home + "/Library/pnpm/store", title: "pnpm"),
@@ -175,6 +210,71 @@ public enum DiskCleaner {
     /// the nested SwiftPM/pip/Go rows, whose own age rules are looser).
     public static func cleanOne(_ target: Target) -> CleanResult {
         clean([target], context: defaultTargets)
+    }
+
+    // MARK: - Detailed SubItem Breakdown
+
+    /// Explores the direct sub-items (folders or files) inside `target.path`, calculating
+    /// each item's eligible size (honoring maxAge cutoff and sibling exclusions).
+    /// Returns items sorted by size descending, capped at `limit`.
+    public static func subItems(of target: Target, limit: Int = 15, context: [Target] = defaultTargets) -> [SubItem] {
+        guard !target.path.isEmpty, FileManager.default.fileExists(atPath: target.path) else { return [] }
+        guard let entries = try? FileManager.default.contentsOfDirectory(atPath: target.path) else { return [] }
+        let excluded = nestedPaths(under: target, in: context)
+        let cut = cutoff(for: target)
+        let uid = getuid()
+        var items: [SubItem] = []
+
+        for entry in entries {
+            let fullPath = (target.path as NSString).appendingPathComponent(entry)
+            guard !excluded.contains(fullPath) else { continue }
+            var st = stat()
+            guard lstat(fullPath, &st) == 0 else { continue }
+            let isDir = (st.st_mode & S_IFMT) == S_IFDIR
+            let mtime = Date(timeIntervalSince1970: TimeInterval(st.st_mtimespec.tv_sec))
+
+            var itemSize: UInt64 = 0
+            if isDir {
+                forEachEligibleFile(fullPath, cutoff: cut, excluding: excluded, uid: uid) { _, childStat in
+                    itemSize += UInt64(childStat.st_size)
+                }
+            } else if (st.st_mode & S_IFMT) == S_IFREG {
+                if passes(cut, mtime), st.st_uid == uid {
+                    itemSize = UInt64(st.st_size)
+                }
+            }
+
+            if itemSize > 0 {
+                items.append(SubItem(name: entry, path: fullPath, size: itemSize, isDirectory: isDir, mtime: mtime))
+            }
+        }
+
+        items.sort { $0.size > $1.size }
+        if items.count > limit {
+            return Array(items.prefix(limit))
+        }
+        return items
+    }
+
+    /// Cleans a specific single sub-item under `target`, keeping sibling exclusions safe.
+    public static func cleanSubItem(_ subItem: SubItem, under target: Target, context: [Target] = defaultTargets) -> CleanResult {
+        var result = CleanResult()
+        let excluded = nestedPaths(under: target, in: context)
+        let cut = cutoff(for: target)
+        if subItem.isDirectory {
+            sweep(subItem.path, cutoff: cut, excluding: excluded, targetId: target.id, into: &result)
+            // If the subfolder itself became empty after sweep, prune it
+            _ = rmdir(subItem.path)
+        } else {
+            if unlink(subItem.path) == 0 {
+                result.freedBytes += subItem.size
+                result.removedCount += 1
+                result.perTarget[target.id] = subItem.size
+            } else {
+                result.failedCount += 1
+            }
+        }
+        return result
     }
 
     // MARK: - Internals

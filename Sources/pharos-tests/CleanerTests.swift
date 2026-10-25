@@ -240,3 +240,40 @@ func testCleanMissingAndNested() {
     expectEq(result.perTarget["c"], UInt64(40), "per-target freed: child row")
     expectEq(result.perTarget["p"], UInt64(60), "per-target freed: parent row")
 }
+
+func testCleanerSubItems() {
+    let base = NSTemporaryDirectory() + "pharos-subitems-\(UUID().uuidString)"
+    try? FileManager.default.createDirectory(atPath: base + "/AppA", withIntermediateDirectories: true)
+    try? FileManager.default.createDirectory(atPath: base + "/AppB", withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(atPath: base) }
+
+    FileManager.default.createFile(atPath: base + "/AppA/cache.dat", contents: Data(repeating: 1, count: 500))
+    FileManager.default.createFile(atPath: base + "/AppB/data.bin", contents: Data(repeating: 2, count: 300))
+    FileManager.default.createFile(atPath: base + "/root.log", contents: Data(repeating: 3, count: 100))
+
+    let target = DiskCleaner.Target(id: "test-target", path: base, title: "test", group: .appCaches, maxAge: nil)
+    let items = DiskCleaner.subItems(of: target, limit: 10, context: [target])
+
+    expectEq(items.count, 3, "detected all 3 sub-items")
+    expectEq(items[0].name, "AppA", "largest item sorted first")
+    expectEq(items[0].size, UInt64(500), "AppA size = 500")
+    expect(items[0].isDirectory, "AppA is directory")
+    expectEq(items[1].name, "AppB", "second largest item")
+    expectEq(items[1].size, UInt64(300), "AppB size = 300")
+    expectEq(items[2].name, "root.log", "root file third")
+    expectEq(items[2].size, UInt64(100), "root.log size = 100")
+    expect(!items[2].isDirectory, "root.log is file")
+
+    // Test cleaning single sub-item (AppA)
+    let cleanRes = DiskCleaner.cleanSubItem(items[0], under: target, context: [target])
+    expectEq(cleanRes.freedBytes, UInt64(500), "freed AppA bytes")
+    expect(!FileManager.default.fileExists(atPath: base + "/AppA/cache.dat"), "AppA cache unlinked")
+    expect(FileManager.default.fileExists(atPath: base + "/AppB/data.bin"), "AppB untouched")
+    expect(FileManager.default.fileExists(atPath: base + "/root.log"), "root.log untouched")
+
+    // Clean single file sub-item (root.log)
+    let cleanFileRes = DiskCleaner.cleanSubItem(items[2], under: target, context: [target])
+    expectEq(cleanFileRes.freedBytes, UInt64(100), "freed root.log bytes")
+    expect(!FileManager.default.fileExists(atPath: base + "/root.log"), "root.log unlinked")
+}
+

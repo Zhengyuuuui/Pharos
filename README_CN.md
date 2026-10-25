@@ -61,7 +61,7 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 | **电池充电上限** | 复刻 macOS 15 原生「未在充电（小插头）」：电量保持在 80 / 85 / 90 / 95 / 100%，外接电源直通主板供电（电芯电流 0 mA），绝不切断适配器；新增可选「合盖与后台持续守护」，由系统级 `pharos-battd` 状态持久化接管，合盖休眠、退出 App 或重启后持续生效；一键交还 macOS 管理 |
 | **风扇与温度** | 风扇转速以及 CPU / GPU / 内存 / SSD / 电池温度；全新汽车座舱仪表盘表盘（60 FPS 物理惯性阻尼与动态高斯运动模糊）与经典条状卡片随心切换；可选风扇控制（固定转速或满速），内置安全规则 |
 | **结束进程** | 先 `SIGTERM`，拒不退出才 `SIGKILL`；不碰系统进程和其他用户的进程 |
-| **磁盘清理** | 临时目录与开发缓存，按单个文件、按保留期判断；显示的体积就是实际能释放的体积 |
+| **磁盘清理** | 四大专业清理模块：基础与系统缓存（含子目录明细探查与单项清理）、已卸载应用残留数据扫描、npkill 风格项目构建产物清理（休眠判定与批量释放）、开发者与 AI 专项（Homebrew 历史版本、Ollama/HuggingFace 大模型与 Blob 垃圾回收、Docker.raw 与 Xcode 模拟器） |
 | **常用项目** | 收藏项目文件夹，自动识别启动命令，一键在终端中启动 |
 | **浏览器实例** | 支持 Chrome、Chrome Beta / Canary、Chromium、Edge、Brave，按配置文件夹列出每个实例，显示调试端口、代理、内存；收藏后关闭也能看到端口和启动命令；启动与退出 |
 | **AI 助手会话管理** | 扫描、分析、备份与清理 23+ 种本地 AI 编程助手与编辑器（Cursor、Trae、Windsurf、VS Code、Antigravity、OpenCode、Claude Code、MiniMax 等）的会话数据库；内置纳秒级 `DB + WAL` 指纹增量缓存，未变动大库免重复解析；识别孤立工作区，支持手动添加扫描 `/Applications` 下的任意应用 |
@@ -132,12 +132,28 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 - 🐞 用默认浏览器打开 `http://127.0.0.1:端口`（DevTools 调试列表）。Pharos 本身不连接调试端口
 
 ### 磁盘清理
-- **置顶的「临时文件」组**：`/tmp`、`/var/tmp`、你的 `/var/folders/…/T` 和 `…/C`——AI 助手、命令行工具和构建工具不断往这里写临时文件。一个**一键清理临时文件**按钮，加可调的保留期（保留最近：不保留 / 1 小时 / 6 小时 / 1 天 / 3 天；默认 1 天），适合每 1–2 天清理一次
-- 其他缓存按组折叠显示，每组有**清理本组**按钮：应用缓存（`~/Library/Caches`）、Xcode 与 Apple 工具链（DerivedData、Archives、DeviceSupport、模拟器、SwiftPM、CocoaPods）、包管理器缓存（npm、pnpm、uv、pip、Gradle、Maven、Cargo、rustup、Go、Homebrew）
-- 每个位置有单独的**清理**按钮，还有**全部清理**；所有删除按钮都要点两次确认
-- 按单个文件判断：只删属于你、超过保留期的普通文件；socket、FIFO、符号链接和其他用户的文件不动；删空的子目录会回收，目标目录本身保留
-- 显示的体积与清理用同一条规则，看到多少就能释放多少；结果横幅会显示释放了多少，或说明为什么没能释放
-- `~/Library/Caches` 下嵌套的开发缓存单列一行，并从父目录体积中排除——不会重复计数
+全新升级的四大专业级清理中心，在纯原生 Swift 栈下实现 CleanMyMac 与 Mole 的全部核心清理能力，并针对现代 AI 时代与开发者场景深度定制：
+- **基础与系统缓存**：
+  - **置顶的「临时文件」组**：`/tmp`、`/var/tmp`、`/var/folders/…/T` 与 `…/C`——AI 助手、命令行工具和构建工具高频写入的临时目录。支持一键清理与自定义保留期（不保留 / 1 小时 / 6 小时 / 1 天 / 3 天）。
+  - **系统与应用日志**：`~/Library/Logs` 与 `/Library/Logs/DiagnosticReports` 崩溃诊断报告，清理历史堆积的大量无用文本。
+  - **系统废纸篓**：快速分析并一键清空用户废纸篓（`~/.Trash`）。
+  - **浏览器深度缓存**：针对 Chrome、Edge、Brave 及 Safari，清理庞大的预编译 JavaScript 代码缓存（Code Cache）、GPUCache 及 WebKit 临时缓存。
+  - **应用缓存与工具链**：`~/Library/Caches`、Xcode DerivedData、Archives、SwiftPM、CocoaPods 及 npm、pnpm、uv、pip、Gradle、Maven、Cargo、rustup、Go 等全生态包管理缓存。
+  - **子目录占用详情与单项清理**：点击任意缓存行右侧的「明细」，可实时展开显示该目录下占用最大的 Top 15 子文件夹与文件，支持精准单项清理或整组清理，彻底搞清几 GB 缓存的具体构成。
+- **已卸载应用残留数据扫描 (App Leftovers)**：
+  - 智能检索 `/Applications`、`/System/Applications` 及 `~/Applications` 中所有已安装软件的 Bundle Identifier 与应用名。
+  - 深度扫描 `~/Library/Application Support`、`~/Library/Saved Application State`、`~/Library/Containers`、`~/Library/WebKit` 及 `~/Library/HTTPStorages`。
+  - 内置完善的 Apple 系统组件、核心服务与开发者 CLI 工具白名单，精确找出已拖入废纸篓卸载但仍遗留数 GB 孤立数据的应用，支持安全移入废纸篓或一键批量清除。
+- **项目构建产物与依赖清理 (npkill 风格 Project Purge)**：
+  - 深度遍历开发者工作区项目，快速发现占用巨大的 `node_modules`、Cargo `target`、SwiftPM `.build`、Python `.venv` / `venv`、Next.js `.next`、Nuxt `.nuxt` 及 `dist` 构建产物。
+  - 自动依据最后修改时间计算活跃度，醒目标注「休眠中 (> 14 天)」与「活跃」，支持一键批量清理所有休眠依赖，轻松释放 20GB–50GB+ 存储空间。
+- **开发者与 AI 专项清理**：
+  - **Homebrew 深度清理**：安全扫描 `/opt/homebrew/Cellar` 与 `Caskroom` 中的多版本旧 Formula/Cask，严格校验活跃软链接保留生效版本，并一键清除 `~/Library/Caches/Homebrew/downloads` 下的大型 Bottle 归档。
+  - **本地 AI 大模型与检查点管理**：深度解析 Ollama 本地模型（精确计算各 Layer 大小）、Hugging Face Hub 快照、LM Studio GGUF 模型与 PyTorch 权重；删除 Ollama 模型时自动执行未引用 Layer Blob 碎片的垃圾回收（GC），绝不留存无用权重。
+  - **容器与模拟器存储**：直观展示 Docker Desktop VM 镜像（`Docker.raw`）、Colima 虚拟机磁盘、Xcode 模拟器独立系统分区（解析设备名称与 iOS 版本）及真机调试符号（`iOS DeviceSupport`），释放隐藏的数十 GB 磁盘空间。
+- **安全与口径保证**：
+  - 按单个文件严格判断，绝不触碰非当前用户所有、正在运行中或处于保留期内的文件；删空的子目录自动安全回收。
+  - 扫描与清理共用同一套底层计算规则，所见即所清；清理完成后提供详细的成功或原因说明横幅。
 
 ### AI 助手会话与数据库管理
 - 自动发现 23+ 款主流 AI 编程助手（Cursor、Trae、Windsurf、VS Code、Antigravity、Qoder、Cherry Studio、CodeBuddy、Kiro、OpenCode、Claude Code、Zed、MiniMax Code、豆包 等）的本地会话 SQLite 数据库
