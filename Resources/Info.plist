@@ -13,4 +13,8 @@
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>
+    <key>NSDocumentsFolderUsageDescription</key><string>Pharos 需要读取文稿目录中的开发项目以分析构建产物与依赖占用。</string>
+    <key>NSDesktopFolderUsageDescription</key><string>Pharos 需要读取桌面目录中的开发项目以分析构建产物与依赖占用。</string>
+    <key>NSDownloadsFolderUsageDescription</key><string>Pharos 需要读取下载目录以扫描安装包与临时缓存。</string>
+    <key>NSSystemAdministrationUsageDescription</key><string>Pharos 需要管理员权限以配置风扇控制与电池充电守护进程。</string>
 </dict></plist>

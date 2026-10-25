@@ -852,6 +852,21 @@ final class L10n: ObservableObject {
     }
     var cleanToolchainItem: String { en ? "Clean Storage" : "释放空间" }
 
+    // MARK: - Full Disk Access & First-Launch Guidance
+    var permissionOnboardingTitle: String { en ? "Full Disk Access Recommended" : "授权完全磁盘访问权限" }
+    var permissionOnboardingMessage: String {
+        en ? "CleanMyMac-grade scanning experience: Granting Full Disk Access enables deep inspection of system logs, Trash, app leftovers, and project build artifacts. Grant once, and future scans and sub-windows will run silently without repeated permission prompts."
+           : "CleanMyMac 级深度扫描体验：建议在系统设置中授予「完全磁盘访问权限」，后续扫描系统日志、废纸篓与项目构建废料均可静默高速完成，不再弹出任何权限提示。"
+    }
+    var openSystemSettings: String { en ? "Open System Settings" : "前往系统设置" }
+    var gotIt: String { en ? "Got It" : "我知道了" }
+    var fullDiskAccessGranted: String { en ? "Full Disk Access Granted" : "完全磁盘访问权限已开启" }
+    var fullDiskAccessNotGranted: String { en ? "Full Disk Access Not Granted" : "完全磁盘访问权限未开启" }
+    var fullDiskAccessHelp: String {
+        en ? "Click to open System Settings → Privacy & Security → Full Disk Access."
+           : "点击前往「系统设置 → 隐私与安全性 → 完全磁盘访问权限」进行授权。"
+    }
+
     var dataNotice: String {
         en ? "Read-only: lists your own processes with listening TCP ports. Memory = Activity Monitor footprint (incl. child processes)."
            : "只读：列出你自己监听 TCP 端口的进程。内存 = 活动监视器口径（含子进程）。"

@@ -280,6 +280,7 @@ public enum DiskCleaner {
     // MARK: - Internals
 
     private static func size(of target: Target, excluding: Set<String>) -> UInt64 {
+        guard !target.path.isEmpty, DiskPermissions.isPathReadable(target.path) else { return 0 }
         var total: UInt64 = 0
         forEachEligibleFile(target.path, cutoff: cutoff(for: target), excluding: excluding,
                             uid: getuid()) { _, st in total += UInt64(st.st_size) }

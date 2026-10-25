@@ -64,6 +64,31 @@ final class CleanupStore: ObservableObject {
     @Published private(set) var toolchainItems: [ContainerAndToolchainCleaner.ToolchainItem] = []
     @Published private(set) var isScanningToolchain = false
 
+    // Full Disk Access (FDA) & First-Launch One-Time Guidance
+    @Published private(set) var hasFullDiskAccess: Bool = DiskPermissions.hasFullDiskAccess
+    @Published private(set) var hasPromptedFirstLaunchDiskPermission: Bool
+    private static let promptedPermissionKey = "pharos.hasPromptedFirstLaunchDiskPermission"
+
+    var shouldShowFirstLaunchPermissionBanner: Bool {
+        !hasFullDiskAccess && !hasPromptedFirstLaunchDiskPermission
+    }
+
+    func refreshPermissionStatus() {
+        hasFullDiskAccess = DiskPermissions.hasFullDiskAccess
+    }
+
+    func dismissFirstLaunchPermissionPrompt() {
+        hasPromptedFirstLaunchDiskPermission = true
+        UserDefaults.standard.set(true, forKey: Self.promptedPermissionKey)
+    }
+
+    func openFullDiskAccessSettings() {
+        dismissFirstLaunchPermissionPrompt()
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
     @Published var tempRetentionHours: Int {
         didSet {
             guard tempRetentionHours != oldValue else { return }
@@ -77,6 +102,8 @@ final class CleanupStore: ObservableObject {
     init() {
         let saved = UserDefaults.standard.object(forKey: Self.retentionKey) as? Int
         tempRetentionHours = saved.flatMap { Self.tempRetentionChoices.contains($0) ? $0 : nil } ?? 24
+        hasPromptedFirstLaunchDiskPermission = UserDefaults.standard.bool(forKey: Self.promptedPermissionKey)
+        hasFullDiskAccess = DiskPermissions.hasFullDiskAccess
     }
 
     /// Default targets with the user's temp retention applied.

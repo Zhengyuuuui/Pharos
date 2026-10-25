@@ -277,3 +277,14 @@ func testCleanerSubItems() {
     expect(!FileManager.default.fileExists(atPath: base + "/root.log"), "root.log unlinked")
 }
 
+func testDiskPermissions() {
+    // FDA probe should execute without crash or throwing errors
+    let _ = DiskPermissions.hasFullDiskAccess
+    expect(DiskPermissions.isPathReadable("/private/tmp"), "/private/tmp is readable")
+    expect(!DiskPermissions.isPathReadable("/nonexistent/pharos/path"), "nonexistent path is not readable")
+
+    // defaultSearchRoots when FDA is false should skip Desktop/Documents to avoid TCC popups
+    let nonProtectedRoots = PackageScanner.defaultSearchRoots(includeProtectedUserFolders: false)
+    expect(!nonProtectedRoots.contains { $0.hasSuffix("/Desktop") }, "skips Desktop when not included")
+}
+

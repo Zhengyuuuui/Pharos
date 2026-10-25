@@ -39,6 +39,14 @@ struct CleanupView: View {
                     ))
             }
 
+            if cleanup.shouldShowFirstLaunchPermissionBanner {
+                FirstLaunchPermissionCard()
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .move(edge: .top)),
+                        removal: .opacity
+                    ))
+            }
+
             if let targetGroup = selectedGroup {
                 groupFocusedContent(targetGroup)
             } else {
@@ -253,6 +261,24 @@ struct CleanupView: View {
     private var header: some View {
         PharosPageHeader(title: l10n.diskCleanup, subtitle: l10n.cleanupIntro) {
             HStack(spacing: PharosSpacing.s) {
+                // FDA Status Pill
+                Button {
+                    cleanup.openFullDiskAccessSettings()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: cleanup.hasFullDiskAccess ? "checkmark.shield.fill" : "shield")
+                            .font(.system(size: 10))
+                        Text(cleanup.hasFullDiskAccess ? l10n.fullDiskAccessGranted : l10n.fullDiskAccessNotGranted)
+                            .font(.system(size: 10, weight: .medium))
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(cleanup.hasFullDiskAccess ? Color.green.opacity(0.12) : Color.secondary.opacity(0.1)))
+                    .foregroundStyle(cleanup.hasFullDiskAccess ? Color.green : Color.secondary)
+                }
+                .buttonStyle(.plain)
+                .help(l10n.fullDiskAccessHelp)
+
                 PharosActionButton(
                     cleanup.isScanning ? l10n.scanning : l10n.cleanupScan,
                     systemImage: "arrow.clockwise",
@@ -271,6 +297,56 @@ struct CleanupView: View {
                 .help(l10n.cleanEverythingHelp(ByteFormat.short(cleanup.totalBytes)))
             }
         }
+    }
+}
+
+/// One-time first-launch permission recommendation card (CleanMyMac style).
+private struct FirstLaunchPermissionCard: View {
+    @ObservedObject private var cleanup = CleanupStoreHolder.shared
+    @ObservedObject private var l10n = L10n.shared
+
+    var body: some View {
+        PharosCard {
+            HStack(alignment: .top, spacing: PharosSpacing.m) {
+                Image(systemName: "shield.lefthalf.filled")
+                    .font(.system(size: 22))
+                    .foregroundStyle(PharosColor.accent)
+                    .frame(width: 38, height: 38)
+                    .background(PharosColor.fill, in: RoundedRectangle(cornerRadius: PharosRadius.control, style: .continuous))
+
+                VStack(alignment: .leading, spacing: PharosSpacing.xs) {
+                    Text(l10n.permissionOnboardingTitle)
+                        .font(PharosFont.rowLabel)
+                    Text(l10n.permissionOnboardingMessage)
+                        .font(PharosFont.caption)
+                        .foregroundStyle(PharosColor.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack(spacing: PharosSpacing.s) {
+                        Button {
+                            cleanup.openFullDiskAccessSettings()
+                        } label: {
+                            Label(l10n.openSystemSettings, systemImage: "arrow.up.right.square")
+                        }
+                        .buttonStyle(.pharosPrimary)
+                        .controlSize(.small)
+
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                cleanup.dismissFirstLaunchPermissionPrompt()
+                            }
+                        } label: {
+                            Text(l10n.gotIt)
+                        }
+                        .buttonStyle(.pharos)
+                        .controlSize(.small)
+                    }
+                    .padding(.top, 4)
+                }
+                Spacer()
+            }
+        }
+        .padding(.bottom, PharosSpacing.xs)
     }
 }
 

@@ -140,7 +140,12 @@ public enum PackageScanner {
 
 
     /// 开发者常见项目存放根目录候选列表 (自动探测存在性)
-    public static func defaultSearchRoots(home: String = NSHomeDirectory()) -> [String] {
+    /// 默认情况下若尚未获得完全磁盘访问权限 (FDA)，则跳过受 macOS TCC 弹窗保护的 Desktop/Documents 目录，
+    /// 避免用户切换或点击子页面时触发突兀的系统权限弹窗。
+    public static func defaultSearchRoots(
+        home: String = NSHomeDirectory(),
+        includeProtectedUserFolders: Bool = DiskPermissions.hasFullDiskAccess
+    ) -> [String] {
         let candidates = [
             "Developer",
             "Projects",
@@ -149,9 +154,7 @@ public enum PackageScanner {
             "code",
             "dev",
             "src",
-            "git",
-            "Desktop",
-            "Documents"
+            "git"
         ]
         var roots: [String] = []
         for folder in candidates {
@@ -160,7 +163,24 @@ public enum PackageScanner {
                 roots.append(p)
             }
         }
-        return roots.isEmpty ? [(home as NSString).appendingPathComponent("Documents")] : roots
+
+        if includeProtectedUserFolders {
+            for folder in ["Desktop", "Documents"] {
+                let p = (home as NSString).appendingPathComponent(folder)
+                if FileManager.default.fileExists(atPath: p) {
+                    roots.append(p)
+                }
+            }
+        }
+
+        if roots.isEmpty {
+            let devPath = (home as NSString).appendingPathComponent("Developer")
+            if FileManager.default.fileExists(atPath: devPath) {
+                return [devPath]
+            }
+            return [(home as NSString).appendingPathComponent("Documents")]
+        }
+        return roots
     }
 
     /// 快速探索开发者常见项目目录 (支持 Node、Python、Swift、Rust 等)
