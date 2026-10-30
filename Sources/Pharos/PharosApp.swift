@@ -61,8 +61,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             w.toolbarStyle = .unified
             w.titlebarSeparatorStyle = .none
             w.isMovableByWindowBackground = false
-            w.isOpaque = false
-            w.backgroundColor = .clear
+            w.isOpaque = true
+            w.backgroundColor = .windowBackgroundColor
             w.minSize = NSSize(width: 940, height: 620)
             w.setContentSize(NSSize(width: 1040, height: 700))
             w.isReleasedWhenClosed = false
@@ -171,6 +171,13 @@ struct PharosApp: App {
             let caches = PackageScanner.scanCacheRepositories()
             let totalCacheBytes = caches.reduce(0) { $0 + $1.fileSizeBytes }
             print("packages\t\(clis.count) CLI tools\t\(caches.count) caches (\(ByteFormat.disk(totalCacheBytes)))")
+            let diagnosis = MemoryDoctor.diagnose(processes: procs)
+            if diagnosis.hasBloat {
+                print("bloat\treclaimable \(ByteFormat.short(diagnosis.reclaimableBytes))\t\(diagnosis.bloatedCount) daemons")
+                for item in diagnosis.bloatedItems {
+                    print("daemon\t\(item.daemon.primaryName)\t\(ByteFormat.short(item.memoryBytes))\t\(item.status.rawValue)\t\(item.processCount) proc")
+                }
+            }
             exit(0)
         }
     }

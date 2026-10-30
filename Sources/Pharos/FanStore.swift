@@ -104,15 +104,16 @@ final class FanStore: ObservableObject {
 
     private func handle(_ reply: FanProtocol.Reply?, failure: String?) {
         guard let reply else {
-            helper = isInstalled ? .notResponding : .notInstalled
-            if let failure { errorMessage = failure }
+            let nextHelper: HelperState = isInstalled ? .notResponding : .notInstalled
+            if helper != nextHelper { helper = nextHelper }
+            if let failure, errorMessage != failure { errorMessage = failure }
             return
         }
-        helper = .ready
+        if helper != .ready { helper = .ready }
         let oldRequest = request
-        request = reply.request
-        overheating = reply.overheating
-        unsupported = reply.unsupported
+        if request != reply.request { request = reply.request }
+        if overheating != reply.overheating { overheating = reply.overheating }
+        if unsupported != reply.unsupported { unsupported = reply.unsupported }
         if oldRequest != request {
             scheduleTimer()
         }

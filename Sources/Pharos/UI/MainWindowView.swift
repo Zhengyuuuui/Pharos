@@ -25,13 +25,15 @@ struct MainWindowView: View {
         case batteryAndThermals
         case portsOverview
         case diskCleanup
-        case chrome
+        case browsersAndNetwork
         case agentChats
         case packages
         case favorite(String)
         case project(String)
         case customize
         case settings
+
+        public static let chrome = SidebarItem.browsersAndNetwork
     }
 
     var body: some View {
@@ -47,13 +49,16 @@ struct MainWindowView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .background(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(Color.black.opacity(0.045))
+                            .offset(y: 1.5)
+                    )
+                    .background(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .fill(PharosColor.surface)
-                            .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
-                            .shadow(color: Color.black.opacity(0.07), radius: 14, x: 0, y: 6)
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(PharosColor.separator.opacity(0.35), lineWidth: 0.5)
+                            .strokeBorder(PharosColor.separator.opacity(0.38), lineWidth: 0.5)
                     )
                     .padding(.trailing, 14) // 14pt 导航与中间区隔离带
 
@@ -63,7 +68,7 @@ struct MainWindowView: View {
                     .overlay(alignment: .topTrailing) {
                         if isWideScreen && !showInspector {
                             Button {
-                                withAnimation(.easeInOut(duration: 0.25)) {
+                                withAnimation(.easeInOut(duration: 0.22)) {
                                     showInspector = true
                                 }
                             } label: {
@@ -72,8 +77,7 @@ struct MainWindowView: View {
                                     .foregroundStyle(PharosColor.textSecondary)
                                     .frame(width: 28, height: 28)
                                     .background(Circle().fill(PharosColor.surface))
-                                    .overlay(Circle().stroke(PharosColor.separator.opacity(0.35), lineWidth: 0.5))
-                                    .shadow(color: Color.black.opacity(0.06), radius: 4, x: 0, y: 2)
+                                    .overlay(Circle().strokeBorder(PharosColor.separator.opacity(0.4), lineWidth: 0.5))
                             }
                             .buttonStyle(.plain)
                             .help(l10n.toggleInspector)
@@ -85,15 +89,12 @@ struct MainWindowView: View {
                 // 3. Floating Bento Context Rail (260pt，三维安全隔离区)
                 if isInspectorVisible {
                     PharosInspectorIsland(selection: selection) {
-                        withAnimation(.easeInOut(duration: 0.25)) {
+                        withAnimation(.easeInOut(duration: 0.22)) {
                             showInspector = false
                         }
                     }
                     .padding(.leading, 16) // 16pt 中间与右卡片安全区 (Center-to-Right Safe Gutter)
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .move(edge: .trailing)),
-                        removal: .opacity.combined(with: .move(edge: .trailing))
-                    ))
+                    .transition(.opacity)
                 }
             }
             .padding(10)
@@ -102,7 +103,6 @@ struct MainWindowView: View {
         .background(PharosColor.windowGradient)
         .ignoresSafeArea()
         .frame(minWidth: 940, minHeight: 620)
-        .animation(.easeInOut(duration: 0.25), value: showInspector)
         .onAppear {
             store.viewAppeared()
             if selection == nil { selection = initialSelection ?? .portsOverview }
@@ -197,15 +197,15 @@ struct MainWindowView: View {
             }
 
             PharosSidebarRow(
-                icon: "globe",
-                title: l10n.chromeTitle,
+                icon: "network",
+                title: l10n.browsersAndNetwork,
                 badge: {
                     let browserCount = store.chrome.filter { ChromeStore.shared.isVisible($0.config.browser) }.count
                     return browserCount > 0 ? "\(browserCount)" : nil
                 }(),
-                isSelected: selection == .chrome
+                isSelected: selection == .browsersAndNetwork
             ) {
-                selection = .chrome
+                selection = .browsersAndNetwork
             }
 
             PharosSidebarRow(
@@ -320,8 +320,8 @@ struct MainWindowView: View {
                 FavoriteDetailView(favoriteId: id) { selection = .portsOverview }
             case .diskCleanup:
                 CleanupView()
-            case .chrome:
-                ChromeView()
+            case .browsersAndNetwork:
+                BrowserNetworkView()
             case .agentChats:
                 AgentChatView()
             case .packages:
@@ -599,93 +599,24 @@ struct ProjectDetailView: View {
     }
 }
 
-/// Hardware-accelerated `CABackdropLayer` (`blendingMode = .withinWindow`) header
-/// that blurs scrolling sidebar content underneath the native traffic lights at 120 FPS
-/// with zero SwiftUI `@State` updates or view re-evaluations during scroll.
-private final class TunableFrostedEffectView: NSVisualEffectView {
-    private static let verticalMaskImage: NSImage = {
-        let height: CGFloat = 40
-        let size = NSSize(width: 1, height: height)
-        return NSImage(size: size, flipped: true) { rect in
-            guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
-            let colors = [
-                NSColor.black.cgColor,
-                NSColor.black.cgColor,
-                NSColor.black.withAlphaComponent(0.45).cgColor,
-                NSColor.clear.cgColor
-            ] as CFArray
-            let locations: [CGFloat] = [0.0, 0.65, 0.85, 1.0]
-            if let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: locations) {
-                ctx.drawLinearGradient(grad, start: CGPoint(x: 0, y: 0), end: CGPoint(x: 0, y: rect.height), options: [])
-            }
-            return true
-        }
-    }()
-
-    var transparency: Double = 0.75 {
-        didSet {
-            guard oldValue != transparency else { return }
-            needsDisplay = true
-            applyParameters()
-        }
-    }
-
-    override func updateLayer() {
-        super.updateLayer()
-        applyParameters()
-    }
-
-    override func layout() {
-        super.layout()
-        applyParameters()
-    }
-
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        applyParameters()
-    }
-
-    func applyParameters() {
-        if maskImage == nil {
-            maskImage = Self.verticalMaskImage
-        }
-        let t = min(1.0, max(0.0, transparency))
-        let blurRadius = 0.8 + (1.0 - t) * 7.2
-        let veilOpacity = Float((1.0 - t) * 0.82)
-        guard let root = layer else { return }
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        Self.configureSublayers(of: root, blurRadius: blurRadius, veilOpacity: veilOpacity)
-        CATransaction.commit()
-    }
-
-    private static func configureSublayers(of layer: CALayer, blurRadius: Double, veilOpacity: Float) {
-        for sub in layer.sublayers ?? [] {
-            if sub.name == "backdrop" {
-                sub.setValue(blurRadius, forKeyPath: "filters.gaussianBlur.inputRadius")
-            } else if sub.name == "fill" {
-                sub.opacity = veilOpacity
-            }
-            configureSublayers(of: sub, blurRadius: blurRadius, veilOpacity: veilOpacity)
-        }
-    }
-}
-
-private struct TunableFrostedHeader: NSViewRepresentable {
+/// Lightweight top traffic-light veil over the solid `PharosColor.surface` sidebar.
+/// Uses a pure vector gradient instead of `CABackdropLayer` (`NSVisualEffectView`)
+/// so `WindowServer` never has to run backdrop sampling passes during Mission Control.
+private struct TunableFrostedHeader: View {
     var transparency: Double
 
-    func makeNSView(context: Context) -> TunableFrostedEffectView {
-        let v = TunableFrostedEffectView()
-        v.blendingMode = .withinWindow
-        v.material = .headerView
-        v.state = .active
-        v.transparency = transparency
-        return v
-    }
-
-    func updateNSView(_ nsView: TunableFrostedEffectView, context: Context) {
-        nsView.transparency = transparency
-        nsView.applyParameters()
+    var body: some View {
+        let strength = min(1.0, max(0.0, 1.0 - transparency * 0.35))
+        LinearGradient(
+            stops: [
+                .init(color: PharosColor.surface.opacity(0.96 * strength), location: 0.0),
+                .init(color: PharosColor.surface.opacity(0.82 * strength), location: 0.65),
+                .init(color: PharosColor.surface.opacity(0.35 * strength), location: 0.85),
+                .init(color: PharosColor.surface.opacity(0.0), location: 1.0)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
 }
 

@@ -85,4 +85,16 @@ public struct Project: Hashable, Sendable, Identifiable {
 
     public var allPIDs: [Int32] { listeners.map(\.pid) + helpers.map(\.pid) }
     public var processCount: Int { listeners.count + helpers.count }
+
+    /// A clean, highly portable start command recognized for this project (e.g. "pnpm run dev",
+    /// "cargo run", "go run .", "uv run main.py"), optimized for sharing and reuse across machines.
+    /// Falls back to the listening process's shortCommand if no project manifest is matched.
+    public var startCommand: String {
+        if let dir = directory, let listener = listeners.first {
+            if let cmd = LaunchDetector.command(forRunning: listener.arguments, in: dir) {
+                return cmd
+            }
+        }
+        return listeners.first?.shortCommand ?? name
+    }
 }

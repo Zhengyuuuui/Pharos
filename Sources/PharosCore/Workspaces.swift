@@ -135,20 +135,91 @@ public enum LaunchDetector {
         return candidates.first { $0.confidence == .declared } ?? candidates.first
     }
 
-    /// Turns a running listener's command line back into a start command.
-    /// Prefers the package.json script that launches the same tool (a running
-    /// `node …/node_modules/.bin/vite` → `pnpm run dev`); otherwise rebuilds
-    /// the command line with paths made relative to the project folder.
+    /// Turns a running listener's command line back into a highly portable, reusable start command.
+    /// Prefers declared project manifests (package.json scripts, manage.py, go.mod, Cargo.toml,
+    /// Makefile targets, etc.) that can be directly cloned and run on other developers' machines.
+    /// Otherwise rebuilds the command line with machine-specific paths made relative.
     public static func command(forRunning arguments: [String], in directory: String) -> String? {
         guard !arguments.isEmpty else { return nil }
         let dir = WorkspaceMatcher.normalize(directory)
+        func has(_ n: String) -> Bool { FileManager.default.fileExists(atPath: dir + "/" + n) }
+
+        // 1. Node.js project: package.json script reverse mapping
         if let package = readJSON(dir + "/package.json"),
-           let scripts = (package["scripts"] as? [String: Any])?.compactMapValues({ $0 as? String }),
-           let tool = nodeTool(in: arguments),
-           let name = bestScript(for: tool, arguments: arguments, scripts: scripts) {
-            func has(_ n: String) -> Bool { FileManager.default.fileExists(atPath: dir + "/" + n) }
-            return runScript(name, with: packageManager(package: package, has: has))
+           let scripts = (package["scripts"] as? [String: Any])?.compactMapValues({ $0 as? String }) {
+            let pm = packageManager(package: package, has: has)
+            if let tool = nodeTool(in: arguments),
+               let name = bestScript(for: tool, arguments: arguments, scripts: scripts) {
+                return runScript(name, with: pm)
+            }
+            if let matchedName = matchScriptByArguments(arguments, scripts: scripts) {
+                return runScript(matchedName, with: pm)
+            }
         }
+
+        // 2. Python projects: manage.py / pyproject scripts / uvicorn / entry scripts
+        if has("manage.py"), arguments.contains(where: { ($0 as NSString).lastPathComponent == "manage.py" }) {
+            return "\(python(has: has)) manage.py runserver"
+        }
+        if has("pyproject.toml") {
+            for (name, _) in pyprojectScripts(dir) {
+                if arguments.contains(where: { ($0 as NSString).lastPathComponent == name }) {
+                    return "\(python(has: has, module: true)) \(ShellQuote.quote(name))"
+                }
+            }
+        }
+        if arguments.contains(where: { $0.contains("uvicorn") }) {
+            let pyCmd = python(has: has, module: true)
+            if let uvicornIdx = arguments.firstIndex(where: { ($0 as NSString).lastPathComponent.contains("uvicorn") }) {
+                let rest = arguments.dropFirst(uvicornIdx + 1).filter { !$0.hasPrefix("/") }
+                let joined = rest.joined(separator: " ")
+                if !joined.isEmpty {
+                    return "\(pyCmd) uvicorn \(joined)"
+                }
+            }
+        }
+        if has("requirements.txt") || has("pyproject.toml") || has("uv.lock") || has("poetry.lock") {
+            for entry in pythonEntryNames where has(entry) {
+                if arguments.contains(where: { ($0 as NSString).lastPathComponent == entry }) {
+                    return "\(python(has: has)) \(entry)"
+                }
+            }
+        }
+
+        // 3. Go projects: go.mod
+        if has("go.mod") {
+            if has("main.go") {
+                return "go run main.go"
+            }
+            return "go run ."
+        }
+
+        // 4. Rust projects: Cargo.toml
+        if has("Cargo.toml") {
+            return "cargo run"
+        }
+
+        // 5. Java / JVM projects: gradlew or pom.xml
+        if has("gradlew") {
+            return "./gradlew bootRun"
+        }
+        if has("pom.xml") {
+            return "mvn spring-boot:run"
+        }
+
+        // 6. Swift projects: Package.swift
+        if has("Package.swift") {
+            return "swift run"
+        }
+
+        // 7. Makefile: dev / run / start targets
+        for target in makefileTargets(dir) {
+            if arguments.contains(target) {
+                return "make \(target)"
+            }
+        }
+
+        // 8. Fallback to clean, normalized command line (paths made relative, interpreters simplified)
         return rebuild(arguments, relativeTo: dir)
     }
 
@@ -197,22 +268,44 @@ public enum LaunchDetector {
         return nil
     }
 
-    /// Script whose first word is `tool`; ties broken by how many of the
-    /// script's other words appear in the running command (`next dev` vs `next start`).
+    /// Script whose primary tool matches `tool`; handles wrappers like cross-env, dotenv, concurrently.
+    /// Ties broken by priority ("dev" > "start") and matching command line arguments.
     static func bestScript(for tool: String, arguments: [String], scripts: [String: String]) -> String? {
         let toolName = tool.split(separator: "/").last.map(String.init) ?? tool
-        let argSet = Set(arguments)
+        let argSet = Set(arguments.map { ($0 as NSString).lastPathComponent })
         var best: (name: String, score: Int)?
         for name in rankedScripts(Array(scripts.keys)) + scripts.keys.sorted() {
             guard let value = scripts[name] else { continue }
             let words = value.split(whereSeparator: \.isWhitespace).map(String.init)
-            guard let first = words.first, first == toolName || first == tool else { continue }
-            let rest = words.dropFirst().filter { !$0.hasPrefix("-") }
-            let matched = rest.filter(argSet.contains).count
-            guard matched == rest.count else { continue }
-            if best == nil || matched > best!.score { best = (name, matched) }
+            // Extract primary executables inside script words, skipping env assignments (PORT=3000) and common wrappers
+            let coreTools = words.compactMap { w -> String? in
+                if w.contains("=") || w == "--" { return nil }
+                return (w as NSString).lastPathComponent
+            }
+            guard coreTools.contains(toolName) || coreTools.contains(tool) else { continue }
+            let rest = words.filter { !$0.hasPrefix("-") && !$0.contains("=") && $0 != toolName && $0 != tool }
+            let matched = rest.filter { argSet.contains(($0 as NSString).lastPathComponent) }.count
+            guard rest.isEmpty || matched == rest.count || matched > 0 else { continue }
+            let score = matched * 10 + (name == "dev" ? 2 : (name == "start" ? 1 : 0))
+            if best == nil || score > best!.score { best = (name, score) }
         }
         return best?.name
+    }
+
+    /// Fallback matcher for scripts where nodeTool couldn't extract a unique binary from path
+    static func matchScriptByArguments(_ arguments: [String], scripts: [String: String]) -> String? {
+        let argBases = Set(arguments.map { ($0 as NSString).lastPathComponent })
+        for name in rankedScripts(Array(scripts.keys)) {
+            guard let value = scripts[name] else { continue }
+            let words = value.split(whereSeparator: \.isWhitespace).map(String.init)
+            for w in words where !w.hasPrefix("-") && !w.contains("=") && w != "--" {
+                let base = (w as NSString).lastPathComponent
+                if argBases.contains(base) {
+                    return name
+                }
+            }
+        }
+        return nil
     }
 
     // MARK: - Others

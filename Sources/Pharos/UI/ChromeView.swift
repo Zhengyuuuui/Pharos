@@ -1,10 +1,9 @@
 import SwiftUI
 import PharosCore
 
-/// Main window page: every Chromium browser instance (running or saved preset)
-/// with port, profile folder, proxy, memory, folder size, start/quit and editing.
-/// Filterable by browser; with "All", instances are grouped per browser.
-struct ChromeView: View {
+/// Main window page: Clash/Mihomo network control center, browser proxy isolation matrix,
+/// and Chromium browser instances with live stats, start/quit and configuration.
+struct BrowserNetworkView: View {
     @EnvironmentObject var store: ProjectStore
     @ObservedObject private var chrome = ChromeStore.shared
     @ObservedObject private var l10n = L10n.shared
@@ -21,7 +20,7 @@ struct ChromeView: View {
         let running = entries.compactMap(\.running)
 
         PharosPage {
-            PharosPageHeader(title: l10n.chromeTitle) {
+            PharosPageHeader(title: l10n.browsersAndNetwork, subtitle: l10n.browsersAndNetworkSubtitle) {
                 HStack(spacing: PharosSpacing.s) {
                     PharosActionButton(chrome.sizing ? l10n.measuring : l10n.measureFolders, systemImage: "internaldrive", role: .standard) {
                         chrome.measureSizes(Array(Set(entries.map(\.config.profileKey))))
@@ -32,6 +31,8 @@ struct ChromeView: View {
                 }
             }
         } content: {
+            BrowserProxyMatrixSection()
+
             if browsers.count > 1 {
                 Picker("", selection: $filter) {
                     Text(l10n.allBrowsers).tag(ChromiumBrowser?.none)
@@ -131,6 +132,8 @@ struct ChromeView: View {
     }
 }
 
+typealias ChromeView = BrowserNetworkView
+
 private struct BrowserGroupHeader: View {
     @ObservedObject private var l10n = L10n.shared
     let browser: ChromiumBrowser
@@ -176,6 +179,7 @@ private struct ChromeCard: View {
                             .background(Capsule().fill(PharosColor.accent.opacity(0.13)))
                             .foregroundStyle(PharosColor.accent)
                     }
+                    proxyBadge(c.proxyStrategy)
                     if entry.preset == nil {
                         Text(l10n.notSaved).font(PharosFont.caption).foregroundStyle(PharosColor.textTertiary)
                     } else if !entry.isRunning {
@@ -203,6 +207,74 @@ private struct ChromeCard: View {
                     if !c.extraFlags.isEmpty { row(l10n.extraFlags, c.extraFlags.joined(separator: " "), mono: true) }
                 }
 
+                // Quick Proxy Override Bar
+                HStack(alignment: .center, spacing: 8) {
+                    Text(l10n.proxyStrategyLabel)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(PharosColor.textSecondary)
+
+                    HStack(spacing: 4) {
+                        proxyPillButton(
+                            title: l10n.proxyDirectPill,
+                            isSelected: c.proxyStrategy == .direct,
+                            color: PharosColor.success
+                        ) {
+                            applyProxyStrategy(.direct)
+                        }
+
+                        proxyPillButton(
+                            title: l10n.proxyAPill,
+                            isSelected: c.proxyStrategy == .clashMixedPort(7890),
+                            color: PharosColor.accent
+                        ) {
+                            applyProxyStrategy(.clashMixedPort(7890))
+                        }
+
+                        proxyPillButton(
+                            title: l10n.proxyBPill,
+                            isSelected: c.proxyStrategy == .clashMixedPort(7897),
+                            color: PharosColor.warning
+                        ) {
+                            applyProxyStrategy(.clashMixedPort(7897))
+                        }
+
+                        proxyPillButton(
+                            title: l10n.proxySystemPill,
+                            isSelected: c.proxyStrategy == .followSystem,
+                            color: PharosColor.textSecondary
+                        ) {
+                            applyProxyStrategy(.followSystem)
+                        }
+                    }
+
+                    Spacer()
+
+                    if let r = entry.running {
+                        Button {
+                            chrome.relaunch(r, with: entry.preset?.config ?? c) {
+                                await store.refresh()
+                            }
+                        } label: {
+                            Label(l10n.relaunchWithProxy, systemImage: "arrow.clockwise")
+                        }
+                        .controlSize(.small)
+                        .buttonStyle(.bordered)
+                    } else {
+                        Button {
+                            chrome.start(entry.preset?.config ?? c, running: store.chrome, listening: store.state.listeningPorts)
+                        } label: {
+                            Label(l10n.startWithProxy, systemImage: "play.fill")
+                        }
+                        .controlSize(.small)
+                        .buttonStyle(.borderedProminent)
+                    }
+                }
+                .padding(6)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(PharosColor.surfaceSecondary.opacity(0.5))
+                )
+
                 LaunchCommandRow(config: entry.preset?.config ?? c)
 
                 if let preset = entry.preset, let r = entry.running, r.config != preset.config {
@@ -223,6 +295,60 @@ private struct ChromeCard: View {
                 if let preset = entry.preset, editing == preset.id {
                     ChromePresetEditor(preset: preset) { editing = nil }
                 }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func proxyBadge(_ strategy: BrowserProxyStrategy) -> some View {
+        switch strategy {
+        case .direct:
+            Text(l10n.clashModeDirect)
+                .font(PharosFont.captionDigits)
+                .padding(.horizontal, 6).padding(.vertical, 1)
+                .background(Capsule().fill(PharosColor.success.opacity(0.13)))
+                .foregroundStyle(PharosColor.success)
+        case .clashMixedPort(let port):
+            Text("Clash :\(port)")
+                .font(PharosFont.captionDigits)
+                .padding(.horizontal, 6).padding(.vertical, 1)
+                .background(Capsule().fill(PharosColor.accent.opacity(0.13)))
+                .foregroundStyle(PharosColor.accent)
+        case .custom(let s):
+            Text(s)
+                .font(PharosFont.captionDigits)
+                .padding(.horizontal, 6).padding(.vertical, 1)
+                .background(Capsule().fill(PharosColor.fill))
+                .foregroundStyle(PharosColor.textSecondary)
+        case .followSystem:
+            EmptyView()
+        }
+    }
+
+    private func proxyPillButton(title: String, isSelected: Bool, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(
+                    Capsule().fill(isSelected ? color.opacity(0.18) : PharosColor.fill.opacity(0.4))
+                )
+                .overlay(
+                    Capsule().stroke(isSelected ? color : Color.clear, lineWidth: 1)
+                )
+                .foregroundStyle(isSelected ? color : PharosColor.textSecondary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func applyProxyStrategy(_ strategy: BrowserProxyStrategy) {
+        chrome.updateProxyStrategy(strategy, for: entry)
+        if let r = entry.running {
+            var target = r.config
+            target.proxyStrategy = strategy
+            chrome.relaunch(r, with: target) {
+                await store.refresh()
             }
         }
     }
@@ -357,6 +483,41 @@ private struct ChromePresetEditor: View {
             }
             field(l10n.profileFolder, $dir, "~/chrome-dig")
             field(l10n.debugPort, $port, "9223")
+            HStack {
+                Text(l10n.proxyStrategyLabel).font(.system(size: 10)).foregroundStyle(.secondary).frame(width: 90, alignment: .leading)
+                Picker("", selection: Binding(
+                    get: {
+                        if proxy.isEmpty { return "system" }
+                        if proxy == "direct://" { return "direct" }
+                        if proxy.contains("127.0.0.1") || proxy.contains("localhost") { return "clash" }
+                        return "custom"
+                    },
+                    set: { sel in
+                        switch sel {
+                        case "system":
+                            proxy = ""
+                        case "direct":
+                            proxy = "direct://"
+                            if !flags.contains("--no-proxy-server") {
+                                flags = (flags + " --no-proxy-server").trimmingCharacters(in: .whitespaces)
+                            }
+                        case "clash":
+                            proxy = "http://127.0.0.1:7890"
+                            flags = flags.replacingOccurrences(of: "--no-proxy-server", with: "").trimmingCharacters(in: .whitespaces)
+                        default:
+                            break
+                        }
+                    }
+                )) {
+                    Text(l10n.proxyFollowSystem).tag("system")
+                    Text(l10n.proxyDirect).tag("direct")
+                    Text(l10n.proxyClash).tag("clash")
+                    Text(l10n.proxyCustom).tag("custom")
+                }
+                .pickerStyle(.menu)
+                .controlSize(.small)
+                Spacer()
+            }
             field(l10n.proxy, $proxy, "http://127.0.0.1:7890")
             field(l10n.startURL, $url, "https://grok.com")
             field(l10n.extraFlags, $flags, "--no-first-run --no-default-browser-check")

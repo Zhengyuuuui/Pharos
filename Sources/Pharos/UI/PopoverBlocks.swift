@@ -145,12 +145,9 @@ private struct TopAppsBlock: View {
 private struct ProjectListBlock: View {
     @EnvironmentObject var store: ProjectStore
     @ObservedObject private var l10n = L10n.shared
-    @ObservedObject private var layoutStore = PopoverLayoutStore.shared
-    @State private var rowHeights: [Int: CGFloat] = [:]
 
     var body: some View {
         let maxMem = store.projects.map(\.memoryBytes).max() ?? 1
-        let limit = layoutStore.layout.visibleProjectRows
         if store.projects.isEmpty {
             VStack(spacing: 4) {
                 Image(systemName: "network.slash").font(.system(size: 20)).foregroundStyle(.tertiary)
@@ -161,38 +158,12 @@ private struct ProjectListBlock: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
         } else {
-            let rows = VStack(alignment: .leading, spacing: 2) {
-                ForEach(Array(store.projects.enumerated()), id: \.element.id) { index, project in
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(store.projects, id: \.id) { project in
                     PopoverProjectRow(project: project, fraction: Double(project.memoryBytes) / Double(max(1, maxMem)))
-                        .background(GeometryReader { geo in
-                            Color.clear.preference(key: RowHeightsKey.self, value: [index: geo.size.height])
-                        })
                 }
             }
-            .onPreferenceChange(RowHeightsKey.self) { rowHeights = $0 }
-
-            if limit > 0, store.projects.count > limit {
-                ScrollView { rows }
-                    // Exactly `limit` rows tall (rows differ in height: port chips wrap).
-                    .frame(height: visibleHeight(limit))
-            } else {
-                rows
-            }
         }
-    }
-
-    private func visibleHeight(_ limit: Int) -> CGFloat {
-        let measured = (0..<limit).compactMap { rowHeights[$0] }
-        let fallback: CGFloat = 58
-        let total = measured.reduce(0, +) + CGFloat(limit - measured.count) * fallback
-        return total + CGFloat(max(0, limit - 1)) * 2
-    }
-}
-
-private struct RowHeightsKey: PreferenceKey {
-    static let defaultValue: [Int: CGFloat] = [:]
-    static func reduce(value: inout [Int: CGFloat], nextValue: () -> [Int: CGFloat]) {
-        value.merge(nextValue()) { $1 }
     }
 }
 

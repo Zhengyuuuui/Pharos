@@ -8,34 +8,37 @@ private struct SpinningFanBlade: View {
     var hardware3D: Bool = true
     @State private var isSpinning = false
 
+    private var shouldSpin: Bool {
+        hardware3D && rpm > 0
+    }
+
     var body: some View {
         Image(systemName: "fanblades")
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(rpm > 0 ? Color.accentColor : Color.secondary)
+            .frame(width: 14, height: 14)
+            .compositingGroup()
             .rotationEffect(.degrees(isSpinning ? 360 : 0))
             .animation(
-                rpm > 0
+                shouldSpin
                     ? Animation.linear(duration: spinDuration).repeatForever(autoreverses: false)
                     : .default,
                 value: isSpinning
             )
             .onAppear {
-                if rpm > 0 { isSpinning = true }
+                isSpinning = shouldSpin
             }
-            .onChange(of: rpm) { _, newRPM in
-                if newRPM > 0 && !isSpinning {
-                    isSpinning = true
-                } else if newRPM == 0 && isSpinning {
-                    isSpinning = false
-                }
+            .onChange(of: shouldSpin) { _, active in
+                isSpinning = active
             }
     }
 
+    /// Bucketed into 4 discrete speed tiers so minor RPM fluctuations never reset the animation.
     private var spinDuration: Double {
-        guard rpm > 0 else { return 2.0 }
-        let clamped = max(800, min(7000, rpm))
-        let factor = 1.0 - (Double(clamped - 800) / 6200.0)
-        return max(0.25, 0.25 + factor * 1.55)
+        if rpm >= 5000 { return 0.35 }
+        if rpm >= 3500 { return 0.55 }
+        if rpm >= 2000 { return 0.85 }
+        return 1.25
     }
 }
 
@@ -103,12 +106,12 @@ private struct RacingNeedleAssembly: View {
     }
 }
 
-// MARK: - Automotive Speedometer Needle with Motion Blur & Co-axial Pivot
+// MARK: - Automotive Speedometer Needle with Co-axial Pivot (Zero CPU Blur, Pure GPU Transform)
 private struct FanSpeedometerNeedle: View {
     let angle: Double
     let radius: CGFloat
     let isRedline: Bool
-    var motionBlur: CGFloat = 0
+    var isSweeping: Bool = false
     var hardware3D: Bool = true
 
     var body: some View {
@@ -116,31 +119,22 @@ private struct FanSpeedometerNeedle: View {
         let needleTail = radius * 0.16
 
         ZStack {
-            // 1. Aerodynamic Motion Blur Ghost Trail (Only in 3D acceleration mode when moving fast)
-            if hardware3D && motionBlur > 0.8 {
+            // 1. Aerodynamic Ghost Trail (Pure vector opacity trail when sweeping, zero CPU Gaussian blur)
+            if hardware3D && isSweeping {
                 RacingNeedleAssembly(needleLength: needleLength, needleTail: needleTail, isRedline: isRedline)
-                    .opacity(0.35)
-                    .blur(radius: motionBlur * 1.3)
+                    .opacity(0.24)
                     .rotationEffect(.degrees(angle - (angle > 360 ? 3.5 : -3.5)), anchor: .center)
             }
 
-            // 2. Co-rotating Drop Shadow (Rotated with angle, cast down-right)
+            // 2. Co-rotating Vector Drop Shadow (Rotated with angle, cast down-right without CPU blur)
             RacingNeedleAssembly(needleLength: needleLength, needleTail: needleTail, isRedline: isRedline)
                 .colorMultiply(.black)
-                .opacity(0.38)
-                .blur(radius: 2.0)
+                .opacity(0.26)
                 .rotationEffect(.degrees(angle), anchor: .center)
                 .offset(x: 1.5, y: 1.5)
 
             // 3. Dynamic Illuminated Racing Needle
             RacingNeedleAssembly(needleLength: needleLength, needleTail: needleTail, isRedline: isRedline)
-                .shadow(
-                    color: (isRedline ? Color.red : Color.orange).opacity(0.55),
-                    radius: 4,
-                    x: 0,
-                    y: 0
-                )
-                .blur(radius: hardware3D ? motionBlur * 0.7 : 0)
                 .rotationEffect(.degrees(angle), anchor: .center)
 
             // 4. Machined Dual-Concentric Pivot Hub Cap
@@ -157,18 +151,151 @@ private struct FanSpeedometerNeedle: View {
                     Circle()
                         .stroke(Color.primary.opacity(0.35), lineWidth: 1)
                 )
-                .shadow(color: Color.black.opacity(0.45), radius: 3, x: 0, y: 1.5)
 
             // Inner Rivet Core
             Circle()
                 .fill(isRedline ? Color.red : Color.orange)
                 .frame(width: 7, height: 7)
-                .shadow(color: (isRedline ? Color.red : Color.orange).opacity(0.6), radius: 3)
+        }
+        .compositingGroup()
+    }
+}
+
+// MARK: - Pre-Rasterized Static Dial Face (Cached on GPU via drawingGroup)
+private struct StaticDialFace: View, Equatable {
+    let minRPM: Int
+    let maxRPM: Int
+    let side: CGFloat
+
+    static func == (lhs: StaticDialFace, rhs: StaticDialFace) -> Bool {
+        lhs.minRPM == rhs.minRPM && lhs.maxRPM == rhs.maxRPM && abs(lhs.side - rhs.side) < 0.5
+    }
+
+    private var scale: FanGaugeScale {
+        FanGaugeScale(minRPM: minRPM, maxRPM: maxRPM)
+    }
+
+    var body: some View {
+        let radius = side / 2
+        let gradRadius = radius * 0.81
+        let redlineStartFrac = scale.redlineStartFraction * 0.75
+
+        ZStack {
+            // 1. Dial Face & Radial Backing
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            Color.primary.opacity(0.04),
+                            Color.primary.opacity(0.10)
+                        ],
+                        center: .center,
+                        startRadius: 10,
+                        endRadius: radius
+                    )
+                )
+                .overlay(
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color.primary.opacity(0.15),
+                                    Color.primary.opacity(0.04),
+                                    Color.primary.opacity(0.20)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1.5
+                        )
+                )
+
+            // 2. Background Track Arc (270° Sweep starting at 225° / 7:30 position)
+            Circle()
+                .trim(from: 0, to: 0.75)
+                .stroke(
+                    Color.primary.opacity(0.08),
+                    style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                )
+                .rotationEffect(.degrees(scale.circleRotationAngle))
+                .frame(width: radius * 1.62, height: radius * 1.62)
+
+            // 3. Redline Danger Arc Segment (> 85% RPM)
+            Circle()
+                .trim(from: redlineStartFrac, to: 0.75)
+                .stroke(
+                    Color.red.opacity(0.28),
+                    style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                )
+                .rotationEffect(.degrees(scale.circleRotationAngle))
+                .frame(width: radius * 1.62, height: radius * 1.62)
+
+            // 4. High-Precision Graduation Tick Marks & Numerals (Polar Coordinate Alignment)
+            dialGraduations(radius: gradRadius)
+        }
+        .frame(width: side, height: side)
+        .drawingGroup()
+    }
+
+    @ViewBuilder
+    private func dialGraduations(radius: CGFloat) -> some View {
+        ZStack {
+            // A. Minor micro-ticks every 100 RPM
+            ForEach(0...scale.minorTicksCount, id: \.self) { idx in
+                let rpmVal = scale.minorTickRPM(at: idx)
+                let isMinorRed = scale.isRedline(rpm: rpmVal)
+                let angle = scale.angle(for: rpmVal)
+                let rad = angle * .pi / 180.0
+                let tickR = radius - 3.0
+
+                Rectangle()
+                    .fill(isMinorRed ? Color.red.opacity(0.55) : Color.primary.opacity(0.20))
+                    .frame(width: 1.0, height: 4.5)
+                    .rotationEffect(.degrees(angle))
+                    .offset(x: tickR * sin(rad), y: -tickR * cos(rad))
+            }
+
+            // B. Medium ticks at 500 RPM intervals
+            ForEach(scale.mediumTicks, id: \.self) { rpmVal in
+                let isMedRed = scale.isRedline(rpm: rpmVal)
+                let angle = scale.angle(for: rpmVal)
+                let rad = angle * .pi / 180.0
+                let tickR = radius - 4.5
+
+                Rectangle()
+                    .fill(isMedRed ? Color.red.opacity(0.85) : Color.primary.opacity(0.45))
+                    .frame(width: 1.6, height: 7.5)
+                    .rotationEffect(.degrees(angle))
+                    .offset(x: tickR * sin(rad), y: -tickR * cos(rad))
+            }
+
+            // C. Major ticks every 1000 RPM + Upright Numerals
+            ForEach(scale.majorTicks, id: \.self) { rpmVal in
+                let isMajRed = scale.isRedline(rpm: rpmVal)
+                let angle = scale.angle(for: rpmVal)
+                let rad = angle * .pi / 180.0
+                let thousands = rpmVal / 1000
+
+                // Major Tick Line
+                let tickR = radius - 6.0
+                Rectangle()
+                    .fill(isMajRed ? Color.red : Color.primary.opacity(0.88))
+                    .frame(width: 2.5, height: 11)
+                    .rotationEffect(.degrees(angle))
+                    .offset(x: tickR * sin(rad), y: -tickR * cos(rad))
+
+                // Upright Chrono Number (e.g. 0, 1, 2, ... 7)
+                let numR = radius - 20.0
+                Text("\(thousands)")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(isMajRed ? Color.red : Color.primary.opacity(0.85))
+                    .offset(x: numR * sin(rad), y: -numR * cos(rad))
+            }
         }
     }
 }
 
-// MARK: - High-Precision Speedometer Dial View (Continuous 60FPS Mechanical Acceleration Engine)
+// MARK: - High-Precision Speedometer Dial View (GPU-Accelerated CoreAnimation Engine)
 public struct FanSpeedometerDialView: View {
     @ObservedObject private var l10n = L10n.shared
     @AppStorage("pharos.gauge3DAcceleration") private var gauge3DAcceleration: Bool = true
@@ -178,11 +305,11 @@ public struct FanSpeedometerDialView: View {
     public let count: Int
     public let targetRPM: Int?
 
-    // Smooth mechanical physics & continuous frame states
+    // GPU-driven display state (avoids 60Hz CPU timer polling & bitmap blur allocations)
     @State private var currentDisplayRPM: Double = 0
-    @State private var motionBlur: CGFloat = 0
+    @State private var isSweeping: Bool = false
     @State private var hasAppeared: Bool = false
-    @State private var animationTask: Task<Void, Never>? = nil
+    @State private var sweepTask: Task<Void, Never>? = nil
 
     public init(fan: FanReading, count: Int, targetRPM: Int? = nil) {
         self.fan = fan
@@ -250,58 +377,11 @@ public struct FanSpeedometerDialView: View {
                 let radius = side / 2
 
                 ZStack {
-                    // 1. Dial Face & Radial Shadow Backing
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    Color.primary.opacity(0.04),
-                                    Color.primary.opacity(0.10)
-                                ],
-                                center: .center,
-                                startRadius: 10,
-                                endRadius: radius
-                            )
-                        )
-                        .overlay(
-                            Circle()
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [
-                                            Color.primary.opacity(0.15),
-                                            Color.primary.opacity(0.04),
-                                            Color.primary.opacity(0.20)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 1.5
-                                )
-                        )
-                        .shadow(color: Color.black.opacity(0.12), radius: 6, x: 0, y: 2)
+                    // 1–3 & 5. Pre-Rasterized Static Dial Face (80+ ticks & arcs cached in a single GPU texture)
+                    StaticDialFace(minRPM: fan.minRPM, maxRPM: fan.maxRPM, side: side)
+                        .equatable()
 
-                    // 2. Background Track Arc (270° Sweep starting at 225° / 7:30 position)
-                    Circle()
-                        .trim(from: 0, to: 0.75)
-                        .stroke(
-                            Color.primary.opacity(0.08),
-                            style: StrokeStyle(lineWidth: 10, lineCap: .round)
-                        )
-                        .rotationEffect(.degrees(scale.circleRotationAngle))
-                        .frame(width: radius * 1.62, height: radius * 1.62)
-
-                    // 3. Redline Danger Arc Segment (> 85% RPM)
-                    let redlineStartFrac = scale.redlineStartFraction * 0.75
-                    Circle()
-                        .trim(from: redlineStartFrac, to: 0.75)
-                        .stroke(
-                            Color.red.opacity(0.28),
-                            style: StrokeStyle(lineWidth: 10, lineCap: .round)
-                        )
-                        .rotationEffect(.degrees(scale.circleRotationAngle))
-                        .frame(width: radius * 1.62, height: radius * 1.62)
-
-                    // 4. Dynamic Speed Ribbon (Continuous smooth extension + optional Gaussian blur)
+                    // 4. Dynamic Speed Ribbon (Smooth CoreAnimation trim, zero CPU blur)
                     let progress = effectiveFraction * 0.75
                     Circle()
                         .trim(from: 0, to: max(0.0001, progress))
@@ -315,18 +395,7 @@ public struct FanSpeedometerDialView: View {
                         )
                         .rotationEffect(.degrees(scale.circleRotationAngle))
                         .frame(width: radius * 1.62, height: radius * 1.62)
-                        .shadow(
-                            color: (effectiveRedline ? Color.red : Color.cyan).opacity(0.35),
-                            radius: 5,
-                            x: 0,
-                            y: 0
-                        )
-                        .blur(radius: is3DActive ? motionBlur * 0.65 : 0)
                         .opacity(progress > 0.001 ? 1 : 0)
-                        .animation(is3DActive ? nil : .spring(response: 0.50, dampingFraction: 0.82), value: progress)
-
-                    // 5. High-Precision Graduation Tick Marks & Numerals (Polar Coordinate Alignment)
-                    dialGraduations(radius: radius * 0.81)
 
                     // 6. Target RPM Notch Marker (when in Manual Mode)
                     if let target = targetRPM, target > 0, fan.mode == .manual {
@@ -338,25 +407,16 @@ public struct FanSpeedometerDialView: View {
                         angle: scale.angle(for: effectiveRPM),
                         radius: radius * 0.81,
                         isRedline: effectiveRedline,
-                        motionBlur: motionBlur,
+                        isSweeping: isSweeping,
                         hardware3D: is3DActive
                     )
-                    .animation(is3DActive ? nil : .spring(response: 0.50, dampingFraction: 0.82), value: effectiveRPM)
 
-                    // 8. Digital HUD Cluster (Shifted downward to eliminate overlap with center hub)
+                    // 8. Digital HUD Cluster (Isolated from dial geometry, smooth numeric transition)
                     VStack(spacing: 2) {
-                        if is3DActive {
-                            Text(effectiveRPM > 0 ? "\(effectiveRPM)" : "0")
-                                .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
-                                .foregroundStyle(effectiveRedline ? Color.red : Color.primary)
-                                .blur(radius: motionBlur * 0.45)
-                        } else {
-                            Text(effectiveRPM > 0 ? "\(effectiveRPM)" : "0")
-                                .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
-                                .foregroundStyle(effectiveRedline ? Color.red : Color.primary)
-                                .contentTransition(.numericText())
-                                .animation(.easeInOut(duration: 0.2), value: effectiveRPM)
-                        }
+                        Text(effectiveRPM > 0 ? "\(effectiveRPM)" : "0")
+                            .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
+                            .foregroundStyle(effectiveRedline ? Color.red : Color.primary)
+                            .contentTransition(.numericText(value: Double(effectiveRPM)))
 
                         HStack(spacing: 4) {
                             SpinningFanBlade(rpm: effectiveRPM, hardware3D: is3DActive)
@@ -414,8 +474,6 @@ public struct FanSpeedometerDialView: View {
                         Capsule()
                             .fill(LinearGradient(colors: speedGradientColors(actualRPM: effectiveRPM), startPoint: .leading, endPoint: .trailing))
                             .frame(width: barGeo.size.width * CGFloat(effectiveFraction))
-                            .blur(radius: is3DActive ? motionBlur * 0.4 : 0)
-                            .animation(is3DActive ? nil : .spring(response: 0.50, dampingFraction: 0.82), value: effectiveFraction)
                     }
                 }
                 .frame(height: 4)
@@ -437,42 +495,31 @@ public struct FanSpeedometerDialView: View {
                 )
         )
         .onAppear {
+            let targetVal = Double(fan.actualRPM)
             if !hasAppeared {
                 hasAppeared = true
-                let targetVal = Double(fan.actualRPM)
                 if is3DActive {
                     if targetVal > 0 {
-                        // Smooth spool-up from 0 directly to actual RPM
                         currentDisplayRPM = 0
-                        animateToRPM(targetVal)
+                        animateToRPM(targetVal, force: true)
                     } else {
-                        // When fans are stopped (0 RPM at idle), perform an authentic racing gauge sweep
                         performGaugeSelfCheckSweep()
                     }
                 } else {
                     currentDisplayRPM = targetVal
-                    motionBlur = 0
+                    isSweeping = false
                 }
             } else {
-                if is3DActive {
-                    animateToRPM(Double(fan.actualRPM))
-                } else {
-                    currentDisplayRPM = Double(fan.actualRPM)
-                    motionBlur = 0
-                }
+                animateToRPM(targetVal, force: true)
             }
         }
         .onDisappear {
-            animationTask?.cancel()
-            animationTask = nil
+            sweepTask?.cancel()
+            sweepTask = nil
+            isSweeping = false
         }
         .onChange(of: fan.actualRPM) { _, newRPM in
-            if is3DActive {
-                animateToRPM(Double(newRPM))
-            } else {
-                currentDisplayRPM = Double(newRPM)
-                motionBlur = 0
-            }
+            animateToRPM(Double(newRPM))
         }
         .onChange(of: targetRPM) { _, newTarget in
             if let newTarget, newTarget > 0, fan.mode == .manual, is3DActive {
@@ -488,170 +535,79 @@ public struct FanSpeedometerDialView: View {
     }
 
     private func updateMotionState() {
+        sweepTask?.cancel()
+        sweepTask = nil
+        isSweeping = false
         if !is3DActive {
-            animationTask?.cancel()
-            animationTask = nil
-            motionBlur = 0
             currentDisplayRPM = Double(fan.actualRPM)
         } else {
-            animateToRPM(Double(fan.actualRPM))
+            animateToRPM(Double(fan.actualRPM), force: true)
         }
     }
 
-    // MARK: - Tachometer Power-On / Test Self-Check Sweep
+    // MARK: - Tachometer Power-On / Test Self-Check Sweep (Pure CoreAnimation Keyframes, Zero 60Hz Polling)
     private func performGaugeSelfCheckSweep() {
-        animationTask?.cancel()
-        animationTask = nil
+        sweepTask?.cancel()
+        sweepTask = nil
 
         guard is3DActive else {
             currentDisplayRPM = 0
-            motionBlur = 0
+            isSweeping = false
             return
         }
 
         let sweepRPM = Double(min(scale.maxRPM, max(4200, fan.maxRPM - 1200)))
-        let duration = 1.25
-        let startTime = CACurrentMediaTime()
-        let peakBlur: CGFloat = 3.6
+        isSweeping = true
 
-        animationTask = Task { @MainActor in
-            while !Task.isCancelled {
-                let now = CACurrentMediaTime()
-                let elapsed = now - startTime
-                let progress = min(1.0, elapsed / duration)
+        withAnimation(.easeInOut(duration: 0.55)) {
+            currentDisplayRPM = sweepRPM
+        }
 
-                if progress <= 0.45 {
-                    // Phase 1: 0 -> sweepRPM
-                    let t = progress / 0.45
-                    let eased = t * t * (3.0 - 2.0 * t)
-                    currentDisplayRPM = sweepRPM * eased
-                    motionBlur = peakBlur * CGFloat(4.0 * t * (1.0 - t))
-                } else {
-                    // Phase 2: sweepRPM -> target / 0
-                    let t = (progress - 0.45) / 0.55
-                    let eased = t * t * (3.0 - 2.0 * t)
-                    let finalTarget = Double(fan.actualRPM)
-                    currentDisplayRPM = sweepRPM + (finalTarget - sweepRPM) * eased
-                    motionBlur = peakBlur * CGFloat(4.0 * t * (1.0 - t))
-                }
-
-                if progress >= 1.0 {
-                    currentDisplayRPM = Double(fan.actualRPM)
-                    motionBlur = 0
-                    break
-                }
-
-                try? await Task.sleep(nanoseconds: 16_000_000)
+        sweepTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 560_000_000)
+            guard !Task.isCancelled else { return }
+            let finalTarget = Double(fan.actualRPM)
+            withAnimation(.spring(response: 0.65, dampingFraction: 0.82)) {
+                currentDisplayRPM = finalTarget
             }
+            try? await Task.sleep(nanoseconds: 650_000_000)
+            guard !Task.isCancelled else { return }
+            isSweeping = false
         }
     }
 
-    // MARK: - Authentic Mechanical Fan Acceleration Engine
-    private func animateToRPM(_ target: Double) {
-        animationTask?.cancel()
-        animationTask = nil
-
+    // MARK: - Authentic Mechanical Fan Acceleration Engine (GPU Spring Interpolation)
+    private func animateToRPM(_ target: Double, force: Bool = false) {
         guard is3DActive else {
             currentDisplayRPM = target
-            motionBlur = 0
+            isSweeping = false
             return
         }
 
-        let startRPM = currentDisplayRPM
-        let diff = abs(target - startRPM)
-        guard diff > 1.0 else {
+        let diff = abs(target - currentDisplayRPM)
+        // Ignore micro-jitter (< 15 RPM) unless transitioning to/from 0 or forced, preventing unnecessary redraws
+        guard force || diff >= 15.0 || target == 0 || currentDisplayRPM == 0 else {
+            return
+        }
+
+        sweepTask?.cancel()
+        sweepTask = nil
+
+        let duration = max(0.45, min(1.25, 0.45 + (diff / 6000.0) * 0.8))
+        let largeJump = diff > 600
+        if largeJump {
+            isSweeping = true
+        }
+
+        withAnimation(.spring(response: duration, dampingFraction: 0.84)) {
             currentDisplayRPM = target
-            motionBlur = 0
-            return
         }
 
-        // Mechanical fan spool-up duration (0.55s to 1.85s depending on delta)
-        let duration = max(0.55, min(1.85, 0.55 + (diff / 6000.0) * 1.3))
-        let startTime = CACurrentMediaTime()
-        let peakBlur = min(4.5, max(1.5, CGFloat(diff) / 450.0))
-
-        animationTask = Task { @MainActor in
-            while !Task.isCancelled {
-                let now = CACurrentMediaTime()
-                let elapsed = now - startTime
-                let progress = min(1.0, elapsed / duration)
-
-                // Smoothstep S-curve (cubic acceleration & deceleration): 3*t^2 - 2*t^3
-                let t = progress
-                let eased = t * t * (3.0 - 2.0 * t)
-
-                let nextRPM = startRPM + (target - startRPM) * eased
-                currentDisplayRPM = nextRPM
-
-                // Dynamic Gaussian motion blur: peaks during mid-acceleration, fades out near target
-                let bellCurve = 4.0 * t * (1.0 - t)
-                motionBlur = peakBlur * CGFloat(bellCurve)
-
-                if progress >= 1.0 {
-                    currentDisplayRPM = target
-                    motionBlur = 0
-                    break
-                }
-
-                try? await Task.sleep(nanoseconds: 16_000_000) // ~60 FPS
-            }
-        }
-    }
-
-    // MARK: - Tick Marks & Upright Numerals (Polar Coordinate Alignment)
-    @ViewBuilder
-    private func dialGraduations(radius: CGFloat) -> some View {
-        ZStack {
-            // A. Minor micro-ticks every 100 RPM
-            ForEach(0...scale.minorTicksCount, id: \.self) { idx in
-                let rpmVal = scale.minorTickRPM(at: idx)
-                let isMinorRed = scale.isRedline(rpm: rpmVal)
-                let angle = scale.angle(for: rpmVal)
-                let rad = angle * .pi / 180.0
-                let tickR = radius - 3.0
-
-                Rectangle()
-                    .fill(isMinorRed ? Color.red.opacity(0.55) : Color.primary.opacity(0.20))
-                    .frame(width: 1.0, height: 4.5)
-                    .rotationEffect(.degrees(angle))
-                    .offset(x: tickR * sin(rad), y: -tickR * cos(rad))
-            }
-
-            // B. Medium ticks at 500 RPM intervals
-            ForEach(scale.mediumTicks, id: \.self) { rpmVal in
-                let isMedRed = scale.isRedline(rpm: rpmVal)
-                let angle = scale.angle(for: rpmVal)
-                let rad = angle * .pi / 180.0
-                let tickR = radius - 4.5
-
-                Rectangle()
-                    .fill(isMedRed ? Color.red.opacity(0.85) : Color.primary.opacity(0.45))
-                    .frame(width: 1.6, height: 7.5)
-                    .rotationEffect(.degrees(angle))
-                    .offset(x: tickR * sin(rad), y: -tickR * cos(rad))
-            }
-
-            // C. Major ticks every 1000 RPM + Upright Numerals
-            ForEach(scale.majorTicks, id: \.self) { rpmVal in
-                let isMajRed = scale.isRedline(rpm: rpmVal)
-                let angle = scale.angle(for: rpmVal)
-                let rad = angle * .pi / 180.0
-                let thousands = rpmVal / 1000
-
-                // Major Tick Line
-                let tickR = radius - 6.0
-                Rectangle()
-                    .fill(isMajRed ? Color.red : Color.primary.opacity(0.88))
-                    .frame(width: 2.5, height: 11)
-                    .rotationEffect(.degrees(angle))
-                    .offset(x: tickR * sin(rad), y: -tickR * cos(rad))
-
-                // Upright Chrono Number (e.g. 0, 1, 2, ... 7)
-                let numR = radius - 20.0
-                Text("\(thousands)")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(isMajRed ? Color.red : Color.primary.opacity(0.85))
-                    .offset(x: numR * sin(rad), y: -numR * cos(rad))
+        if largeJump {
+            sweepTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
+                guard !Task.isCancelled else { return }
+                isSweeping = false
             }
         }
     }
@@ -666,7 +622,6 @@ public struct FanSpeedometerDialView: View {
         Image(systemName: "arrowtriangle.down.fill")
             .font(.system(size: 8))
             .foregroundStyle(Color.orange)
-            .shadow(color: Color.orange.opacity(0.8), radius: 3)
             .rotationEffect(.degrees(angle))
             .offset(x: markerR * sin(rad), y: -markerR * cos(rad))
             .animation(.spring(response: 0.45, dampingFraction: 0.7), value: targetRPM)
@@ -894,7 +849,7 @@ public struct FanSpeedometerClusterView: View {
                     }
                 }
             }
-            .blur(radius: (is3DActive && isSwitchingMode) ? 6.5 : 0)
+            .opacity((is3DActive && isSwitchingMode) ? 0.72 : 1.0)
             .scaleEffect((is3DActive && isSwitchingMode) ? 0.985 : 1.0)
             .animation(.easeInOut(duration: 0.18), value: isSwitchingMode)
         }
@@ -958,14 +913,13 @@ public struct FanSpeedometerClusterView: View {
     }
 }
 
-// MARK: - Classic Fan Bar Card (Preserved with Continuous Acceleration)
+// MARK: - Classic Fan Bar Card (GPU Spring Interpolation, Zero Timer Polling)
 public struct ClassicFanBarCard: View {
     @ObservedObject private var l10n = L10n.shared
     public let fan: FanReading
     public let count: Int
 
     @State private var displayRPM: Double = 0
-    @State private var animationTask: Task<Void, Never>? = nil
 
     public init(fan: FanReading, count: Int) {
         self.fan = fan
@@ -996,6 +950,7 @@ public struct ClassicFanBarCard: View {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(currentRPM > 0 ? "\(currentRPM)" : "0")
                     .font(.system(size: 22, weight: .semibold).monospacedDigit())
+                    .contentTransition(.numericText(value: Double(currentRPM)))
                 Text("rpm").font(.system(size: 11)).foregroundStyle(.secondary)
                 if currentRPM == 0 {
                     Text(l10n.fanStopped).font(.system(size: 10)).foregroundStyle(.tertiary)
@@ -1017,35 +972,16 @@ public struct ClassicFanBarCard: View {
         .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
         .onAppear {
             let target = Double(fan.actualRPM)
-            displayRPM = max(0, target - 1000)
-            animateTo(target)
-        }
-        .onDisappear {
-            animationTask?.cancel()
+            displayRPM = max(0, target - 600)
+            withAnimation(.spring(response: 0.55, dampingFraction: 0.84)) {
+                displayRPM = target
+            }
         }
         .onChange(of: fan.actualRPM) { _, newRPM in
-            animateTo(Double(newRPM))
-        }
-    }
-
-    private func animateTo(_ target: Double) {
-        animationTask?.cancel()
-        let start = displayRPM
-        let diff = abs(target - start)
-        guard diff > 1.0 else { displayRPM = target; return }
-
-        let duration = max(0.45, min(1.85, 0.45 + (diff / 6000.0) * 1.4))
-        let startTime = CACurrentMediaTime()
-
-        animationTask = Task { @MainActor in
-            while !Task.isCancelled {
-                let elapsed = CACurrentMediaTime() - startTime
-                let progress = min(1.0, elapsed / duration)
-                let t = progress
-                let eased = t * t * (3.0 - 2.0 * t)
-                displayRPM = start + (target - start) * eased
-                if progress >= 1.0 { displayRPM = target; break }
-                try? await Task.sleep(nanoseconds: 16_000_000)
+            let target = Double(newRPM)
+            guard abs(target - displayRPM) >= 15.0 || target == 0 else { return }
+            withAnimation(.spring(response: 0.50, dampingFraction: 0.84)) {
+                displayRPM = target
             }
         }
     }

@@ -70,3 +70,115 @@ func testMemoryHistory() {
     let empty = MemoryHistory().projectSeries(limit: 5, otherName: "x")
     expect(empty.names.isEmpty && empty.points.isEmpty, "empty history")
 }
+
+func testMemoryDoctorDiagnosis() {
+    let mb: UInt64 = 1024 * 1024
+    let gb: UInt64 = 1024 * 1024 * 1024
+
+    let procs = [
+        // mediaAnalysis: 200MB + 150MB = 350MB (> 300MB -> .bloated)
+        ProcessSnapshot(pid: 101, ppid: 1, name: "mediaanalysisd",
+                        executablePath: "/System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+                        memoryBytes: 200 * mb),
+        ProcessSnapshot(pid: 102, ppid: 1, name: "mediaanalysisd-access",
+                        executablePath: "/System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd-access",
+                        memoryBytes: 150 * mb),
+
+        // photoAnalysis: 1.2 GB (> 1GB -> .critical)
+        ProcessSnapshot(pid: 201, ppid: 1, name: "photoanalysisd",
+                        executablePath: "/System/Library/PrivateFrameworks/PhotoAnalysis.framework/Versions/A/photoanalysisd",
+                        memoryBytes: UInt64(1.2 * Double(gb))),
+
+        // wallpaper: 450 MB (> 400MB -> .bloated)
+        ProcessSnapshot(pid: 301, ppid: 1, name: "WallpaperVideoExtension",
+                        executablePath: "/System/Library/ExtensionKit/Extensions/WallpaperVideoExtension.appex/Contents/MacOS/WallpaperVideoExtension",
+                        memoryBytes: 450 * mb),
+
+        // spotlight: corespotlightd (250MB) + mdworker_shared (200MB) = 450MB (> 400MB -> .bloated)
+        ProcessSnapshot(pid: 401, ppid: 1, name: "corespotlightd",
+                        executablePath: "/System/Library/Frameworks/CoreSpotlight.framework/corespotlightd",
+                        memoryBytes: 250 * mb),
+        ProcessSnapshot(pid: 402, ppid: 1, name: "mdworker_shared",
+                        executablePath: "/System/Library/Frameworks/CoreServices.framework/Frameworks/Metadata.framework/Versions/A/Support/mdworker_shared",
+                        memoryBytes: 200 * mb),
+
+        // openAndSavePanel: 120 MB (> 100MB -> .bloated)
+        ProcessSnapshot(pid: 501, ppid: 1, name: "openAndSavePanelService",
+                        executablePath: "/System/Library/Frameworks/AppKit.framework/Versions/C/XPCServices/com.apple.appkit.xpc.openAndSavePanelService.xpc/Contents/MacOS/com.apple.appkit.xpc.openAndSavePanelService",
+                        memoryBytes: 120 * mb),
+
+        // quickLook: 80 MB (< 200MB -> .healthy)
+        ProcessSnapshot(pid: 601, ppid: 1, name: "QuickLookUIService",
+                        executablePath: "/System/Library/Frameworks/QuickLook.framework/Versions/A/XPCServices/QuickLookUIService.xpc/Contents/MacOS/QuickLookUIService",
+                        memoryBytes: 80 * mb),
+
+        // iconServices: 50 MB (< 200MB -> .healthy)
+        ProcessSnapshot(pid: 701, ppid: 1, name: "iconservicesagent",
+                        executablePath: "/System/Library/CoreServices/iconservicesagent",
+                        memoryBytes: 50 * mb),
+
+        // intelligencePlatform: 320 MB (> 300MB -> .bloated)
+        ProcessSnapshot(pid: 801, ppid: 1, name: "intelligenceplatformd",
+                        executablePath: "/usr/libexec/intelligenceplatformd",
+                        memoryBytes: 320 * mb),
+
+        // suggest: 100 MB (< 250MB -> .healthy)
+        ProcessSnapshot(pid: 901, ppid: 1, name: "suggestd",
+                        executablePath: "/System/Library/PrivateFrameworks/CoreSuggestions.framework/suggestd",
+                        memoryBytes: 100 * mb),
+
+        // Unrelated process: node dev server
+        ProcessSnapshot(pid: 9999, ppid: 1, name: "node",
+                        executablePath: "/opt/homebrew/bin/node",
+                        memoryBytes: 500 * mb),
+    ]
+
+    let report = MemoryDoctor.diagnose(processes: procs, disabledDaemons: [.mediaAnalysis])
+
+    expect(report.hasBloat, "report has bloated daemons")
+    expectEq(report.criticalCount, 1, "photoanalysisd is critical")
+    expectEq(report.bloatedCount, 6, "photoanalysisd + mediaAnalysis + wallpaper + spotlight + openAndSavePanel + intelligencePlatform = 6 bloated or critical")
+
+    let photo = report.items.first { $0.daemon == .photoAnalysis }
+    expect(photo != nil, "photoanalysisd item found")
+    expectEq(photo?.status, .critical, "photoanalysisd is critical (>1GB)")
+    expectEq(photo?.pids, [201], "photoanalysisd PID")
+    expect(!photo!.isLaunchdDisabled, "photoAnalysis not disabled")
+
+    let media = report.items.first { $0.daemon == .mediaAnalysis }
+    expect(media != nil, "mediaAnalysis item found")
+    expectEq(media?.status, .bloated, "mediaAnalysis is bloated (350MB > 300MB)")
+    expectEq(media?.pids, [101, 102], "mediaAnalysis aggregated both PIDs")
+    expectEq(media?.memoryBytes, 350 * mb, "mediaAnalysis aggregated memory")
+    expect(media!.isLaunchdDisabled, "mediaAnalysis is launchd-disabled")
+
+    let wallpaper = report.items.first { $0.daemon == .wallpaper }
+    expectEq(wallpaper?.status, .bloated, "wallpaper is bloated")
+
+    let quickLook = report.items.first { $0.daemon == .quickLook }
+    expectEq(quickLook?.status, .healthy, "quickLook is healthy (80MB < 200MB)")
+
+    let iconServices = report.items.first { $0.daemon == .iconServices }
+    expectEq(iconServices?.status, .healthy, "iconServices is healthy (50MB < 200MB)")
+
+    let suggest = report.items.first { $0.daemon == .suggest }
+    expectEq(suggest?.status, .healthy, "suggest is healthy (100MB < 250MB)")
+
+    var expectedReclaimable: UInt64 = 0
+    expectedReclaimable += photo?.memoryBytes ?? 0
+    expectedReclaimable += media?.memoryBytes ?? 0
+    expectedReclaimable += wallpaper?.memoryBytes ?? 0
+    expectedReclaimable += report.items.first { $0.daemon == .spotlight }?.memoryBytes ?? 0
+    expectedReclaimable += report.items.first { $0.daemon == .openAndSavePanel }?.memoryBytes ?? 0
+    expectedReclaimable += report.items.first { $0.daemon == .intelligencePlatform }?.memoryBytes ?? 0
+
+    expectEq(report.reclaimableBytes, expectedReclaimable, "reclaimable bytes sum")
+    expect(report.reclaimableBytes > 2 * gb, "reclaimable bytes exceeds 2GB")
+
+    // Test clean/empty diagnosis
+    let cleanReport = MemoryDoctor.diagnose(processes: [
+        ProcessSnapshot(pid: 1, ppid: 0, name: "launchd", memoryBytes: 10 * mb)
+    ])
+    expect(!cleanReport.hasBloat, "clean report has no bloat")
+    expectEq(cleanReport.reclaimableBytes, 0, "clean report reclaimable is 0")
+}

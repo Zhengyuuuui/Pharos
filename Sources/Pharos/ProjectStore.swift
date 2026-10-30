@@ -20,6 +20,7 @@ final class ProjectStore: ObservableObject {
         var thermalState: ProcessInfo.ThermalState = .nominal
         var history = MemoryHistory(window: 3600, minInterval: 10)
         var lastScan: Date?
+        var memoryDiagnosis: MemoryDiagnosisReport = MemoryDiagnosisReport(items: [], reclaimableBytes: 0)
     }
 
     @Published private(set) var state = ScanState()
@@ -33,6 +34,7 @@ final class ProjectStore: ObservableObject {
     var volumes: [DiskVolume] { state.volumes }
     var thermals: ThermalSnapshot? { state.thermals }
     var thermalState: ProcessInfo.ThermalState { state.thermalState }
+    var memoryDiagnosis: MemoryDiagnosisReport { state.memoryDiagnosis }
     private var internalHistory = MemoryHistory(window: 3600, minInterval: 10)
     var history: MemoryHistory { internalHistory }
     var lastScan: Date? { state.lastScan }
@@ -136,18 +138,27 @@ final class ProjectStore: ObservableObject {
         Task { await refreshVolumes() }
         Task { await refreshThermals() }
         let include = showSystem
-        let (projects, chrome, ports, apps, system) = await Task.detached(priority: .utility) {
+        let (projects, chrome, ports, apps, system, diagnosis) = await Task.detached(priority: .utility) {
             autoreleasepool {
                 let all = ProcessScanner.scan()
                 let chrome = ChromeInstances.find(in: all)
                 // Chrome instances get their own page; keep debug-port browsers out
                 // of the project list even when "show background apps" is on.
                 let chromePIDs = Set(chrome.flatMap(\.allPIDs))
+                let disabledServices = MemoryDoctor.queryDisabledServices()
+                var disabledDaemons: Set<KnownBloatedDaemon> = []
+                for d in KnownBloatedDaemon.allCases where d.supportsLaunchdToggle {
+                    if d.launchdServiceNames.allSatisfy({ disabledServices.contains($0) }) {
+                        disabledDaemons.insert(d)
+                    }
+                }
+                let diagnosis = MemoryDoctor.diagnose(processes: all, disabledDaemons: disabledDaemons)
                 return (ProjectGrouper.group(all.filter { !chromePIDs.contains($0.pid) }, includeSystem: include),
                         chrome,
                         Set(all.flatMap { $0.ports.map(\.port) }),
                         AppGrouper.group(all),
-                        SystemMemory.read())
+                        SystemMemory.read(),
+                        diagnosis)
             }
         }.value
         let now = Date()
@@ -165,7 +176,7 @@ final class ProjectStore: ObservableObject {
         let projectsUnchanged = (projects == state.projects)
         let portsUnchanged = (ports == state.listeningPorts)
 
-        if viewers == 0 && projectsUnchanged && portsUnchanged && memoryUnchanged {
+        if viewers == 0 && projectsUnchanged && portsUnchanged && memoryUnchanged && state.memoryDiagnosis == diagnosis {
             return
         }
 
@@ -177,10 +188,29 @@ final class ProjectStore: ObservableObject {
         if let system { next.system = system }
         next.history = internalHistory
         next.lastScan = now
+        next.memoryDiagnosis = diagnosis
         state = next
         let alive = stubborn.intersection(projects.map(\.id))
         if alive != stubborn { stubborn = alive }
         ChromeStore.shared.clearStubborn(keeping: Set(chrome.map(\.id)))
+    }
+
+    func reclaimBloatedDaemon(_ daemon: KnownBloatedDaemon) async {
+        guard let item = state.memoryDiagnosis.items.first(where: { $0.daemon == daemon }) else { return }
+        await MemoryDoctor.reclaim(pids: item.pids)
+        await refresh()
+    }
+
+    func reclaimAllBloatedDaemons() async {
+        await MemoryDoctor.reclaimAllBloated(in: state.memoryDiagnosis)
+        await refresh()
+    }
+
+    func toggleDaemonAutostart(_ daemon: KnownBloatedDaemon) async {
+        guard daemon.supportsLaunchdToggle else { return }
+        let currentDisabled = state.memoryDiagnosis.items.first(where: { $0.daemon == daemon })?.isLaunchdDisabled ?? false
+        MemoryDoctor.setDaemonDisabled(!currentDisabled, daemon: daemon)
+        await refresh()
     }
 
     /// At most one read in flight: if a share hangs, later polls skip instead of piling up threads.

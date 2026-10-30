@@ -85,6 +85,48 @@ public struct ChromeConfig: Codable, Hashable, Sendable {
     /// process per user-data-dir, so the folder *is* the instance.
     public var profileKey: String { userDataDir ?? browser.defaultUserDataDir }
     public var isDefaultProfile: Bool { userDataDir == nil || userDataDir == browser.defaultUserDataDir }
+
+    /// High-level proxy strategy derived from `proxyServer` and `extraFlags`.
+    public var proxyStrategy: BrowserProxyStrategy {
+        get {
+            if let proxy = proxyServer, !proxy.isEmpty {
+                if proxy == "direct://" || extraFlags.contains("--no-proxy-server") {
+                    return .direct
+                }
+                if proxy.contains("127.0.0.1:") || proxy.contains("localhost:") {
+                    let portStr = proxy.components(separatedBy: ":").last?.trimmingCharacters(in: CharacterSet.decimalDigits.inverted)
+                    if let p = portStr.flatMap(Int.init) {
+                        return .clashMixedPort(p)
+                    }
+                }
+                return .custom(proxy)
+            }
+            if extraFlags.contains("--no-proxy-server") {
+                return .direct
+            }
+            return .followSystem
+        }
+        set {
+            switch newValue {
+            case .followSystem:
+                proxyServer = nil
+                extraFlags.removeAll { $0 == "--no-proxy-server" || $0.hasPrefix("--proxy-bypass-list=") }
+            case .direct:
+                proxyServer = "direct://"
+                if !extraFlags.contains("--no-proxy-server") {
+                    extraFlags.append("--no-proxy-server")
+                }
+                extraFlags.removeAll { $0.hasPrefix("--proxy-bypass-list=") }
+            case .clashMixedPort(let port):
+                proxyServer = "http://127.0.0.1:\(port)"
+                extraFlags.removeAll { $0 == "--no-proxy-server" || $0.hasPrefix("--proxy-bypass-list=") }
+                extraFlags.append("--proxy-bypass-list=<local>;localhost;127.0.0.1;*.local")
+            case .custom(let url):
+                proxyServer = url
+                extraFlags.removeAll { $0 == "--no-proxy-server" }
+            }
+        }
+    }
 }
 
 public struct ChromePreset: Codable, Identifiable, Hashable, Sendable {
@@ -196,10 +238,44 @@ public enum ChromeInstances {
             args.append("--remote-debugging-port=\(port)")
             args.append("--remote-allow-origins=http://localhost:\(port),http://127.0.0.1:\(port)")
         }
-        if let proxy = c.proxyServer, !proxy.isEmpty { args.append("--proxy-server=\(proxy)") }
+        if let proxy = c.proxyServer, !proxy.isEmpty {
+            args.append("--proxy-server=\(proxy)")
+            if proxy == "direct://" && !c.extraFlags.contains("--no-proxy-server") {
+                args.append("--no-proxy-server")
+            }
+        }
         args.append(contentsOf: c.extraFlags.filter { $0.hasPrefix("-") })
         if let url = c.startURL, !url.isEmpty { args.append(url) }
         return args
+    }
+
+    /// Helper to generate a dedicated Pure Direct (zero proxy) configuration.
+    public static func directConfig(for browser: ChromiumBrowser, profileName: String = "direct") -> ChromeConfig {
+        var config = ChromeConfig(
+            browser: browser,
+            userDataDir: NSHomeDirectory() + "/Library/Application Support/Pharos/Profiles/\(browser.rawValue)-\(profileName)",
+            extraFlags: ["--no-first-run", "--no-default-browser-check"]
+        )
+        config.proxyStrategy = .direct
+        return config
+    }
+
+    /// Helper to generate a Clash proxy-isolated configuration.
+    public static func clashConfig(for browser: ChromiumBrowser, port: Int = 7890, profileName: String = "clash") -> ChromeConfig {
+        var config = ChromeConfig(
+            browser: browser,
+            userDataDir: NSHomeDirectory() + "/Library/Application Support/Pharos/Profiles/\(browser.rawValue)-\(profileName)",
+            extraFlags: ["--no-first-run", "--no-default-browser-check"]
+        )
+        config.proxyStrategy = .clashMixedPort(port)
+        return config
+    }
+
+    /// Returns terminal shell snippets for exporting and unsetting proxy variables.
+    public static func terminalProxyCommands(mixedPort: Int = 7890) -> (exportCmd: String, unsetCmd: String) {
+        let exportCmd = "export http_proxy=http://127.0.0.1:\(mixedPort) https_proxy=http://127.0.0.1:\(mixedPort) all_proxy=socks5://127.0.0.1:\(mixedPort)"
+        let unsetCmd = "unset http_proxy https_proxy all_proxy"
+        return (exportCmd, unsetCmd)
     }
 
     /// The same launch as a terminal command, for showing and copying. Pharos

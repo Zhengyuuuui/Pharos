@@ -16,12 +16,15 @@ struct PharosCard<Content: View>: View {
         content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .topLeading)
+            .background(
+                shape
+                    .fill(needsHairline ? Color.clear : Color.black.opacity(0.035))
+                    .offset(y: 1.5)
+            )
             .background(shape.fill(PharosColor.surface))
             .overlay {
-                if needsHairline { shape.strokeBorder(PharosColor.separator, lineWidth: 0.5) }
+                shape.strokeBorder(PharosColor.separator.opacity(needsHairline ? 1.0 : 0.32), lineWidth: 0.5)
             }
-            .shadow(color: needsHairline ? .clear : PharosShadow.color,
-                    radius: PharosShadow.radius, y: PharosShadow.y)
     }
 }
 

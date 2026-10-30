@@ -191,15 +191,20 @@ struct PopoverTabsContent: View {
                 Text(l10n.popoverEmpty).font(.system(size: 11)).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity).padding(.vertical, 12)
             } else {
+                let maxH = maxAllowedHeight(for: layout[current], limit: layout.visibleProjectRows)
+                let isScrollNeeded = contentHeight > maxH
                 ScrollView {
                     PopoverBlockStack(blocks: layout[current])
                         .allowsHitTesting(interactive)
+                        .padding(.trailing, 6)
                         .background(GeometryReader { geo in
                             Color.clear.preference(key: ContentHeightKey.self, value: geo.size.height)
                         })
+                        .background(SlimScrollerAttacher())
                 }
-                // Grow with the content, scroll past 520 pt.
-                .frame(height: min(max(contentHeight, 40), 520))
+                .scrollDisabled(!isScrollNeeded)
+                // Grow with the content, scroll past maxH pt.
+                .frame(height: min(max(contentHeight, 40), maxH))
                 .animation(isBlurActive ? .spring(response: 0.28, dampingFraction: 0.85) : nil, value: contentHeight)
                 .blur(radius: (isBlurActive && isSwitchingTab) ? 5.0 : 0)
                 .opacity((isBlurActive && isSwitchingTab) ? 0.75 : 1.0)
@@ -224,6 +229,17 @@ struct PopoverTabsContent: View {
             switchTask = nil
             isSwitchingTab = false
         }
+    }
+
+    private func maxAllowedHeight(for blocks: [PopoverBlock], limit: Int) -> CGFloat {
+        let standardMax: CGFloat = 520
+        // When tab strictly contains only running projects, align maximum viewport height with visibleProjectRows limit
+        if blocks == [.projects], limit > 0 {
+            let rowEstimate: CGFloat = 56
+            let target = CGFloat(limit) * rowEstimate + 4
+            return min(max(target, 160), standardMax)
+        }
+        return standardMax
     }
 }
 
@@ -261,12 +277,13 @@ struct PopoverProjectRow: View {
             HStack(alignment: .top, spacing: 6) {
                 PortChips(ports: project.ports)
                 Spacer(minLength: 0)
-                Text(project.listeners.first?.shortCommand ?? "")
-                    .font(.system(size: 10))
+                Text(project.startCommand)
+                    .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                    .frame(maxWidth: 130, alignment: .trailing)
+                    .frame(maxWidth: 150, alignment: .trailing)
+                    .help(project.startCommand)
             }
             MemoryBar(fraction: fraction)
         }
@@ -336,4 +353,65 @@ private struct RefreshIcon: View {
             Image(systemName: "arrow.clockwise").font(.system(size: 11))
         }
     }
+}
+
+/// An ultra-slim (3.5pt), highly refined custom overlay scroller designed specifically for menu bar popovers.
+/// Eliminates the thick default macOS scroller and prevents obstructing buttons or text.
+final class SlimPopoverScroller: NSScroller {
+    override class var isCompatibleWithOverlayScrollers: Bool { true }
+
+    override func drawKnob() {
+        let knobRect = self.rect(for: .knob)
+        guard knobRect.width > 0, knobRect.height > 0 else { return }
+
+        let slimWidth: CGFloat = 3.5
+        let rightMargin: CGFloat = 2.0
+        let x = bounds.width - slimWidth - rightMargin
+        let y = knobRect.origin.y + 2
+        let h = max(16, knobRect.height - 4)
+
+        let pillRect = NSRect(x: x, y: y, width: slimWidth, height: h)
+        let path = NSBezierPath(roundedRect: pillRect, xRadius: slimWidth / 2, yRadius: slimWidth / 2)
+
+        let isDark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let color = isDark ? NSColor.white.withAlphaComponent(0.40) : NSColor.black.withAlphaComponent(0.30)
+        color.setFill()
+        path.fill()
+    }
+
+    override func drawKnobSlot(in rect: NSRect, highlight: Bool) {
+        // Keep track background completely invisible
+    }
+}
+
+private struct SlimScrollerAttacher: NSViewRepresentable {
+    func makeNSView(context: Context) -> SlimScrollerNSView {
+        SlimScrollerNSView()
+    }
+    func updateNSView(_ nsView: SlimScrollerNSView, context: Context) {
+        nsView.attach()
+    }
+}
+
+private final class SlimScrollerNSView: NSView {
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        attach()
+    }
+
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        attach()
+    }
+
+    func attach() {
+        guard let sv = enclosingScrollView else { return }
+        if !(sv.verticalScroller is SlimPopoverScroller) {
+            let s = SlimPopoverScroller()
+            sv.verticalScroller = s
+            sv.scrollerStyle = .overlay
+        }
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }

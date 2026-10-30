@@ -130,3 +130,45 @@ func testLiveScan() {
     expectEq(me?.cwd, FileManager.default.currentDirectoryPath, "cwd")
     expect(me?.executablePath?.hasSuffix("pharos-tests") == true, "exec path")
 }
+
+func testChromeFilteringInProjectGrouper() {
+    let home = "/Users/me"
+    let chromeExe = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+    let helperExe = "/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/1.0/Helpers/Google Chrome Helper.app/Contents/MacOS/Google Chrome Helper"
+
+    let procs = [
+        // Real dev project in /Users/me/code/web
+        ProcessSnapshot(pid: 10, ppid: 1, name: "node", executablePath: "/opt/homebrew/bin/node",
+                        cwd: "/Users/me/code/web", memoryBytes: 150_000_000,
+                        ports: [ListeningPort(port: 3000, loopbackOnly: true)]),
+
+        // Chrome browser launched from terminal inside /Users/me/code/web with debug port 9222
+        ProcessSnapshot(pid: 20, ppid: 1, name: "Google Chrome", executablePath: chromeExe,
+                        cwd: "/Users/me/code/web",
+                        arguments: [chromeExe, "--remote-debugging-port=9222", "--user-data-dir=/Users/me/.chrome-debug"],
+                        memoryBytes: 250_000_000,
+                        ports: [ListeningPort(port: 9222, loopbackOnly: true)]),
+
+        // Helper process child of Chrome
+        ProcessSnapshot(pid: 21, ppid: 20, name: "Google Chrome Helper", executablePath: helperExe,
+                        cwd: "/Users/me/code/web",
+                        arguments: [helperExe, "--type=renderer"],
+                        memoryBytes: 400_000_000,
+                        ports: [])
+    ]
+
+    // Normal mode (includeSystem: false)
+    let normalProjects = ProjectGrouper.group(procs, homeDirectory: home, includeSystem: false)
+    expectEq(normalProjects.count, 1, "only 1 dev project")
+    expectEq(normalProjects.first?.name, "web", "project is web")
+    expectEq(normalProjects.first?.ports.map(\.port), [3000], "only port 3000, debug port 9222 excluded")
+    expectEq(normalProjects.first?.listeners.map(\.pid), [10], "Chrome PID 20 excluded from listeners")
+    expectEq(normalProjects.first?.helpers.map(\.pid), [], "Chrome helper PID 21 excluded from helpers")
+    expectEq(normalProjects.first?.memoryBytes, 150_000_000, "Chrome memory not added to dev project")
+
+    // System mode (includeSystem: true, e.g. --check --all CLI)
+    let allProjects = ProjectGrouper.group(procs, homeDirectory: home, includeSystem: true)
+    expectEq(allProjects.count, 1, "even with includeSystem: true, Chrome is not treated as a dev project")
+    expectEq(allProjects.first?.ports.map(\.port), [3000], "debug port 9222 excluded in includeSystem mode")
+    expectEq(allProjects.first?.allPIDs, [10], "Chrome PIDs never present in allPIDs")
+}

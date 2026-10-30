@@ -65,7 +65,7 @@ struct PharosInspectorIsland: View {
             BatteryThermalInspectorView()
         case .packages:
             PackagesInspectorView()
-        case .chrome:
+        case .browsersAndNetwork:
             ChromeInspectorView()
         case .agentChats:
             AgentChatsInspectorView()

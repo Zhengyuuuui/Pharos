@@ -110,16 +110,43 @@ func testLaunchDetectionEntryFiles() {
 
 func testRunningCommandMapping() {
     let (dir, done) = makeProject([
-        "package.json": #"{"scripts":{"dev":"next dev --turbo","start":"next start","x":"vite"}}"#,
+        "package.json": #"{"scripts":{"dev":"cross-env NODE_ENV=dev next dev --turbo","start":"next start","x":"vite"}}"#,
         "pnpm-lock.yaml": "",
     ])
     defer { done() }
     let nextDev = ["node", dir + "/node_modules/next/dist/bin/next", "dev", "--turbo"]
-    expectEq(LaunchDetector.command(forRunning: nextDev, in: dir), "pnpm run dev", "running next dev → its script")
+    expectEq(LaunchDetector.command(forRunning: nextDev, in: dir), "pnpm run dev", "running next dev with cross-env wrapper → its script")
     let nextStart = ["node", dir + "/node_modules/next/dist/bin/next", "start"]
     expectEq(LaunchDetector.command(forRunning: nextStart, in: dir), "pnpm run start", "next start → start script")
     let vite = ["node", dir + "/node_modules/.bin/vite"]
     expectEq(LaunchDetector.command(forRunning: vite, in: dir), "pnpm run x", ".bin tool → matching script")
+
+    // Portable start commands across ecosystems
+    let (goDir, goDone) = makeProject(["go.mod": "module myapp\ngo 1.22\n"])
+    defer { goDone() }
+    let goProc = ["/var/folders/xx/T/go-build123/b001/exe/main"]
+    expectEq(LaunchDetector.command(forRunning: goProc, in: goDir), "go run .", "go.mod project resolves to portable go run .")
+
+    let (rustDir, rustDone) = makeProject(["Cargo.toml": "[package]\nname=\"myapp\"\nversion=\"0.1.0\"\n"])
+    defer { rustDone() }
+    let rustProc = [rustDir + "/target/debug/myapp"]
+    expectEq(LaunchDetector.command(forRunning: rustProc, in: rustDir), "cargo run", "Cargo.toml project resolves to portable cargo run")
+
+    let (djangoDir, djangoDone) = makeProject(["manage.py": "# django"])
+    defer { djangoDone() }
+    let djangoProc = ["/usr/bin/python3", djangoDir + "/manage.py", "runserver", "0.0.0.0:8000"]
+    expectEq(LaunchDetector.command(forRunning: djangoProc, in: djangoDir), "python3 manage.py runserver",
+             "Django project resolves to portable manage.py runserver")
+
+    let (gradleDir, gradleDone) = makeProject(["gradlew": "#!/bin/sh\n"])
+    defer { gradleDone() }
+    let javaProc = ["/usr/bin/java", "-jar", "build/libs/app.jar"]
+    expectEq(LaunchDetector.command(forRunning: javaProc, in: gradleDir), "./gradlew bootRun", "Gradle project resolves to portable ./gradlew bootRun")
+
+    // Verify Project.startCommand uses the portable detector
+    let pSnapshot = ProcessSnapshot(pid: 99, ppid: 1, name: "node", arguments: nextDev, memoryBytes: 100)
+    let proj = Project(id: "test", name: "test", directory: dir, listeners: [pSnapshot], helpers: [], ports: [], memoryBytes: 100)
+    expectEq(proj.startCommand, "pnpm run dev", "Project.startCommand integrates portable launch command")
 
     let py = ["/opt/homebrew/bin/python3", dir + "/server.py", "--port", "8000"]
     expectEq(LaunchDetector.command(forRunning: py, in: dir), "python3 server.py --port 8000",

@@ -152,6 +152,102 @@ final class ChromeStore: ObservableObject {
 
     // MARK: - Actions
 
+    /// Launches or restarts the user's main/original browser profile with the specified proxy strategy.
+    /// If the main profile is currently running, it is gracefully quit and relaunched with the new proxy.
+    func launchMainWithProxy(
+        browser: ChromiumBrowser? = nil,
+        strategy: BrowserProxyStrategy,
+        running: [ChromeInstance],
+        listening: Set<UInt16>,
+        then refresh: @escaping () async -> Void
+    ) {
+        let b = browser ?? defaultBrowser
+        var config = ChromeConfig(browser: b, userDataDir: nil)
+        config.proxyStrategy = strategy
+
+        if let existing = running.first(where: { $0.config.browser == b && $0.config.isDefaultProfile }) {
+            relaunch(existing, with: config, then: refresh)
+        } else {
+            start(config, running: running, listening: listening)
+        }
+    }
+
+    /// Launches an isolated profile with a designated proxy strategy (Proxy A, Proxy B, etc.).
+    func launchIsolated(
+        name: String,
+        folderName: String,
+        strategy: BrowserProxyStrategy,
+        browser: ChromiumBrowser? = nil,
+        port: UInt16? = nil,
+        running: [ChromeInstance],
+        listening: Set<UInt16>
+    ) {
+        let b = browser ?? defaultBrowser
+        let dir = NSHomeDirectory() + "/Library/Application Support/Pharos/Profiles/" + folderName
+        var config = ChromeConfig(
+            browser: b,
+            userDataDir: dir,
+            debugPort: port,
+            extraFlags: ["--no-first-run", "--no-default-browser-check"]
+        )
+        config.proxyStrategy = strategy
+        if let idx = presets.firstIndex(where: { $0.config.browser == b && $0.config.profileKey == config.profileKey }) {
+            presets[idx].config.proxyStrategy = strategy
+            persist()
+        } else {
+            presets.append(ChromePreset(name: name, config: config))
+            persist()
+        }
+        start(config, running: running, listening: listening)
+    }
+
+    /// Relaunches a running browser instance with new flags after graceful termination.
+    func relaunch(_ instance: ChromeInstance, with config: ChromeConfig, then refresh: @escaping () async -> Void) {
+        guard instance.pid > 1, instance.pid != getpid() else { return }
+        ProcessControl.send(.terminate, to: [instance.pid])
+        stubborn.remove(instance.id)
+        Task { [weak self] in
+            for _ in 0..<45 {
+                try? await Task.sleep(for: .milliseconds(100))
+                if !ProcessControl.isAlive(instance.pid) { break }
+            }
+            guard let self else { return }
+            await refresh()
+            self.start(config, running: [], listening: [])
+            try? await Task.sleep(for: .milliseconds(300))
+            await refresh()
+        }
+    }
+
+    /// Updates or assigns proxy strategy to an instance/preset.
+    func updateProxyStrategy(_ strategy: BrowserProxyStrategy, for entry: Entry) {
+        if let preset = entry.preset {
+            var p = preset
+            p.config.proxyStrategy = strategy
+            update(p)
+        } else if let r = entry.running {
+            var c = r.config
+            c.proxyStrategy = strategy
+            let preset = ChromePreset(name: defaultName(c), config: c)
+            presets.append(preset)
+            persist()
+        }
+    }
+
+    /// Launches a Pure Direct (zero proxy) browser instance to isolate local localhost debugging.
+    func launchDirect(browser: ChromiumBrowser? = nil, running: [ChromeInstance], listening: Set<UInt16>) {
+        let b = browser ?? defaultBrowser
+        let config = ChromeInstances.directConfig(for: b)
+        start(config, running: running, listening: listening)
+    }
+
+    /// Launches a Clash-routed browser instance for external documentation & AI services.
+    func launchClash(browser: ChromiumBrowser? = nil, port: Int = 7890, running: [ChromeInstance], listening: Set<UInt16>) {
+        let b = browser ?? defaultBrowser
+        let config = ChromeInstances.clashConfig(for: b, port: port)
+        start(config, running: running, listening: listening)
+    }
+
     func start(_ config: ChromeConfig, running: [ChromeInstance], listening: Set<UInt16>) {
         let l10n = L10n.shared
         guard isInstalled(config.browser) else { errorMessage = l10n.browserNotInstalled(config.browser.appName); return }

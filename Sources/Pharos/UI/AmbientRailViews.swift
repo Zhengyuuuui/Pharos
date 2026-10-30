@@ -123,12 +123,14 @@ struct PortsOverviewInspectorView: View {
 struct SystemMemoryInspectorView: View {
     @EnvironmentObject var store: ProjectStore
     @ObservedObject private var l10n = L10n.shared
+    @State private var showConfirmReclaim = false
 
     var body: some View {
         let stats = store.system
         let breakdown = MemoryAttribution.calculate(apps: store.apps)
         let pressure = stats?.pressure ?? .normal
         let isThrashing = (stats?.swapUsed ?? 0) > 1024 * 1024 * 1024 // > 1GB swap
+        let diagnosis = store.memoryDiagnosis
 
         VStack(spacing: 8) {
             // [Block 1] 内存压力与颠簸脉搏条 (Mini 胶囊卡, 高 48pt)
@@ -136,6 +138,33 @@ struct SystemMemoryInspectorView: View {
                 text: pressure == .normal && !isThrashing ? l10n.memoryPulseNormal : l10n.memoryPulseWarning,
                 dotLevel: pressure == .critical ? .critical : (pressure == .warning || isThrashing ? .warning : .normal)
             )
+
+            // [Bloat Alert Block] 守护进程异常膨胀治理联动卡片 (当检测到膨胀时置顶高亮展示)
+            if diagnosis.hasBloat {
+                PharosBentoCard(title: l10n.memoryBloatDiagnostics, systemImage: "cross.vial.fill") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 6) {
+                            Image(systemName: diagnosis.criticalCount > 0 ? "xmark.octagon.fill" : "exclamationmark.triangle.fill")
+                                .foregroundStyle(diagnosis.criticalCount > 0 ? PharosColor.error : PharosColor.warning)
+                                .font(.system(size: 13))
+                            Text(l10n.ambientBloatWarning(diagnosis.bloatedCount, ByteFormat.short(diagnosis.reclaimableBytes)))
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(PharosColor.textPrimary)
+                        }
+
+                        if let topBloat = diagnosis.bloatedItems.first {
+                            Text("\(topBloat.daemon.primaryName): \(ByteFormat.short(topBloat.memoryBytes)) (\(l10n.daemonStatus(topBloat.status)))")
+                                .font(.system(size: 10))
+                                .foregroundStyle(PharosColor.textSecondary)
+                                .lineLimit(1)
+                        }
+
+                        PharosActionPill(title: l10n.reclaimAllBloated, systemImage: "sparkles", isPrimary: true) {
+                            showConfirmReclaim = true
+                        }
+                    }
+                }
+            }
 
             // [Block 2] 三大领域占用归因组件 (Hero 主力大卡, 约 160pt)
             PharosBentoCard(title: l10n.domainBreakdown, systemImage: "chart.pie.fill") {
@@ -206,6 +235,14 @@ struct SystemMemoryInspectorView: View {
                     }
                 }
             }
+        }
+        .alert(l10n.confirmReclaimAllTitle, isPresented: $showConfirmReclaim) {
+            Button(l10n.cancel, role: .cancel) {}
+            Button(l10n.confirmReclaimButton, role: .destructive) {
+                Task { await store.reclaimAllBloatedDaemons() }
+            }
+        } message: {
+            Text(l10n.confirmReclaimDesc)
         }
     }
 }

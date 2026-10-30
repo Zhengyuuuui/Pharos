@@ -23,22 +23,19 @@ struct PharosStatusDot: View {
 
     let level: Level
     var animated: Bool = false
-    @State private var isPulsing: Bool = false
 
     var body: some View {
-        Circle()
-            .fill(level.color)
-            .frame(width: 6, height: 6)
-            .shadow(color: level.color.opacity(level == .offline ? 0 : 0.45), radius: 2.5, x: 0, y: 0)
-            .scaleEffect(animated && isPulsing ? 1.25 : 1.0)
-            .opacity(animated && isPulsing ? 0.8 : 1.0)
-            .onAppear {
-                if animated && level == .warning {
-                    withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
-                        isPulsing = true
-                    }
-                }
+        ZStack {
+            if level != .offline {
+                Circle()
+                    .fill(level.color.opacity(0.22))
+                    .frame(width: 10, height: 10)
             }
+            Circle()
+                .fill(level.color)
+                .frame(width: 6, height: 6)
+        }
+        .frame(width: 10, height: 10)
     }
 }
 
@@ -173,13 +170,16 @@ struct PharosBentoTile: View {
         .frame(width: 126, height: 68, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.black.opacity(0.035))
+                .offset(y: 1.5)
+        )
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(PharosColor.surface)
-                .shadow(color: Color.black.opacity(0.03), radius: 2, x: 0, y: 1)
-                .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 3)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(PharosColor.separator.opacity(0.3), lineWidth: 0.5)
+                .strokeBorder(PharosColor.separator.opacity(0.35), lineWidth: 0.5)
         )
     }
 }
@@ -226,13 +226,16 @@ struct PharosBentoPulse: View {
         .frame(width: 260, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.black.opacity(0.035))
+                .offset(y: 1.5)
+        )
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(PharosColor.surface)
-                .shadow(color: Color.black.opacity(0.03), radius: 2, x: 0, y: 1)
-                .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 3)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(PharosColor.separator.opacity(0.3), lineWidth: 0.5)
+                .strokeBorder(PharosColor.separator.opacity(0.35), lineWidth: 0.5)
         )
     }
 }
@@ -273,13 +276,16 @@ struct PharosBentoCard<Content: View>: View {
         .frame(width: 260, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.black.opacity(0.035))
+                .offset(y: 1.5)
+        )
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(PharosColor.surface)
-                .shadow(color: Color.black.opacity(0.03), radius: 2, x: 0, y: 1)
-                .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 3)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(PharosColor.separator.opacity(0.3), lineWidth: 0.5)
+                .strokeBorder(PharosColor.separator.opacity(0.35), lineWidth: 0.5)
         )
     }
 }

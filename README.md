@@ -61,8 +61,8 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 | **Fans & temperature** | Fan speeds and CPU / GPU / memory / SSD / battery temperatures; automotive cockpit speedometer dials (60 FPS mechanical inertia engine & dynamic motion blur) & classic horizontal bars; optional fan control (fixed speed or max) with built-in safety rules |
 | **Stop processes** | `SIGTERM` first, `SIGKILL` only if it refuses; never system or other users' processes |
 | **Disk cleanup** | 4 specialized cleaning hubs: System & Caches (with sub-directory inspection & single-item clean), Orphaned App Leftovers scanner, npkill-style Project Purge (dormancy detection & batch release), and Dev & AI Tools (Homebrew multi-versions, Ollama/HuggingFace model weights with layer blob GC, Docker.raw & Xcode simulators) |
-| **Favorite projects** | Save project folders, start commands detected automatically, open in Terminal with one click |
-| **Browser instances** | Chrome, Chrome Beta / Canary, Chromium, Edge and Brave — every profile folder with its debug port, proxy and memory; save favorites that stay listed with their launch command after quitting; start and quit |
+| **Favorite projects & portable start contract** | Cross-ecosystem project start engine (peels through wrappers like `cross-env`/`dotenv` to match `package.json`, detects `go.mod`, `Cargo.toml`, `uv`/`poetry`/Django, Gradle/Maven), offering 100% portable start commands across developer machines; open in Terminal or copy command |
+| **Browsers & Proxy** | Clash / Mihomo network control hub (automatic detection of all major clients, UDS & HTTP dual-channel, hot mode switching & connection reset) and Chromium proxy isolation matrix (pure direct `direct://` for local debugging vs Clash rule proxy); manage Chrome, Edge, Brave profiles |
 | **AI agent chat databases** | Inspect, clean and backup local chat / session databases from 23+ AI IDEs and editors (Cursor, Trae, Windsurf, VS Code, Antigravity, OpenCode, Claude Code, MiniMax…); nanosecond-precision incremental fingerprint cache (`DB + WAL` size/mtime) skips unchanged databases; detect orphaned workspaces; manually add and scan any custom application under `/Applications` |
 | **Packages & CLI tools** | Real Homebrew Cellar formula & Caskroom package scanning, diagnostics (`brew doctor`/`services`) and cache cleanup; global CLI tools (Node, Homebrew, Rust, Python, Go) with terminal run, reveal and uninstall; two-stage progressive project dependency scanning with `mtime` + lockfile fingerprint cache across 10 developer workspace directories (`.venv`, `node_modules`, `.build`, `target`); language cache repos overview |
 | **Design system & sidebar** | Strict 3-step lightness hierarchy (`background` → `surface` → `fill` with calibrated high-contrast tokens and `Font.TextStyle` dynamic typography), floating sidebar island with native traffic lights and customizable frosted-glass scroll blur (0%–100% slider + live top-left 3-buttons preview in Settings), zero AppKit blue highlight clashing, and adaptive responsive popover customizer (`ViewThatFits`) |
@@ -73,7 +73,8 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 
 ### Menu bar popover
 - **Overview** tab: system memory, pressure, disk usage of every volume (incl. external drives), top apps
-- **Projects** tab: running projects with ports and memory, plus your browser instances (start / quit / open debug list, “Manage…” jumps to the Browsers page)
+- **Projects** tab: running projects with ports, memory, and portable cross-machine start commands, plus your browser instances (start / quit / open debug list, “Manage…” jumps to the Browsers page)
+- **Unified single-scroll architecture & ultra-slim scroller**: Features a unified outer scroll container that eliminates nested scrollers inside individual cards, permanently preventing multiple vertical scrollbars and wheel gesture conflicts; equipped with a custom 3.5 pt semi-transparent floating capsule scroller (`SlimPopoverScroller`), eliminating macOS native 16 pt thick scroller overlap over action buttons and text.
 - Quick buttons to open the main window or jump straight to Disk Cleanup
 - **Customizable like widgets** (Main window → Customize): a live snapshot of the popover next to its two tabs and a component library — drag blocks to reorder them, move them between tabs, drag them out to hide or in to add (memory, disk, fans & temperature, dev projects, top apps, running projects, browser instances, favorite projects). Adaptive side-by-side or stacked layout (`ViewThatFits`) prevents window squeezing; Empty tabs disappear; Reset to Default restores the original layout
 - Below the library, **Running projects shown** sets how many projects the popover lists before scrolling: quick picks (3 / 5 / 8 / 10 / 15 / all running) or type a number — minimum 3, maximum the number of projects running right now (default 5). Extra projects scroll inside the list
@@ -112,23 +113,33 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 - Port map chart (log scale, ◆ = exposed), memory-by-project bars, stacked dev-memory trend
 
 ### Favorite projects (workspaces)
+- **Portable Cross-Machine Start Contract Engine**: Automatically resolves standard start commands with team reproducibility across different developer machines. Skips boilerplate execution wrappers (e.g. `cross-env`, `dotenv`, `concurrently`, `nodemon`, `PORT=3000`) to match declared scripts (`pnpm run dev`, `bun run dev`, `npm start`), and intelligently detects `go.mod` (`go run .`), `Cargo.toml` (`cargo run`), `uv`/`poetry`/Django (`python3 manage.py runserver`), and Gradle/Maven (`./gradlew bootRun`). Running projects in both the popover and main window display their normalized start command alongside one-click Terminal launch and clipboard copy.
 - **Add Workspace…**: pick project folders; the start command is detected from the folder's own files — `package.json` scripts (npm / pnpm / yarn / bun from the lockfile or `packageManager`), `deno.json`, `manage.py`, `bin/dev`, `Makefile` targets, docker compose, `Cargo.toml`, `go.mod`, `Package.swift`, `pyproject.toml` `[project.scripts]`, and entry files for script-only projects (`run.py`, `serve.py`, `gateway.py`, `server.mjs`…)
 - The best match is filled in automatically; `start.sh` / `run.sh` are listed but never auto-filled, and scripts containing `git reset --hard`, `rm -rf` or `sudo` are flagged and can't be applied with one click
 - **☆ on any running project** saves it with the command it is *actually running with* (e.g. a running `next dev` maps back to `pnpm run dev`). Inline code (`node -e`, `python -c`), multi-line or huge command lines are never saved — they often contain tokens
 - Favorites show running (ports, memory, stop) or stopped (last seen ports); edit the command, pick another detected one, copy `cd … && command`
 - **Open in Terminal** runs the command in a new window of your terminal (Terminal by default; iTerm2, Ghostty or Warp in Settings) with your login shell (PATH, nvm, pyenv as usual); the process belongs to that window — Ctrl-C there stops it. Pharos never runs commands in the background
 
-### Browser instances (Chrome, Edge, Brave…)
-- Supports Google Chrome, Chrome Beta, Chrome Canary, Chromium, Microsoft Edge and Brave — they share Chromium's flags; pick the browser per preset
-- Several browsers side by side (e.g. Chrome for work, Edge for testing, Brave for personal): a filter bar switches between them, and “All” groups instances per browser with running count and memory
-- **Settings → Browsers**: every supported browser with installed / running / saved counts and its default profile folder; hide browsers you don't use and choose which one “New Instance” uses
-- Every running browser, identified by its profile folder (`--user-data-dir`): debug port, proxy, start URL, signed-in profiles, memory incl. all helper processes, folder size on demand. Debug-profile browsers no longer clutter the project list
-- ☆ saves a running instance as a preset with its exact flags; **New Instance** picks the next free port and a `~/chromeNNNN` folder; every field is editable
-- Saved instances stay listed after you quit Chrome (“saved · not running”) with their port and the exact **launch command** — a ready-to-paste `open -na 'Google Chrome' --args …` with a copy button; ★ again removes it
-- If a saved instance is relaunched elsewhere with different flags, the card says so and **Update Preset** adopts the running flags
-- **Start** runs `open -na "Google Chrome" --args …` after checking the folder isn't already open and the port is free
-- **Quit** sends `SIGTERM` (normal Chrome shutdown, tabs restore next time); force quit is offered only if it's still open after 3 s
-- 🐞 opens `http://127.0.0.1:<port>` (DevTools target list) in your default browser. Pharos itself never connects to debug ports
+### Browsers & Network Proxy (Browsers & Proxy)
+
+1. **Clash / Mihomo Real-time Network Hub**:
+   - Automatically detects active local Mihomo/Clash engines: Mihomo Party / Clash Party (via `/tmp/mihomo-party-*.sock` Unix Domain Socket without credentials), Clash Verge Rev, Clash Nyanpasu, ClashX.Meta, Flclash, and generic Mihomo CLI.
+   - Live display of Mixed Port, SOCKS Port, TUN virtual network adapter state, active connections, and real-time upload/download speeds.
+   - Millisecond-level hot switching between **Rule**, **Direct**, and **Global** routing modes without restarting the client; one-click reset for all open connections to immediately route traffic to the new mode; one-click copy for terminal proxy configuration (`export http_proxy` / `unset`).
+2. **Browser Proxy Isolation Matrix**:
+   - **Local Dev Direct Browser**: Launch dedicated Chromium profiles with `--proxy-server="direct://"` and `--no-proxy-server`. Even when Clash system proxy or TUN mode is running, 100% of requests to `localhost`, `127.0.0.1`, and internal APIs bypass the proxy, eliminating SSL errors and proxy interference.
+   - **AI & Research Browser**: Launch profiles with `--proxy-server="http://127.0.0.1:7890"` to take advantage of node acceleration and smart split routing for foreign docs and LLM APIs.
+3. **Chromium Browser Instance Management**:
+   - Supports Google Chrome, Chrome Beta, Chrome Canary, Chromium, Microsoft Edge and Brave; every instance card features a proxy strategy capsule badge (`[Direct]` or `[Clash :7890]`) with in-drawer strategy editing.
+   - Several browsers side by side (e.g. Chrome for work, Edge for testing, Brave for personal): a filter bar switches between them, and “All” groups instances per browser with running count and memory
+   - **Settings → Browsers**: every supported browser with installed / running / saved counts and its default profile folder; hide browsers you don't use and choose which one “New Instance” uses
+   - Every running browser, identified by its profile folder (`--user-data-dir`): debug port, proxy, start URL, signed-in profiles, memory incl. all helper processes, folder size on demand. Debug-profile browsers no longer clutter the project list
+   - ☆ saves a running instance as a preset with its exact flags; **New Instance** picks the next free port and a `~/chromeNNNN` folder; every field is editable
+   - Saved instances stay listed after you quit Chrome (“saved · not running”) with their port and the exact **launch command** — a ready-to-paste `open -na 'Google Chrome' --args …` with a copy button; ★ again removes it
+   - If a saved instance is relaunched elsewhere with different flags, the card says so and **Update Preset** adopts the running flags
+   - **Start** runs `open -na "Google Chrome" --args …` after checking the folder isn't already open and the port is free
+   - **Quit** sends `SIGTERM` (normal Chrome shutdown, tabs restore next time); force quit is offered only if it's still open after 3 s
+   - 🐞 opens `http://127.0.0.1:<port>` (DevTools target list) in your default browser. Pharos itself never connects to debug ports
 
 ### Disk cleanup
 Four dedicated cleaning modules engineered in pure Apple Swift to deliver all major capabilities of CleanMyMac and Mole, tailored specifically for modern AI agents and developer workflows:
@@ -240,6 +251,8 @@ Sources/
 │   ├── DiskCleaner      #   temp/cache scan + clean (one shared per-file rule)
 │   ├── Workspaces       #   favorites model, start-command detection, launch script
 │   ├── ChromeInstances  #   Chromium browsers: flags parsing, presets, launch args
+│   ├── ClashModels      #   routing modes, client variants, proxy strategies & snapshots
+│   ├── ClashController  #   Mihomo/Clash probing, UDS & HTTP dual-channel, hot switching
 │   ├── Alerts           #   when to notify (fires once, re-arms after clearing)
 │   ├── Backup           #   export / import format and merge rules
 │   ├── SMC / Thermals   #   read fans and temperatures from the SMC
@@ -258,6 +271,7 @@ Sources/
 │   ├── CleanupStore     #   disk cleanup state
 │   ├── WorkspaceStore   #   favorites: persist, pin, open in Terminal
 │   ├── ChromeStore      #   Chrome presets, start / quit
+│   ├── ClashStore       #   Clash / Mihomo real-time daemon state, hot mode switching
 │   ├── AgentChatStore   #   agent chat databases state, custom apps, backup, delete
 │   ├── PackageStore     #   package manager & Homebrew state, diagnostics
 │   ├── BatteryStore     #   battery charge limit state, hardware monitoring

@@ -18,11 +18,19 @@ public enum ProjectGrouper {
     public static func group(_ all: [ProcessSnapshot],
                              homeDirectory: String = NSHomeDirectory(),
                              includeSystem: Bool = false) -> [Project] {
-        let listeners = all.filter { !$0.ports.isEmpty && (includeSystem || !isSystemProcess($0)) }
+        // Chromium browser instances and their helper child trees belong to
+        // the Browser Instances page. Filter them out unconditionally so they
+        // never get grouped as regular projects (even when started from a project cwd
+        // or when includeSystem is true).
+        let chromeInstances = ChromeInstances.find(in: all)
+        let chromePIDs = Set(chromeInstances.flatMap(\.allPIDs))
+        let procs = chromePIDs.isEmpty ? all : all.filter { !chromePIDs.contains($0.pid) }
+
+        let listeners = procs.filter { !$0.ports.isEmpty && (includeSystem || !isSystemProcess($0)) }
         let listenerPIDs = Set(listeners.map(\.pid))
 
         var children: [Int32: [ProcessSnapshot]] = [:]
-        for p in all where p.pid != p.ppid {
+        for p in procs where p.pid != p.ppid {
             children[p.ppid, default: []].append(p)
         }
 

@@ -326,7 +326,103 @@ final class L10n: ObservableObject {
 
     // MARK: - Browser instances (Chromium-based)
 
-    var chromeTitle: String { en ? "Browsers" : "浏览器实例" }
+    var chromeTitle: String { en ? "Browsers & Proxy" : "浏览器与代理网络" }
+    var browsersAndNetwork: String { en ? "Browsers & Proxy" : "浏览器与代理网络" }
+    var browsersAndNetworkSubtitle: String {
+        en ? "Configure independent proxy routing per browser instance (Main Profile direct, Instance A on Proxy A, Instance B on Proxy B)"
+           : "为不同浏览器配置独立的网络代理（常用主配置直连无代理、实例 A 走代理 A、实例 B 走代理 B）"
+    }
+    var mainProfileTitle: String { en ? "Main Profile (Default)" : "常用主配置 (Default)" }
+    var mainProfileDirectDesc: String {
+        en ? "Uses your daily bookmarks, logins, and extensions. Forced direct://, completely immune to proxy intercepts and localhost SSL errors."
+           : "使用你的日常书签、登录状态与扩展。强制 direct:// 直连，免疫一切代理劫持与本地 SSL 异常。"
+    }
+    var proxyATitle: String { en ? "Isolated Instance · Proxy A" : "分流实例 A · 代理 A" }
+    var proxyADesc: String {
+        en ? "Isolated profile folder running through Proxy A (127.0.0.1:7890) for external AI and documentation."
+           : "独立配置目录，走本地代理 A (127.0.0.1:7890)，用于海外 AI 接口、API 调试与文档检索。"
+    }
+    var proxyBTitle: String { en ? "Isolated Instance · Proxy B" : "分流实例 B · 代理 B" }
+    var proxyBDesc: String {
+        en ? "Isolated profile folder running through Proxy B (127.0.0.1:7897 / custom) for secondary network environments."
+           : "独立配置目录，走备用代理 B (127.0.0.1:7897 或自定义)，满足多网络环境或不同节点需求。"
+    }
+    var launchMainDirect: String { en ? "Launch Main Direct" : "主配置直连启动" }
+    var relaunchMainDirect: String { en ? "Relaunch Main Direct" : "主配置以直连重启" }
+    var launchProxyA: String { en ? "Launch Proxy A" : "启动实例 A" }
+    var launchProxyB: String { en ? "Launch Proxy B" : "启动实例 B" }
+    var relaunchWithProxy: String { en ? "Relaunch with Proxy" : "以该代理重启" }
+    var startWithProxy: String { en ? "Start with Proxy" : "以该代理启动" }
+    var currentRunningProxy: String { en ? "Running with this proxy" : "当前已生效" }
+    var proxyDirectPill: String { en ? "Direct (direct://)" : "⚡ 纯净直连" }
+    var proxyAPill: String { en ? "Proxy A (7890)" : "🌐 代理 A (7890)" }
+    var proxyBPill: String { en ? "Proxy B (7897)" : "🌐 代理 B (7897)" }
+    var proxySystemPill: String { en ? "System" : "🔄 跟随系统" }
+    var proxyCustomPill: String { en ? "Custom…" : "⚙️ 自定义…" }
+    var clashControlHub: String { en ? "Clash / Mihomo Network Hub" : "Clash / Mihomo 实时网络控制中心" }
+    var clashClientRunning: String { en ? "Running" : "运行中" }
+    var clashClientStopped: String { en ? "No Running Client" : "未检测到运行中的客户端" }
+    var clashClientStoppedHint: String {
+        en ? "Supports automatic detection for Mihomo Party, Clash Verge Rev, Clash Nyanpasu, ClashX, and Mihomo Core"
+           : "支持自动探测 Mihomo Party、Clash Verge Rev、Clash Nyanpasu、ClashX 及独立 Mihomo 内核"
+    }
+    var clashRoutingMode: String { en ? "Routing Mode" : "当前路由模式" }
+    var clashModeRule: String { en ? "Rule" : "规则模式" }
+    var clashModeDirect: String { en ? "Direct" : "直连模式" }
+    var clashModeGlobal: String { en ? "Global" : "全局模式" }
+    var clashModeScript: String { en ? "Script" : "脚本模式" }
+    var clashModeRuleDesc: String { en ? "Smart split routing" : "智能海外分流" }
+    var clashModeDirectDesc: String { en ? "100% direct" : "本地纯净无代理" }
+    var clashModeGlobalDesc: String { en ? "Force proxy" : "强制全部代理" }
+    var clashResetConnections: String { en ? "Close Connections" : "一键切断活跃连接" }
+    var clashResetConnectionsHint: String {
+        en ? "Close existing sockets to force traffic migration immediately"
+           : "切模后立即切断旧长连接，确保新请求走新通道"
+    }
+    var clashCopyTerminalProxy: String { en ? "Copy Terminal Proxy" : "复制终端 export 代理" }
+    var clashCopyTerminalUnset: String { en ? "Copy Terminal Unset" : "复制终端 unset 清除" }
+    var clashMixedPort: String { en ? "Mixed Port" : "混合端口" }
+    var clashSocksPort: String { en ? "SOCKS Port" : "SOCKS 端口" }
+    var clashTunMode: String { en ? "TUN Mode" : "TUN 虚拟网卡" }
+    var clashTunEnabled: String { en ? "Enabled" : "已开启" }
+    var clashTunDisabled: String { en ? "Disabled" : "未开启" }
+    var clashActiveConnections: String { en ? "Active Connections" : "活跃连接数" }
+    var clashTrafficRate: String { en ? "Real-time Traffic" : "实时流量速率" }
+
+    // Browser Proxy Isolation Matrix
+    var browserProxyMatrix: String { en ? "Browser Proxy Isolation Matrix" : "浏览器代理策略快速矩阵" }
+    var browserProxyMatrixSubtitle: String {
+        en ? "Quickly launch isolated browser instances with dedicated proxy stacks"
+           : "为不同的开发与调研场景一键启动带独立网络栈的浏览器实例"
+    }
+    var directNoProxyTitle: String { en ? "Local Dev Direct Browser" : "本地调试浏览器 (纯净直连)" }
+    var directNoProxyDesc: String {
+        en ? "Forced direct:// with no proxy. Completely immune to proxy intercepts and localhost SSL errors."
+           : "强制 direct:// 直连，绝不走代理。彻底免疫代理劫持与本地 localhost/127.0.0.1 证书异常。"
+    }
+    var clashProxyTitle: String { en ? "AI & Research Browser" : "海外研报 / AI 浏览器 (代理)" }
+    var clashProxyDesc: String {
+        en ? "Forced through Clash proxy (7890). Enjoy smart rule routing for Claude, ChatGPT, and foreign docs."
+           : "强制走 Clash 规则代理 (7890)。享受节点加速与智能分流，流畅访问海外文档与 AI 接口。"
+    }
+    var launchDirectBrowser: String { en ? "Launch Direct" : "一键直连启动" }
+    var launchClashBrowser: String { en ? "Launch Proxy" : "一键代理启动" }
+    func clashModeSwitchSuccess(_ mode: String) -> String {
+        en ? "Switched to \(mode) mode successfully." : "已成功切换至 \(mode) 模式。"
+    }
+    var clashModeSwitchFailed: String { en ? "Failed to switch routing mode." : "切换路由模式失败。" }
+    var clashConnectionsClosed: String { en ? "All active connections closed." : "已切断并重置所有活跃连接。" }
+    var terminalProxyCopied: String {
+        en ? "Copied terminal proxy command to clipboard." : "已复制终端 export 代理命令到剪贴板。"
+    }
+    var terminalUnsetCopied: String {
+        en ? "Copied terminal unset command to clipboard." : "已复制终端 unset 代理命令到剪贴板。"
+    }
+    var proxyStrategyLabel: String { en ? "Proxy Strategy" : "代理策略" }
+    var proxyFollowSystem: String { en ? "Follow System" : "跟随系统 / Clash" }
+    var proxyDirect: String { en ? "Direct (direct://)" : "纯净直连 (direct://)" }
+    var proxyClash: String { en ? "Clash Mixed Proxy" : "Clash 规则代理 (127.0.0.1)" }
+    var proxyCustom: String { en ? "Custom Proxy URL" : "自定义代理服务器" }
     var manage: String { en ? "Manage…" : "管理…" }
     var chromeRunning: String { en ? "Running" : "运行中" }
     var chromePresets: String { en ? "Saved" : "已保存" }
@@ -1659,6 +1755,102 @@ final class L10n: ObservableObject {
     var cleanTempCachesOnly: String { en ? "Clean Temp Caches Only" : "仅清理临时缓存" }
     var openDerivedData: String { en ? "DerivedData Folder" : "Xcode 衍生数据" }
     var openDockerVm: String { en ? "Docker VM Cache" : "Docker 虚拟缓存" }
+
+    // MARK: - Memory Bloat & Daemon Governance
+
+    var memoryBloatDiagnostics: String { en ? "Memory Bloat & Daemon Governance" : "内存膨胀体检与守护进程治理" }
+    var memoryBloatDiagnosticsDesc: String {
+        en ? "Monitors background system daemons for memory bloat or cache leaks; safely restart them to reclaim RAM or disable autostart."
+           : "监控因缓存堆积或卡死而异常膨胀的系统后台守护进程，可一键重置释放内存或禁用自启"
+    }
+
+    func reclaimableMemoryBanner(_ bytes: String) -> String {
+        en ? "Safely reclaimable: \(bytes)" : "可立即释放 \(bytes)"
+    }
+
+    var reclaimAllBloated: String { en ? "Reclaim All Bloated Daemons" : "一键释放全部膨胀守护进程" }
+    var redetectDaemons: String { en ? "Re-diagnose" : "重新体检" }
+    var reclaimDaemon: String { en ? "Reclaim" : "释放内存" }
+    var reclaiming: String { en ? "Reclaiming…" : "正在释放…" }
+    var disableAutostart: String { en ? "Disable Autostart" : "永久禁用自启" }
+    var autostartDisabled: String { en ? "Disabled (Click to Enable)" : "已禁用（点击恢复）" }
+
+    var allDaemonsHealthy: String { en ? "All System Daemons Healthy" : "系统守护进程健康，未检测到内存膨胀" }
+    var allDaemonsHealthyDesc: String {
+        en ? "All 9 monitored system daemon families are within healthy memory thresholds."
+           : "受监控的 9 类系统守护进程内存均在合理阈值内，系统运行顺畅。"
+    }
+
+    func viewAllMonitoredDaemons(_ n: Int) -> String {
+        en ? "View all \(n) monitored daemons" : "展开查看全部 \(n) 个受监控守护进程"
+    }
+    var hideMonitoredDaemons: String { en ? "Collapse monitored daemons" : "收起受监控守护进程" }
+
+    func monitoredThreshold(_ thresh: String) -> String {
+        en ? "Threshold: \(thresh)" : "建议阈值: \(thresh)"
+    }
+
+    var confirmReclaimTitle: String { en ? "Reclaim Memory from Daemon?" : "确认重置该守护进程？" }
+    var confirmReclaimAllTitle: String { en ? "Reclaim All Bloated Daemons?" : "确认一键释放全部膨胀守护进程？" }
+    var confirmReclaimDesc: String {
+        en ? "The daemon will be restarted to reclaim memory. macOS will automatically respawn clean instances as needed without affecting normal usage."
+           : "重置后守护进程将立即释放内存，系统会自动按需拉起健康新实例，不影响正常使用。"
+    }
+    var confirmReclaimButton: String { en ? "Confirm Reset" : "确认重置" }
+
+    func daemonCategory(_ c: DaemonCategory) -> String {
+        switch c {
+        case .mediaAI: return en ? "Media & Vision AI" : "媒体与视觉 AI 索引"
+        case .desktopUI: return en ? "Desktop & UI Rendering" : "系统桌面与 UI 渲染"
+        case .indexing: return en ? "Spotlight Search Indexing" : "Spotlight 全文检索"
+        }
+    }
+
+    func daemonStatus(_ s: DaemonHealthStatus) -> String {
+        switch s {
+        case .healthy: return en ? "Healthy" : "健康"
+        case .bloated: return en ? "Bloated" : "异常膨胀"
+        case .critical: return en ? "Critical" : "严重膨胀"
+        }
+    }
+
+    func daemonDescription(_ d: KnownBloatedDaemon) -> String {
+        switch d {
+        case .mediaAnalysis:
+            return en ? "Scans photos and videos in background for Live Text OCR and facial recognition. Often leaks several GBs on corrupted video files; terminating or disabling it does not affect viewing photos or playing videos."
+                      : "后台扫描图片与视频帧做实况文本 OCR 与人脸识别，常因视频文件卡死而占用数 GB 内存；结束或禁用完全不影响正常打开照片与播放视频。"
+        case .photoAnalysis:
+            return en ? "Background analysis for Photos library face recognition, scene classification, and Memories; terminating or disabling it does not affect photo viewing or iCloud syncing."
+                      : "照片图库人脸识别、场景分类与回忆生成分析服务；结束或禁用完全不影响照片查看与同步。"
+        case .wallpaper:
+            return en ? "Renders aerial dynamic wallpapers and screensavers. Restarting it quickly frees accumulated video decoding cache without interrupting desktop usage."
+                      : "负责 macOS 动态航拍壁纸与屏幕保护程序的视频解码与渲染缓存，重启可快速释放泄漏内存。"
+        case .spotlight:
+            return en ? "Spotlight search indexer and shared metadata extraction workers; restarting lets launchd respawn it with clean temporary caches."
+                      : "Spotlight 全文检索索引建立与共享元数据提取工作进程；结束时系统会自动拉起并清理内部临时状态。"
+        case .openAndSavePanel:
+            return en ? "Renders macOS file open and save dialogs; often retains large thumbnail caches after browsing large folders."
+                      : "macOS 原生文件打开与保存对话框独立渲染进程，频繁浏览多文件目录后常残留大量缩略图缓存。"
+        case .quickLook:
+            return en ? "Background cache for Finder Spacebar Quick Look previews; restarting cleans up retained file buffers, and pressing Spacebar restarts it instantly."
+                      : "Finder 按空格快速预览文件（图片/PDF/音视频）的后台缓存进程；结束后再次按空格会自动重新启动。"
+        case .iconServices:
+            return en ? "System icon rendering and cache agent; long-running sessions can accumulate oversized icon bitmaps."
+                      : "系统图标生成与多规格像素缓冲池代理进程，长时间运行可能累积膨胀。"
+        case .intelligencePlatform:
+            return en ? "On-device intelligence and local behavioral knowledge graph service; can be safely restarted to reclaim RAM during heavy usage."
+                      : "端侧智能与本地用户行为上下文知识图谱服务，可在高负荷时安全重置以释放 RAM。"
+        case .suggest:
+            return en ? "Provides Siri proactive suggestions and predictive search; restarting frees bloated dictionary caches."
+                      : "Spotlight 与输入法建议联想服务；内存膨胀时重启可释放多余词典索引。"
+        }
+    }
+
+    func ambientBloatWarning(_ count: Int, _ bytes: String) -> String {
+        en ? "\(count) bloated daemons (\(bytes) reclaimable)"
+           : "发现 \(count) 个异常膨胀守护进程，可释放 \(bytes)"
+    }
+    var ambientQuickReclaim: String { en ? "Quick Reclaim" : "一键体检治理" }
 }
 
 

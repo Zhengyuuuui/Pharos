@@ -118,7 +118,9 @@ final class BatteryStore: ObservableObject {
 
     private init() {
         capabilities = BatteryScanner.probeCapabilities()
-        refreshTelemetry()
+        if let r = BatteryScanner.read() {
+            reading = r
+        }
         refreshHelperState()
         scheduleTimers()
 
@@ -167,9 +169,18 @@ final class BatteryStore: ObservableObject {
 
     // MARK: - Telemetry
 
+    private var readingTelemetry = false
+
     func refreshTelemetry() {
-        if let r = BatteryScanner.read() {
-            reading = r
+        guard !readingTelemetry else { return }
+        readingTelemetry = true
+        Task { [weak self] in
+            let r = await Task.detached(priority: .utility) { BatteryScanner.read() }.value
+            guard let self else { return }
+            self.readingTelemetry = false
+            if let r, r != self.reading {
+                self.reading = r
+            }
         }
     }
 
@@ -253,20 +264,22 @@ final class BatteryStore: ObservableObject {
 
     private func handle(_ reply: BatteryProtocol.Reply?, failure: String?) {
         guard let reply else {
-            helper = isInstalled ? .notResponding : .notInstalled
-            helperVersion = nil
-            if let failure { errorMessage = failure }
+            let nextHelper: HelperState = isInstalled ? .notResponding : .notInstalled
+            if helper != nextHelper { helper = nextHelper }
+            if helperVersion != nil { helperVersion = nil }
+            if let failure, errorMessage != failure { errorMessage = failure }
             return
         }
-        helper = .ready
-        helperVersion = reply.version
+        if helper != .ready { helper = .ready }
+        if helperVersion != reply.version { helperVersion = reply.version }
         let oldMode = mode
         let oldNeedsUpdate = helperNeedsUpdate
-        helperNeedsUpdate = (reply.version < BatteryProtocol.version)
-        mode = reply.mode
-        isHolding = reply.isHolding
-        isAdapterBypassed = reply.isAdapterBypassed
-        unsupported = reply.unsupported
+        let nextNeedsUpdate = (reply.version < BatteryProtocol.version)
+        if helperNeedsUpdate != nextNeedsUpdate { helperNeedsUpdate = nextNeedsUpdate }
+        if mode != reply.mode { mode = reply.mode }
+        if isHolding != reply.isHolding { isHolding = reply.isHolding }
+        if isAdapterBypassed != reply.isAdapterBypassed { isAdapterBypassed = reply.isAdapterBypassed }
+        if unsupported != reply.unsupported { unsupported = reply.unsupported }
         if oldMode != mode || oldNeedsUpdate != helperNeedsUpdate {
             scheduleTimers()
         }
