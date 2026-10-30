@@ -47,15 +47,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let hosting = NSHostingController(
                 rootView: MainWindowView(initialSelection: select).environmentObject(store)
             )
-            let w = NSWindow(contentViewController: hosting)
+            let w = PharosMainWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 1040, height: 700),
+                styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+                backing: .buffered,
+                defer: false
+            )
+            w.contentViewController = hosting
             w.title = "Pharos"
-            w.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
             w.titlebarAppearsTransparent = true
             w.titleVisibility = .hidden
             w.toolbar = NSToolbar()
             w.toolbarStyle = .unified
             w.titlebarSeparatorStyle = .none
-            w.isMovableByWindowBackground = true
+            w.isMovableByWindowBackground = false
             w.isOpaque = false
             w.backgroundColor = .clear
             w.minSize = NSSize(width: 940, height: 620)
@@ -96,6 +101,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             closing.contentViewController = nil
             self?.window = nil
         }
+    }
+}
+
+/// Custom NSWindow that restricts background window dragging strictly to the top titlebar
+/// strip (top 52pt), preventing content interactions (such as dragging widget tiles in
+/// CustomizePopoverView, adjusting sliders, or selecting text) from dragging the window.
+private final class PharosMainWindow: NSWindow {
+    override func sendEvent(_ event: NSEvent) {
+        switch event.type {
+        case .leftMouseDown:
+            let distFromTop = frame.height - event.locationInWindow.y
+            let inTitlebarStrip = distFromTop >= 0 && distFromTop <= 52
+            if isMovableByWindowBackground != inTitlebarStrip {
+                isMovableByWindowBackground = inTitlebarStrip
+            }
+        case .leftMouseUp:
+            if isMovableByWindowBackground {
+                isMovableByWindowBackground = false
+            }
+        default:
+            break
+        }
+        super.sendEvent(event)
     }
 }
 

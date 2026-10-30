@@ -1,14 +1,15 @@
 import SwiftUI
-import UniformTypeIdentifiers
 import PharosCore
 
 /// Main window → Customize: edit the popover like widgets. Blocks are dragged
 /// between the two tab columns and the library; the left side is the real
 /// popover content rendered at popover width, so it's an exact live snapshot.
 struct CustomizePopoverView: View {
-    @EnvironmentObject var store: ProjectStore
     @ObservedObject private var layoutStore = PopoverLayoutStore.shared
     @ObservedObject private var l10n = L10n.shared
+    @StateObject private var dragState = DragSessionState()
+    @StateObject private var dragPosition = FloatingDragPosition()
+    @State private var editorFrames = EditorFrames()
     @State private var previewTab: PopoverTab = .overview
     @State private var armedReset = false
 
@@ -53,18 +54,264 @@ struct CustomizePopoverView: View {
             // Upper right: Overview & Projects tabs side-by-side
             HStack(alignment: .top, spacing: PharosSpacing.m) {
                 ForEach(PopoverTab.allCases, id: \.self) { tab in
-                    TabColumn(tab: tab, blocks: layout[tab], selected: previewTab == tab) {
-                        previewTab = tab
-                    }
+                    TabColumn(
+                        tab: tab,
+                        blocks: layout[tab],
+                        selected: previewTab == tab,
+                        dragState: dragState,
+                        onSelect: { previewTab = tab },
+                        onDragChanged: { block, value in
+                            handleDragChanged(block: block, sourceTab: tab, value: value, layout: layout)
+                        },
+                        onDragEnded: { block, value in
+                            handleDragEnded(block: block, sourceTab: tab, value: value, layout: layout)
+                        }
+                    )
                 }
             }
             // Lower right: Component Library
-            LibraryColumn(unused: layout.unused)
+            LibraryColumn(
+                unused: layout.unused,
+                dragState: dragState,
+                onDragChanged: { block, value in
+                    handleDragChanged(block: block, sourceTab: nil, value: value, layout: layout)
+                },
+                onDragEnded: { block, value in
+                    handleDragEnded(block: block, sourceTab: nil, value: value, layout: layout)
+                }
+            )
             // Bottom: Running projects row limit
             ProjectRowsSettings(blockInUse: layout.tab(of: .projects) != nil)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
+        .coordinateSpace(name: CustomizeEditorSpace.name)
+        .onPreferenceChange(EditorFramesKey.self) { editorFrames = $0 }
+        .overlay(alignment: .topLeading) {
+            FloatingDragLayer(dragState: dragState, position: dragPosition)
+        }
+        .background(NonDraggableWindowRegion())
     }
+
+    private func handleDragChanged(
+        block: PopoverBlock,
+        sourceTab: PopoverTab?,
+        value: DragGesture.Value,
+        layout: PopoverLayout
+    ) {
+        if dragState.activeBlock != block {
+            let grabOffset: CGSize
+            let width: CGFloat
+            if let rect = editorFrames.tiles[block], rect.width > 10 {
+                grabOffset = CGSize(
+                    width: min(max(value.startLocation.x - rect.minX, 12), rect.width - 12),
+                    height: min(max(value.startLocation.y - rect.minY, 8), rect.height - 8)
+                )
+                width = rect.width
+            } else {
+                grabOffset = CGSize(width: 80, height: 18)
+                width = 180
+            }
+            dragPosition.grabOffset = grabOffset
+            dragPosition.width = width
+            dragPosition.origin = CGPoint(
+                x: value.location.x - grabOffset.width,
+                y: value.location.y - grabOffset.height
+            )
+            dragState.activeBlock = block
+            dragState.sourceTab = sourceTab
+        } else {
+            dragPosition.origin = CGPoint(
+                x: value.location.x - dragPosition.grabOffset.width,
+                y: value.location.y - dragPosition.grabOffset.height
+            )
+        }
+
+        let newTarget = resolveDropTarget(
+            at: value.location,
+            activeBlock: block,
+            sourceTab: sourceTab,
+            layout: layout
+        )
+        if dragState.dropTarget != newTarget {
+            dragState.dropTarget = newTarget
+        }
+    }
+
+    private func handleDragEnded(
+        block: PopoverBlock,
+        sourceTab: PopoverTab?,
+        value: DragGesture.Value,
+        layout: PopoverLayout
+    ) {
+        let finalTarget = resolveDropTarget(
+            at: value.location,
+            activeBlock: block,
+            sourceTab: sourceTab,
+            layout: layout
+        ) ?? dragState.dropTarget
+
+        dragState.reset()
+
+        guard let target = finalTarget else { return }
+        withAnimation(.spring(response: 0.22, dampingFraction: 0.84)) {
+            switch target {
+            case .insertBefore(let tab, let before):
+                if before != block {
+                    layoutStore.update { $0.insert(block, into: tab, before: before) }
+                }
+            case .appendToTab(let tab):
+                layoutStore.update { $0.insert(block, into: tab) }
+            case .library:
+                if sourceTab != nil {
+                    layoutStore.update { $0.remove(block) }
+                }
+            }
+        }
+    }
+
+    private func resolveDropTarget(
+        at location: CGPoint,
+        activeBlock: PopoverBlock,
+        sourceTab: PopoverTab?,
+        layout: PopoverLayout
+    ) -> DropTarget? {
+        for tab in PopoverTab.allCases {
+            guard let tabRect = editorFrames.tabs[tab],
+                  tabRect.insetBy(dx: -6, dy: -6).contains(location) else { continue }
+
+            let blocks = layout[tab]
+            for candidate in blocks {
+                guard let tileRect = editorFrames.tiles[candidate] else { continue }
+                if location.y < tileRect.midY {
+                    return .insertBefore(tab: tab, before: candidate)
+                }
+            }
+            return .appendToTab(tab)
+        }
+
+        if sourceTab != nil,
+           let libRect = editorFrames.library,
+           libRect.insetBy(dx: -6, dy: -6).contains(location) {
+            return .library
+        }
+
+        return nil
+    }
+}
+
+// MARK: - Direct 120Hz Drag State & Geometry
+
+private enum CustomizeEditorSpace {
+    static let name = "PharosCustomizeEditorSpace"
+}
+
+private enum DropTarget: Equatable {
+    case insertBefore(tab: PopoverTab, before: PopoverBlock)
+    case appendToTab(PopoverTab)
+    case library
+}
+
+/// Low-frequency state: only publishes when a drag begins/ends or crosses into a new drop slot.
+@MainActor
+private final class DragSessionState: ObservableObject {
+    @Published var activeBlock: PopoverBlock? = nil
+    @Published var sourceTab: PopoverTab? = nil
+    @Published var dropTarget: DropTarget? = nil
+
+    func reset() {
+        activeBlock = nil
+        sourceTab = nil
+        dropTarget = nil
+    }
+}
+
+/// High-frequency 120Hz pointer state observed strictly by `FloatingDragLayer` so
+/// moving the cursor never invalidates `TabColumn`, `LibraryColumn`, or `BlockTile`.
+@MainActor
+private final class FloatingDragPosition: ObservableObject {
+    @Published var origin: CGPoint = .zero
+    var grabOffset: CGSize = CGSize(width: 80, height: 18)
+    var width: CGFloat = 180
+}
+
+private struct EditorFrames: Equatable {
+    var tabs: [PopoverTab: CGRect] = [:]
+    var tiles: [PopoverBlock: CGRect] = [:]
+    var library: CGRect? = nil
+
+    mutating func merge(_ other: EditorFrames) {
+        tabs.merge(other.tabs) { _, new in new }
+        tiles.merge(other.tiles) { _, new in new }
+        if let lib = other.library { library = lib }
+    }
+}
+
+private struct EditorFramesKey: PreferenceKey {
+    static let defaultValue = EditorFrames()
+    static func reduce(value: inout EditorFrames, nextValue: () -> EditorFrames) {
+        value.merge(nextValue())
+    }
+}
+
+private struct FloatingDragLayer: View {
+    @ObservedObject var dragState: DragSessionState
+    @ObservedObject var position: FloatingDragPosition
+    @ObservedObject private var l10n = L10n.shared
+
+    var body: some View {
+        if let block = dragState.activeBlock {
+            HStack(spacing: 6) {
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(PharosColor.textSecondary)
+                    .frame(width: 12)
+                Image(systemName: block.icon)
+                    .font(.system(size: 12))
+                    .foregroundStyle(PharosColor.accent)
+                    .frame(width: 16)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(l10n.blockName(block))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(PharosColor.textPrimary)
+                        .lineLimit(1)
+                    Text(l10n.blockDescription(block))
+                        .font(.system(size: 9))
+                        .foregroundStyle(PharosColor.textSecondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 2)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .frame(width: max(140, position.width), alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(PharosColor.accent.opacity(0.85), lineWidth: 1.2)
+            )
+            .shadow(color: Color.black.opacity(0.22), radius: 10, x: 0, y: 5)
+            .scaleEffect(1.02)
+            .offset(x: position.origin.x, y: position.origin.y)
+            .allowsHitTesting(false)
+        }
+    }
+}
+
+/// Marks a SwiftUI region as non-movable for `NSWindow` (`mouseDownCanMoveWindow = false`)
+/// while passing all hit-testing through to SwiftUI gestures.
+private struct NonDraggableWindowRegion: NSViewRepresentable {
+    func makeNSView(context: Context) -> NonDraggableNSView {
+        NonDraggableNSView()
+    }
+    func updateNSView(_ nsView: NonDraggableNSView, context: Context) {}
+}
+
+private final class NonDraggableNSView: NSView {
+    override var mouseDownCanMoveWindow: Bool { false }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 // MARK: - Live snapshot
@@ -114,30 +361,59 @@ private struct PopoverSnapshot: View {
 // MARK: - Editor columns
 
 private struct TabColumn: View {
-    @ObservedObject private var layoutStore = PopoverLayoutStore.shared
     @ObservedObject private var l10n = L10n.shared
     let tab: PopoverTab
     let blocks: [PopoverBlock]
     let selected: Bool
+    @ObservedObject var dragState: DragSessionState
     let onSelect: () -> Void
-    @State private var tailTargeted = false
-    @State private var columnTargeted = false
+    let onDragChanged: (PopoverBlock, DragGesture.Value) -> Void
+    let onDragEnded: (PopoverBlock, DragGesture.Value) -> Void
+
+    private var isColumnTargeted: Bool {
+        switch dragState.dropTarget {
+        case .appendToTab(let t), .insertBefore(let t, _):
+            return t == tab
+        default:
+            return false
+        }
+    }
+
+    private var isTailTargeted: Bool {
+        dragState.dropTarget == .appendToTab(tab)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             header
             ForEach(blocks, id: \.self) { block in
-                TileDropContainer(tab: tab, block: block, isFirst: block == blocks.first, isLast: block == blocks.last)
+                let isInsertTarget = (dragState.dropTarget == .insertBefore(tab: tab, before: block))
+                    && (dragState.activeBlock != block)
+                BlockTile(
+                    block: block,
+                    inTab: tab,
+                    isFirst: block == blocks.first,
+                    isLast: block == blocks.last,
+                    isBeingDragged: dragState.activeBlock == block,
+                    showInsertAbove: isInsertTarget,
+                    onDragChanged: { onDragChanged(block, $0) },
+                    onDragEnded: { onDragEnded(block, $0) }
+                )
             }
             dropTail
-            Spacer(minLength: 0)
         }
         .padding(10)
-        .frame(minWidth: 125, maxWidth: .infinity, minHeight: 160, alignment: .topLeading)
-        .background(background)
+        .frame(minWidth: 125, maxWidth: .infinity, minHeight: 160, maxHeight: .infinity, alignment: .topLeading)
+        .background(
+            GeometryReader { geo in
+                background.preference(
+                    key: EditorFramesKey.self,
+                    value: EditorFrames(tabs: [tab: geo.frame(in: .named(CustomizeEditorSpace.name))])
+                )
+            }
+        )
         .overlay(border)
         .contentShape(Rectangle())
-        .onDrop(of: [UTType.text], delegate: TabColumnDropDelegate(tab: tab, isTargeted: $columnTargeted))
     }
 
     private var header: some View {
@@ -154,11 +430,11 @@ private struct TabColumn: View {
 
     /// Empty tail: drop here to append.
     private var dropTail: some View {
-        let isGlow = tailTargeted || columnTargeted
+        let isGlow = isTailTargeted
         let color: Color = isGlow ? PharosColor.accent : Color.secondary.opacity(0.35)
         return RoundedRectangle(cornerRadius: 8)
             .strokeBorder(color, style: StrokeStyle(lineWidth: isGlow ? 1.5 : 1, dash: [4]))
-            .frame(height: blocks.isEmpty ? 80 : 38)
+            .frame(maxWidth: .infinity, minHeight: blocks.isEmpty ? 80 : 38, maxHeight: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: 8)
                     .fill(isGlow ? PharosColor.accent.opacity(0.08) : Color.clear)
@@ -172,79 +448,33 @@ private struct TabColumn: View {
                 }
                 .foregroundStyle(isGlow ? PharosColor.accent : PharosColor.textTertiary)
             )
-            .contentShape(Rectangle())
-            .onDrop(of: [UTType.text], isTargeted: $tailTargeted) { providers in
-                if let active = DragCoordinator.shared.endDrag() {
-                    withAnimation(.spring(response: 0.22, dampingFraction: 0.8)) {
-                        layoutStore.update { $0.insert(active, into: tab) }
-                    }
-                    return true
-                }
-                return append(providers)
-            }
-    }
-
-    private func append(_ providers: [NSItemProvider]) -> Bool {
-        let t = tab
-        return BlockDrag.load(providers) { store, block in store.update { $0.insert(block, into: t) } }
     }
 
     private var background: some View {
-        RoundedRectangle(cornerRadius: 10)
-            .fill(columnTargeted ? PharosColor.accent.opacity(0.05) : (selected ? Color.primary.opacity(0.06) : Color.primary.opacity(0.03)))
+        let isGlow = isColumnTargeted
+        return RoundedRectangle(cornerRadius: 10)
+            .fill(isGlow ? PharosColor.accent.opacity(0.05) : (selected ? Color.primary.opacity(0.06) : Color.primary.opacity(0.03)))
     }
 
     private var border: some View {
-        let color: Color = columnTargeted
+        let isGlow = isColumnTargeted
+        let color: Color = isGlow
             ? PharosColor.accent.opacity(0.8)
             : (selected ? Color.accentColor.opacity(0.5) : Color.primary.opacity(0.06))
-        return RoundedRectangle(cornerRadius: 10).stroke(color, lineWidth: columnTargeted ? 1.5 : 1)
-    }
-}
-
-private struct TileDropContainer: View {
-    let tab: PopoverTab
-    let block: PopoverBlock
-    let isFirst: Bool
-    let isLast: Bool
-    @State private var isTargeted = false
-
-    var body: some View {
-        VStack(spacing: 0) {
-            // Drop insertion bar above tile with tactile amber guide
-            if isTargeted {
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(PharosColor.accent)
-                        .frame(width: 5, height: 5)
-                    Rectangle()
-                        .fill(PharosColor.accent)
-                        .frame(height: 2)
-                    Circle()
-                        .fill(PharosColor.accent)
-                        .frame(width: 5, height: 5)
-                }
-                .padding(.horizontal, 4)
-                .padding(.vertical, 3)
-                .transition(.scale.combined(with: .opacity))
-            }
-
-            BlockTile(block: block, inTab: tab, isFirst: isFirst, isLast: isLast)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(isTargeted ? PharosColor.accent.opacity(0.8) : Color.clear, lineWidth: isTargeted ? 1.5 : 0)
-                )
-        }
-        .contentShape(Rectangle())
-        .onDrop(of: [UTType.text], delegate: BlockDropDelegate(tab: tab, before: block, isTargeted: $isTargeted))
+        return RoundedRectangle(cornerRadius: 10).stroke(color, lineWidth: isGlow ? 1.5 : 1)
     }
 }
 
 private struct LibraryColumn: View {
-    @ObservedObject private var layoutStore = PopoverLayoutStore.shared
     @ObservedObject private var l10n = L10n.shared
     let unused: [PopoverBlock]
-    @State private var targeted = false
+    @ObservedObject var dragState: DragSessionState
+    let onDragChanged: (PopoverBlock, DragGesture.Value) -> Void
+    let onDragEnded: (PopoverBlock, DragGesture.Value) -> Void
+
+    private var isTargeted: Bool {
+        dragState.dropTarget == .library && dragState.sourceTab != nil
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -252,18 +482,16 @@ private struct LibraryColumn: View {
             content
         }
         .padding(10)
-        .background(background)
+        .background(
+            GeometryReader { geo in
+                background.preference(
+                    key: EditorFramesKey.self,
+                    value: EditorFrames(library: geo.frame(in: .named(CustomizeEditorSpace.name)))
+                )
+            }
+        )
         .overlay(border)
         .contentShape(Rectangle())
-        .onDrop(of: [UTType.text], isTargeted: $targeted) { providers in
-            if let active = DragCoordinator.shared.endDrag() {
-                withAnimation(.spring(response: 0.22, dampingFraction: 0.8)) {
-                    layoutStore.update { $0.remove(active) }
-                }
-                return true
-            }
-            return remove(providers)
-        }
     }
 
     private var header: some View {
@@ -282,67 +510,68 @@ private struct LibraryColumn: View {
         } else {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 125), spacing: 8)], spacing: 8) {
                 ForEach(unused, id: \.self) { block in
-                    BlockTile(block: block, inTab: nil, isFirst: true, isLast: true)
-                        .onDrop(of: [UTType.text], isTargeted: nil) { providers in
-                            if let active = DragCoordinator.shared.endDrag() {
-                                withAnimation(.spring(response: 0.22, dampingFraction: 0.8)) {
-                                    layoutStore.update { $0.remove(active) }
-                                }
-                                return true
-                            }
-                            return remove(providers)
-                        }
+                    BlockTile(
+                        block: block,
+                        inTab: nil,
+                        isFirst: true,
+                        isLast: true,
+                        isBeingDragged: dragState.activeBlock == block,
+                        showInsertAbove: false,
+                        onDragChanged: { onDragChanged(block, $0) },
+                        onDragEnded: { onDragEnded(block, $0) }
+                    )
                 }
             }
         }
     }
 
-    private func remove(_ providers: [NSItemProvider]) -> Bool {
-        BlockDrag.load(providers) { store, block in store.update { $0.remove(block) } }
-    }
-
     private var background: some View {
-        let color: Color = targeted ? Color.red.opacity(0.08) : Color.primary.opacity(0.03)
+        let color: Color = isTargeted ? Color.red.opacity(0.08) : Color.primary.opacity(0.03)
         return RoundedRectangle(cornerRadius: 10).fill(color)
     }
 
     private var border: some View {
-        let color: Color = targeted ? Color.red.opacity(0.6) : Color.secondary.opacity(0.3)
-        let dash: [CGFloat] = targeted ? [] : [4]
+        let color: Color = isTargeted ? Color.red.opacity(0.6) : Color.secondary.opacity(0.3)
+        let dash: [CGFloat] = isTargeted ? [] : [4]
         return RoundedRectangle(cornerRadius: 10).strokeBorder(color, style: StrokeStyle(lineWidth: 1, dash: dash))
     }
 }
 
-/// A draggable block card. Buttons give the same edits without dragging.
+/// A directly draggable block card (120Hz zero-latency gesture) plus quick-action buttons.
 private struct BlockTile: View {
     @ObservedObject private var layoutStore = PopoverLayoutStore.shared
     @ObservedObject private var l10n = L10n.shared
-    @ObservedObject private var dragCoord = DragCoordinator.shared
     let block: PopoverBlock
     /// nil = in the library.
     let inTab: PopoverTab?
     let isFirst: Bool
     let isLast: Bool
+    let isBeingDragged: Bool
+    let showInsertAbove: Bool
+    let onDragChanged: (DragGesture.Value) -> Void
+    let onDragEnded: (DragGesture.Value) -> Void
     @State private var hovering = false
 
-    var isBeingDragged: Bool {
-        dragCoord.activeBlock == block
-    }
-
     var body: some View {
-        tileContent
-            .opacity(isBeingDragged ? 0.35 : 1.0)
-            .contentShape(Rectangle())
-            .onHover { hovering = $0 }
-            .onDrag {
-                dragCoord.beginDrag(block)
-                return NSItemProvider(object: block.rawValue as NSString)
-            } preview: {
-                dragPreview
+        draggableBody
+            .overlay(alignment: .trailing) {
+                actions
+                    .padding(.trailing, 6)
+                    .opacity(hovering && !isBeingDragged ? 1 : 0)
+                    .allowsHitTesting(hovering && !isBeingDragged)
             }
+            .overlay(alignment: .top) {
+                if showInsertAbove {
+                    insertionBar
+                        .offset(y: -4)
+                        .allowsHitTesting(false)
+                }
+            }
+            .opacity(isBeingDragged ? 0.3 : 1.0)
+            .onHover { hovering = $0 }
     }
 
-    private var tileContent: some View {
+    private var draggableBody: some View {
         HStack(spacing: 6) {
             Image(systemName: "line.3.horizontal")
                 .font(.system(size: 10, weight: .medium))
@@ -363,46 +592,55 @@ private struct BlockTile: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 2)
-            if hovering {
-                actions
-            }
         }
-        .padding(.horizontal, 8)
+        .padding(.leading, 8)
+        .padding(.trailing, hovering ? (inTab != nil ? 62 : 26) : 8)
         .padding(.vertical, 6)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor))
+            GeometryReader { geo in
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+                    .preference(
+                        key: EditorFramesKey.self,
+                        value: EditorFrames(tiles: [block: geo.frame(in: .named(CustomizeEditorSpace.name))])
+                    )
+            }
         )
         .overlay(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(hovering ? PharosColor.accent.opacity(0.35) : PharosColor.separator.opacity(0.3), lineWidth: 0.5)
+                .stroke(
+                    showInsertAbove
+                        ? PharosColor.accent.opacity(0.85)
+                        : (hovering ? PharosColor.accent.opacity(0.35) : PharosColor.separator.opacity(0.3)),
+                    lineWidth: showInsertAbove ? 1.2 : 0.5
+                )
         )
         .shadow(color: Color.black.opacity(hovering ? 0.05 : 0.02), radius: 2, y: 1)
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 2, coordinateSpace: .named(CustomizeEditorSpace.name))
+                .onChanged { value in
+                    onDragChanged(value)
+                }
+                .onEnded { value in
+                    onDragEnded(value)
+                }
+        )
     }
 
-    private var dragPreview: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "line.3.horizontal")
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(PharosColor.textSecondary)
-            Image(systemName: block.icon)
-                .font(.system(size: 12))
-                .foregroundStyle(PharosColor.accent)
-            Text(l10n.blockName(block))
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(PharosColor.textPrimary)
+    private var insertionBar: some View {
+        HStack(spacing: 3) {
+            Circle()
+                .fill(PharosColor.accent)
+                .frame(width: 5, height: 5)
+            Rectangle()
+                .fill(PharosColor.accent)
+                .frame(height: 2)
+            Circle()
+                .fill(PharosColor.accent)
+                .frame(width: 5, height: 5)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(PharosColor.accent.opacity(0.6), lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.2), radius: 8, y: 4)
-        )
+        .padding(.horizontal, 2)
     }
 
     @ViewBuilder
@@ -535,117 +773,5 @@ private struct ProjectRowsSettings: View {
     /// Invalid input snaps back to the saved value; out-of-range is clamped.
     private func commit() {
         if let n = Int(text.trimmingCharacters(in: .whitespaces)) { set(n) } else { text = "\(current)" }
-    }
-}
-
-// MARK: - Drag & drop coordinator
-
-@MainActor
-final class DragCoordinator: ObservableObject {
-    static let shared = DragCoordinator()
-    @Published var activeBlock: PopoverBlock? = nil
-    private var clearTask: Task<Void, Never>? = nil
-
-    func beginDrag(_ block: PopoverBlock) {
-        clearTask?.cancel()
-        activeBlock = block
-        clearTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 10_000_000_000)
-            if !Task.isCancelled {
-                self?.activeBlock = nil
-            }
-        }
-    }
-
-    func endDrag() -> PopoverBlock? {
-        clearTask?.cancel()
-        clearTask = nil
-        let b = activeBlock
-        activeBlock = nil
-        return b
-    }
-}
-
-private enum BlockDrag {
-    /// Drag payload fallback using NSItemProvider.
-    @MainActor
-    static func load(_ providers: [NSItemProvider], perform: @escaping @MainActor (PopoverLayoutStore, PopoverBlock) -> Void) -> Bool {
-        guard let provider = providers.first(where: { $0.canLoadObject(ofClass: NSString.self) }) else { return false }
-        _ = provider.loadObject(ofClass: NSString.self) { item, _ in
-            guard let raw = item as? String, let block = PopoverBlock(rawValue: raw) else { return }
-            Task { @MainActor in
-                withAnimation(.spring(response: 0.22, dampingFraction: 0.8)) { perform(PopoverLayoutStore.shared, block) }
-            }
-        }
-        return true
-    }
-}
-
-/// Dropping onto a tile inserts before it.
-private struct BlockDropDelegate: DropDelegate {
-    let tab: PopoverTab
-    let before: PopoverBlock
-    @Binding var isTargeted: Bool
-
-    func dropEntered(info: DropInfo) {
-        withAnimation(.easeOut(duration: 0.12)) { isTargeted = true }
-    }
-
-    func dropExited(info: DropInfo) {
-        withAnimation(.easeOut(duration: 0.12)) { isTargeted = false }
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        withAnimation(.easeOut(duration: 0.12)) { isTargeted = false }
-        if let active = DragCoordinator.shared.endDrag() {
-            withAnimation(.spring(response: 0.22, dampingFraction: 0.8)) {
-                PopoverLayoutStore.shared.update { $0.insert(active, into: tab, before: before) }
-            }
-            return true
-        }
-        let providers = info.itemProviders(for: [UTType.text])
-        return MainActor.assumeIsolated {
-            BlockDrag.load(providers) { store, block in
-                store.update { $0.insert(block, into: tab, before: before) }
-            }
-        }
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
-    }
-}
-
-/// Dropping anywhere on a tab column appends to the tab.
-private struct TabColumnDropDelegate: DropDelegate {
-    let tab: PopoverTab
-    @Binding var isTargeted: Bool
-
-    func dropEntered(info: DropInfo) {
-        withAnimation(.easeOut(duration: 0.12)) { isTargeted = true }
-    }
-
-    func dropExited(info: DropInfo) {
-        withAnimation(.easeOut(duration: 0.12)) { isTargeted = false }
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        withAnimation(.easeOut(duration: 0.12)) { isTargeted = false }
-        if let active = DragCoordinator.shared.endDrag() {
-            withAnimation(.spring(response: 0.22, dampingFraction: 0.8)) {
-                PopoverLayoutStore.shared.update { $0.insert(active, into: tab) }
-            }
-            return true
-        }
-        let providers = info.itemProviders(for: [UTType.text])
-        return MainActor.assumeIsolated {
-            BlockDrag.load(providers) { store, block in
-                store.update { $0.insert(block, into: tab) }
-            }
-        }
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
     }
 }
