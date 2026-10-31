@@ -262,19 +262,21 @@ struct MemoryBloatSectionView: View {
     @EnvironmentObject var store: ProjectStore
     @ObservedObject private var l10n = L10n.shared
     @State private var showConfirmAll = false
+    @State private var showConfirmDisableAIMedia = false
     @State private var targetDaemonToReclaim: KnownBloatedDaemon? = nil
     @State private var showAllMonitored = false
     @State private var isOperating = false
 
     var body: some View {
         let diagnosis = store.memoryDiagnosis
+        let recommendedSet = Set(KnownBloatedDaemon.recommendedNotLaunchDaemons)
         let displayItems: [DaemonDiagnosisItem] = {
             if showAllMonitored {
                 return diagnosis.items
-            } else if diagnosis.hasBloat {
-                return diagnosis.bloatedItems
             } else {
-                return diagnosis.runningItems
+                return diagnosis.items.filter {
+                    $0.isBloated || $0.isRunning || $0.isLaunchdDisabled || recommendedSet.contains($0.daemon)
+                }
             }
         }()
 
@@ -283,6 +285,24 @@ struct MemoryBloatSectionView: View {
             systemImage: "cross.vial.fill"
         ) {
             HStack(spacing: PharosSpacing.s) {
+                if !diagnosis.allRecommendedDisabled {
+                    Button {
+                        showConfirmDisableAIMedia = true
+                    } label: {
+                        Label(l10n.disableAllAIMediaAutostart, systemImage: "nosign")
+                    }
+                    .buttonStyle(.pharos)
+                    .controlSize(.small)
+                    .disabled(isOperating)
+                } else {
+                    Label(l10n.allAIMediaDisabledBadge, systemImage: "checkmark.shield.fill")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(PharosColor.success)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(PharosColor.success.opacity(0.12)))
+                }
+
                 if diagnosis.hasBloat {
                     Button {
                         showConfirmAll = true
@@ -339,9 +359,19 @@ struct MemoryBloatSectionView: View {
                             .foregroundStyle(PharosColor.success)
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(l10n.allDaemonsHealthy)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(PharosColor.textPrimary)
+                            HStack(spacing: 8) {
+                                Text(l10n.allDaemonsHealthy)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(PharosColor.textPrimary)
+                                if diagnosis.disabledCount > 0 {
+                                    Text(l10n.disabledDaemonsCount(diagnosis.disabledCount))
+                                        .font(.system(size: 10.5, weight: .medium))
+                                        .foregroundStyle(PharosColor.success)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 1.5)
+                                        .background(Capsule().fill(PharosColor.success.opacity(0.14)))
+                                }
+                            }
                             Text(l10n.allDaemonsHealthyDesc)
                                 .font(PharosFont.caption)
                                 .foregroundStyle(PharosColor.textSecondary)
@@ -393,6 +423,18 @@ struct MemoryBloatSectionView: View {
                 .padding(.top, 2)
             }
         }
+        .alert(l10n.confirmDisableAllAIMediaTitle, isPresented: $showConfirmDisableAIMedia) {
+            Button(l10n.cancel, role: .cancel) {}
+            Button(l10n.confirmDisableAllAIMediaButton, role: .destructive) {
+                Task {
+                    isOperating = true
+                    await store.disableAllRecommendedDaemons()
+                    isOperating = false
+                }
+            }
+        } message: {
+            Text(l10n.confirmDisableAllAIMediaDesc)
+        }
         .alert(l10n.confirmReclaimAllTitle, isPresented: $showConfirmAll) {
             Button(l10n.cancel, role: .cancel) {}
             Button(l10n.confirmReclaimButton, role: .destructive) {
@@ -442,6 +484,9 @@ private struct DaemonRowView: View {
     }
 
     private var statusIcon: String {
+        if item.isLaunchdDisabled && !item.isRunning {
+            return "nosign"
+        }
         switch item.status {
         case .healthy: return "checkmark.circle.fill"
         case .bloated: return "exclamationmark.triangle.fill"
@@ -453,7 +498,7 @@ private struct DaemonRowView: View {
         HStack(alignment: .top, spacing: PharosSpacing.m) {
             // Status Icon
             Image(systemName: statusIcon)
-                .foregroundStyle(statusColor)
+                .foregroundStyle(item.isLaunchdDisabled && !item.isRunning ? PharosColor.accent : statusColor)
                 .font(.system(size: 13))
                 .padding(.top, 2)
 
@@ -478,12 +523,16 @@ private struct DaemonRowView: View {
                     }
 
                     if item.isLaunchdDisabled {
-                        Text(l10n.autostartDisabled)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(PharosColor.textTertiary)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 1)
-                            .background(Capsule().stroke(PharosColor.textTertiary.opacity(0.3), lineWidth: 1))
+                        HStack(spacing: 3) {
+                            Image(systemName: "nosign")
+                                .font(.system(size: 8.5, weight: .bold))
+                            Text(l10n.notLaunchBadge)
+                                .font(.system(size: 10, weight: .semibold))
+                        }
+                        .foregroundStyle(PharosColor.success)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1.5)
+                        .background(Capsule().fill(PharosColor.success.opacity(0.14)))
                     }
                 }
 
@@ -511,17 +560,27 @@ private struct DaemonRowView: View {
             VStack(alignment: .trailing, spacing: PharosSpacing.xs) {
                 Text(item.isRunning ? ByteFormat.short(item.memoryBytes) : "0 B")
                     .font(.system(size: 13, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(item.isBloated ? statusColor : PharosColor.textPrimary)
+                    .foregroundStyle(item.isBloated ? statusColor : (item.isRunning ? PharosColor.textPrimary : PharosColor.textTertiary))
 
                 HStack(spacing: 6) {
                     if item.daemon.supportsLaunchdToggle {
                         Button(action: onToggleAutostart) {
-                            Text(item.isLaunchdDisabled ? l10n.autostartDisabled : l10n.disableAutostart)
-                                .font(.system(size: 10.5, weight: .medium))
-                                .foregroundStyle(item.isLaunchdDisabled ? PharosColor.accent : PharosColor.textSecondary)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Capsule().fill(PharosColor.fill))
+                            HStack(spacing: 3) {
+                                Image(systemName: item.isLaunchdDisabled ? "arrow.uturn.backward.circle" : "nosign")
+                                    .font(.system(size: 9.5, weight: .semibold))
+                                Text(item.isLaunchdDisabled ? l10n.autostartDisabled : l10n.disableAutostart)
+                                    .font(.system(size: 10.5, weight: .medium))
+                            }
+                            .foregroundStyle(item.isLaunchdDisabled ? PharosColor.accent : PharosColor.warning)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3.5)
+                            .background(
+                                Capsule().fill(
+                                    item.isLaunchdDisabled
+                                        ? PharosColor.accent.opacity(0.12)
+                                        : PharosColor.warning.opacity(0.14)
+                                )
+                            )
                         }
                         .buttonStyle(.plain)
                         .disabled(isOperating)

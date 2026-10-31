@@ -208,8 +208,20 @@ final class ProjectStore: ObservableObject {
 
     func toggleDaemonAutostart(_ daemon: KnownBloatedDaemon) async {
         guard daemon.supportsLaunchdToggle else { return }
-        let currentDisabled = state.memoryDiagnosis.items.first(where: { $0.daemon == daemon })?.isLaunchdDisabled ?? false
-        MemoryDoctor.setDaemonDisabled(!currentDisabled, daemon: daemon)
+        let item = state.memoryDiagnosis.items.first(where: { $0.daemon == daemon })
+        let currentDisabled = item?.isLaunchdDisabled ?? false
+        if currentDisabled {
+            await Task.detached(priority: .userInitiated) {
+                MemoryDoctor.setDaemonDisabled(false, daemon: daemon)
+            }.value
+        } else {
+            await MemoryDoctor.disableAndStop(daemon: daemon, pids: item?.pids ?? [])
+        }
+        await refresh()
+    }
+
+    func disableAllRecommendedDaemons() async {
+        await MemoryDoctor.disableAllRecommended(in: state.memoryDiagnosis)
         await refresh()
     }
 

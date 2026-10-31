@@ -181,4 +181,21 @@ func testMemoryDoctorDiagnosis() {
     ])
     expect(!cleanReport.hasBloat, "clean report has no bloat")
     expectEq(cleanReport.reclaimableBytes, 0, "clean report reclaimable is 0")
+
+    // Test launchd Not Launch support across daemon families
+    expect(KnownBloatedDaemon.mediaAnalysis.supportsLaunchdToggle, "mediaAnalysis supports Not Launch")
+    expect(KnownBloatedDaemon.photoAnalysis.supportsLaunchdToggle, "photoAnalysis supports Not Launch")
+    expect(KnownBloatedDaemon.intelligencePlatform.supportsLaunchdToggle, "intelligencePlatform supports Not Launch")
+    expect(KnownBloatedDaemon.suggest.supportsLaunchdToggle, "suggest supports Not Launch")
+    expect(KnownBloatedDaemon.wallpaper.supportsLaunchdToggle, "wallpaper supports Not Launch")
+    expect(KnownBloatedDaemon.spotlight.supportsLaunchdToggle, "spotlight supports Not Launch")
+    expect(KnownBloatedDaemon.quickLook.supportsLaunchdToggle, "quickLook supports Not Launch")
+    expect(KnownBloatedDaemon.iconServices.supportsLaunchdToggle, "iconServices supports Not Launch")
+
+    let allRecDisabledReport = MemoryDoctor.diagnose(
+        processes: [],
+        disabledDaemons: Set(KnownBloatedDaemon.recommendedNotLaunchDaemons)
+    )
+    expect(allRecDisabledReport.allRecommendedDisabled, "all recommended AI/Media daemons disabled")
+    expectEq(allRecDisabledReport.disabledCount, 4, "4 daemons disabled")
 }

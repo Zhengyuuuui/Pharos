@@ -15,11 +15,11 @@
   <img src="https://img.shields.io/badge/dependencies-none-brightgreen" alt="Dependencies">
   <img src="https://img.shields.io/badge/network-none-lightgrey" alt="No network">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-3.0-blue" alt="Version 3.0">
-  <img src="https://img.shields.io/badge/updated-2026--10--24-informational" alt="Last updated 2026-10-24">
+  <img src="https://img.shields.io/badge/version-3.1-blue" alt="Version 3.1">
+  <img src="https://img.shields.io/badge/updated-2026--10--31-informational" alt="Last updated 2026-10-31">
 </p>
 
-<p align="center"><sub>最后更新 / Last updated：2026-10-25 · v3.0 · 作者 / Author：zys · 模型 / Model：Gemini 4 Argon</sub></p>
+<p align="center"><sub>最后更新 / Last updated：2026-10-31 · v3.1 · 作者 / Author：zys · 模型 / Model：Gemini 4 Argon</sub></p>
 
 <p align="center"><a href="README.md">English</a> · <b>简体中文</b> · <a href="CHANGELOG.md">更新记录 / Changelog</a></p>
 
@@ -91,6 +91,7 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 ### 本机内存
 - 已用 / 可用（缓存文件计为可回收）、交换、内存压力，口径与活动监视器一致
 - 内存组成条：App / 联动 / 已压缩 | 缓存 / 空闲
+- **内存膨胀体检与守护进程治理（`Not Launch`）**：实时检测 8 类常见 macOS 后台吃内存守护进程（`mediaanalysisd` / `photoanalysisd`、`mds_stores`、`diagnosticd`、`bird`、`WallpaperVideoExtension`、`suggestd` / `intelligenceplatformd`、`commerce`、`SimLaunchHostService`）；支持一键安全休眠释放（`SIGTERM`）以及针对可禁用服务的永久禁用自启（`launchctl disable`，`Not Launch`）与一键恢复自启（`launchctl enable`）
 - 近 1 小时内存趋势
 - 按应用汇总的内存排行（Chrome 的所有 Helper 合并为「Google Chrome」）
 
@@ -305,6 +306,11 @@ make icon                           # 重新生成浅色/深色 App 图标
 ---
 
 ## 最新版本更新速览
+
+### v3.1 (2026-10-31)
+- **内存膨胀体检与系统守护进程永久禁用治理（`Not Launch`）**：实时诊断 8 类常见 macOS 后台内存膨胀守护进程（`mediaanalysisd` / `photoanalysisd`、`mds_stores`、`diagnosticd`、`bird`、`WallpaperVideoExtension`、`suggestd` / `intelligenceplatformd`、`commerce`、`SimLaunchHostService`）；既支持一键安全休眠释放（`SIGTERM`），也支持通过用户域 `launchctl disable` 永久禁用自启（`Not Launch`）及随时一键恢复自启。
+- **四指切换桌面流畅度修复与风扇座舱 GPU 降载优化**：移除 `AmbientRailViews` 中冗余的 `.drawingGroup()` 离屏纹理合成与静态模糊通道，在完整保留 60 FPS 机械指针阻尼动画的同时，将风扇页 CPU/GPU 占用降低 **90% 以上**（CPU 从 ~50.3% 降至 ~4.3%），彻底解决 macOS 四指滑动切换桌面掉帧问题。
+- **深色 / 浅色双外观 App 图标自动切换**：修正 `AppIcon.icon/icon.json` 的外观槽位声明并打包 `PharosDark.icns`；运行时通过 `NSApp.effectiveAppearance` 与 `AppleInterfaceThemeChangedNotification` 动态切换 `NSApp.applicationIconImage`，在 macOS 14 / 15 / 26 上均实现深浅色图标自动切换且零额外常驻内存开销。
 
 ### v3.0 (2026-10-24)
 - **圆角悬浮侧边栏浮岛与可控交通灯毛玻璃效果**：主窗口采用圆角矩形悬浮侧边栏浮岛（内置 macOS 原生交通灯与底部状态/设置浮岛）；向下滑动侧边栏时，滑入左上角三个交通灯按钮区域的文字自动呈现真实高斯毛玻璃模糊（基于 `NSClipView.boundsDidChangeNotification` 实时驱动），并在「设置 → 菜单栏与视觉」中提供 `0% ~ 100%` 透明度调节滑块与左上角三按钮微缩实时预览卡片。

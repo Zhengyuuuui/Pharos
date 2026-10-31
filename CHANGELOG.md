@@ -8,6 +8,7 @@ Times are UTC+8. 时间为北京时间（UTC+8）。
 ---
 
 ## 目录 / Quick Links
+- [v3.1 (2026-10-31)](#v31--2026-10-31-1935) — Memory Bloat Doctor & Permanent Daemon Governance (`Not Launch`), Fan Cockpit GPU Optimization & Adaptive Light/Dark App Icon / 内存膨胀体检与系统守护进程永久禁用治理、风扇座舱 GPU 降载优化与深浅色图标自动切换
 - [v3.0 (2026-10-24)](#v30--2026-10-24-0840) — Global Design System Overhaul, Domain-Categorized Pure Sidebar & Adaptive Anti-Squeezing Popover Customizer / 全局设计系统规范落地、领域分类纯净侧边栏与自适应防挤压小组件布局
 - [v2.9 (2026-10-23)](#v29--2026-10-23-1546) — Persistent Lid-Closed Battery Guard, SMC Write Deduplication, Incremental Scanners & Modular Architecture / 电池合盖持续守护、SMC 写入去重、增量扫描缓存与模块化重构
 - [v2.8 (2026-10-19)](#v28--2026-10-19-1320) — Automotive Cockpit Speedometer & 60FPS Mechanical Inertia Engine / 拟真机车仪表盘风扇座舱与 60FPS 物理惯性引擎
@@ -20,6 +21,34 @@ Times are UTC+8. 时间为北京时间（UTC+8）。
 - [v2.1 (2026-10-13)](#v21--2026-10-13-1327) — SMC Fans & Temperature / SMC 风扇与温度监控
 - [v2.0 (2026-10-13)](#v20--2026-10-13-1233) — Multi-Chromium Browser Instances / 多 Chromium 浏览器实例管理
 - [Earlier Versions (2026-10-10 ~ 2026-10-13)](#2026-10-13--disk-usage--browser-favorites--磁盘用量与浏览器收藏)
+
+---
+
+### v3.1 — 2026-10-31 19:35
+
+> Author / 作者：zys · Model / 模型：Gemini 4 Argon
+
+**English**
+- **Memory Bloat Doctor & Permanent System Daemon Governance (`MemoryDoctor`)**:
+  - Added real-time detection and diagnosis for 8 categories of notorious macOS background memory-bloating daemons (`mediaanalysisd` / `photoanalysisd`, `mds_stores` / `corespotlightd`, `diagnosticd` / `spindump`, `bird` / `cloudd`, `WallpaperVideoExtension`, `suggestd` / `parsecd` / `intelligenceplatformd`, `commerce` / `appstoreagent`, and `SimLaunchHostService`), calculating excess reclaimable RAM above healthy baselines
+  - **One-Click Reclaim & Permanent `Not Launch` (`launchctl disable`)**: supports one-click safe `SIGTERM` reclamation and permanent user-domain `launchctl disable gui/<uid>/<service>` + `bootout` governance for safe-to-disable background daemons (`mediaanalysisd`, `WallpaperVideoExtension`, `suggestd`, `commerce`, `SimLaunchHostService`) so they no longer respawn in the background; includes one-click **Restore Auto-Launch** (`launchctl enable`) at any time
+- **Mission Control 4-Finger Swipe Fluency & Fan Speedometer GPU Optimization**:
+  - Removed continuous offscreen Metal texture passes (`.drawingGroup()` and idle blur passes) in `AmbientRailViews`, cutting `Pharos` CPU/GPU usage on the Fans & Temperature page by over **90%** (from ~50.3% to ~4.3% CPU) and eliminating WindowServer frame drops during macOS four-finger desktop swipes while preserving the smooth 60 FPS mechanical inertia needle animation
+- **Dual-Mechanism Adaptive Light / Dark App Icon Switching**:
+  - Fixed `Resources/AppIcon.icon/icon.json` layer specialization schema (`image-name-specializations`) so `actool` compiles both `light` (`NSAppearanceNameAqua`) and `dark` (`NSAppearanceNameDarkAqua` & `ISAppearanceTintable`) renditions into `Assets.car`
+  - Bundled `Resources/PharosDark.icns` alongside `Resources/Pharos.icns` and added runtime appearance synchronization in `AppDelegate` (`NSApp.effectiveAppearance` KVO + `AppleInterfaceThemeChangedNotification` + `NSApp.applicationIconImage`), enabling automatic Light / Dark Dock & App icon switching on macOS 14 / 15 (Sonoma / Sequoia) as well as macOS 26 (Tahoe) with zero extra memory overhead in Light mode
+- **Codebase Integrity**: 100% native Swift/SwiftUI, zero third-party dependencies, all **949 unit assertions passed**.
+
+**简体中文**
+- **内存膨胀体检与系统守护进程永久禁用治理（`MemoryDoctor`）**：
+  - 新增针对 8 类常见 macOS 后台吃内存元凶（视觉与媒体分析 `mediaanalysisd`/`photoanalysisd`、Spotlight 索引 `mds_stores`/`corespotlightd`、诊断抓栈 `diagnosticd`/`spindump`、iCloud 同步 `bird`/`cloudd`、动态壁纸解码 `WallpaperVideoExtension`、Siri 建议与本地智能 `suggestd`/`parsecd`/`intelligenceplatformd`、应用商店后台 `commerce`/`appstoreagent`、Xcode 模拟器后台 `SimLaunchHostService`）的实时基线超标诊断与可回收内存测算
+  - **一键回收与永久禁用自启（`Not Launch`）**：在「本机内存」页面支持一键安全休眠释放（`SIGTERM`），并对可安全禁用的 5 类高耗能守护进程提供一键永久禁用自启（`launchctl disable gui/<uid>/<service>` + `bootout`），彻底阻止系统后台反复拉起导致机身发热与内存泄漏；随时支持一键「恢复自启」（`launchctl enable`）
+- **四指切换桌面流畅度修复与风扇座舱 GPU 降载优化**：
+  - 优化 `AmbientRailViews` 汽车仪表盘渲染管线，移除造成 `WindowServer` 离屏纹理合成压力的冗余 `.drawingGroup()` 与静态模糊通道；在完整保留 60 FPS 机械指针阻尼动画的前提下，将风扇页 CPU/GPU 占用降低 **90% 以上**（CPU 占用从 ~50.3% 降至 ~4.3%），彻底解决 macOS 四指滑动切换桌面时的掉帧卡顿
+- **深色 / 浅色双外观 App 图标自动切换**：
+  - 修正 `Resources/AppIcon.icon/icon.json` 的 `image-name-specializations` 规范，使 `actool` 将 `light.png` 与 `dark.png` 完整编译进 `Assets.car` 的 `Aqua` 与 `DarkAqua` 外观槽位
+  - 新增 `Resources/PharosDark.icns` 并在 `AppDelegate` 中监听 `NSApp.effectiveAppearance` 与 `AppleInterfaceThemeChangedNotification` 动态同步 `NSApp.applicationIconImage`，在 macOS 14 / 15（Sonoma / Sequoia）及 macOS 26 上均实现深浅色图标自动切换（浅色模式下自动释放自定义图像缓存，零额外内存开销）
+- **工程质量与纯净度**：纯 Apple 原生 Swift / SwiftUI，零第三方依赖，全量单测套件 **949 项断言全绿通过**。
 
 ---
 

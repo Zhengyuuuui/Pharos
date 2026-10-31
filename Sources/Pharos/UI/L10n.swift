@@ -1772,8 +1772,22 @@ final class L10n: ObservableObject {
     var redetectDaemons: String { en ? "Re-diagnose" : "重新体检" }
     var reclaimDaemon: String { en ? "Reclaim" : "释放内存" }
     var reclaiming: String { en ? "Reclaiming…" : "正在释放…" }
-    var disableAutostart: String { en ? "Disable Autostart" : "永久禁用自启" }
-    var autostartDisabled: String { en ? "Disabled (Click to Enable)" : "已禁用（点击恢复）" }
+    var disableAutostart: String { en ? "Not Launch (Disable)" : "永久禁止启动 (Not Launch)" }
+    var autostartDisabled: String { en ? "Not Launch · Active (Restore)" : "已禁启 · Not Launch（恢复）" }
+    var notLaunchBadge: String { en ? "Not Launch" : "已永久禁启 (Not Launch)" }
+    var disableAllAIMediaAutostart: String { en ? "Not Launch AI/Media Daemons" : "一键永久禁启 AI/媒体后台" }
+    var allAIMediaDisabledBadge: String { en ? "AI/Media Not-Launch Active" : "AI/媒体后台已永久禁启" }
+    func disabledDaemonsCount(_ n: Int) -> String {
+        en ? "\(n) daemon(s) set to Not Launch" : "已永久禁启 \(n) 项守护进程 (Not Launch)"
+    }
+    var confirmDisableAllAIMediaTitle: String {
+        en ? "Set AI & Media Daemons to Not Launch?" : "确认一键永久禁止 AI 与媒体后台启动 (Not Launch)？"
+    }
+    var confirmDisableAllAIMediaDesc: String {
+        en ? "Immediately terminates mediaanalysisd, photoanalysisd, intelligenceplatformd, and suggestd, and disables them in launchd so they never launch automatically. Viewing photos and playing videos are completely unaffected, and you can restore them anytime."
+           : "将立即结束 mediaanalysisd、photoanalysisd、intelligenceplatformd 与 suggestd 进程，并通过 launchctl 写入永久禁启（Not Launch），重启后也不会再偷跑吃内存。完全不影响打开照片、播放视频与日常使用，且随时可点击恢复。"
+    }
+    var confirmDisableAllAIMediaButton: String { en ? "Confirm Not Launch" : "确认永久禁启" }
 
     var allDaemonsHealthy: String { en ? "All System Daemons Healthy" : "系统守护进程健康，未检测到内存膨胀" }
     var allDaemonsHealthyDesc: String {

@@ -64,17 +64,17 @@ public enum KnownBloatedDaemon: String, CaseIterable, Identifiable, Sendable {
         case .wallpaper:
             return ["WallpaperVideoExtension", "WallpaperAgent"]
         case .spotlight:
-            return ["corespotlightd", "mdworker_shared"]
+            return ["corespotlightd", "mdworker_shared", "spotlightknowledged"]
         case .openAndSavePanel:
             return ["com.apple.appkit.xpc.openAndSavePanelService", "openAndSavePanelService"]
         case .quickLook:
-            return ["QuickLookUIService", "QuickLookSatellite"]
+            return ["QuickLookUIService", "QuickLookSatellite", "ThumbnailsAgent"]
         case .iconServices:
             return ["iconservicesagent"]
         case .intelligencePlatform:
-            return ["intelligenceplatformd", "BiomeAgent"]
+            return ["intelligenceplatformd", "BiomeAgent", "biomesyncd", "intelligencecontextd", "intelligenceflowd", "knowledge-agent", "knowledgeconstructiond"]
         case .suggest:
-            return ["suggestd", "parsecd"]
+            return ["suggestd", "parsecd", "parsec-fbf", "siriinferenced", "siriknowledged", "siriactionsd"]
         }
     }
 
@@ -98,21 +98,71 @@ public enum KnownBloatedDaemon: String, CaseIterable, Identifiable, Sendable {
         1024 * 1024 * 1024 // 1 GB
     }
 
-    /// Corresponding launchd service names if supported.
+    /// Corresponding launchd user-domain (gui/<uid>) service names if supported.
     public var launchdServiceNames: [String] {
         switch self {
         case .mediaAnalysis:
             return ["com.apple.mediaanalysisd", "com.apple.mediaanalysisd-access"]
         case .photoAnalysis:
             return ["com.apple.photoanalysisd"]
-        default:
+        case .intelligencePlatform:
+            return [
+                "com.apple.intelligenceplatformd",
+                "com.apple.BiomeAgent",
+                "com.apple.biomesyncd",
+                "com.apple.intelligencecontextd",
+                "com.apple.intelligenceflowd",
+                "com.apple.knowledge-agent",
+                "com.apple.knowledgeconstructiond"
+            ]
+        case .suggest:
+            return [
+                "com.apple.suggestd",
+                "com.apple.parsecd",
+                "com.apple.parsec-fbf",
+                "com.apple.siriinferenced",
+                "com.apple.siriknowledged",
+                "com.apple.siriactionsd"
+            ]
+        case .wallpaper:
+            return ["com.apple.wallpaper.agent"]
+        case .spotlight:
+            return [
+                "com.apple.corespotlightd",
+                "com.apple.corespotlightservice",
+                "com.apple.spotlightknowledged",
+                "com.apple.spotlightknowledged.importer",
+                "com.apple.spotlightknowledged.updater"
+            ]
+        case .quickLook:
+            return [
+                "com.apple.quicklook",
+                "com.apple.quicklook.ThumbnailsAgent",
+                "com.apple.quicklook.ui.helper"
+            ]
+        case .iconServices:
+            return ["com.apple.iconservices.iconservicesagent"]
+        case .openAndSavePanel:
             return []
         }
+    }
+
+    /// Primary service label used to determine whether the daemon family is disabled in `launchd`.
+    public var primaryLaunchdService: String? {
+        launchdServiceNames.first
     }
 
     public var supportsLaunchdToggle: Bool {
         !launchdServiceNames.isEmpty
     }
+
+    /// Daemons recommended for permanent "Not Launch" governance to save background RAM & CPU without affecting normal file/video/photo viewing.
+    public static let recommendedNotLaunchDaemons: [KnownBloatedDaemon] = [
+        .mediaAnalysis,
+        .photoAnalysis,
+        .intelligencePlatform,
+        .suggest
+    ]
 
     public func matches(process: ProcessSnapshot) -> Bool {
         let name = process.name
@@ -175,6 +225,16 @@ public struct MemoryDiagnosisReport: Sendable, Hashable {
 
     public var criticalCount: Int {
         items.filter { $0.status == .critical }.count
+    }
+
+    public var disabledCount: Int {
+        items.filter(\.isLaunchdDisabled).count
+    }
+
+    public var allRecommendedDisabled: Bool {
+        let recommended = Set(KnownBloatedDaemon.recommendedNotLaunchDaemons)
+        let disabled = Set(items.filter(\.isLaunchdDisabled).map(\.daemon))
+        return recommended.isSubset(of: disabled)
     }
 
     public var totalMonitoredBytes: UInt64 {
@@ -322,7 +382,7 @@ public enum MemoryDoctor {
         let disabledServices = queryDisabledServices(uid: uid)
         var result = Set<KnownBloatedDaemon>()
         for daemon in KnownBloatedDaemon.allCases where daemon.supportsLaunchdToggle {
-            if daemon.launchdServiceNames.allSatisfy({ disabledServices.contains($0) }) {
+            if let primary = daemon.primaryLaunchdService, disabledServices.contains(primary) {
                 result.insert(daemon)
             }
         }
@@ -330,9 +390,9 @@ public enum MemoryDoctor {
     }
 
     public static func isDaemonDisabled(_ daemon: KnownBloatedDaemon, uid: uid_t = getuid()) -> Bool {
-        guard daemon.supportsLaunchdToggle else { return false }
+        guard let primary = daemon.primaryLaunchdService else { return false }
         let disabledServices = queryDisabledServices(uid: uid)
-        return daemon.launchdServiceNames.allSatisfy { disabledServices.contains($0) }
+        return disabledServices.contains(primary)
     }
 
     public static func setDaemonDisabled(_ disabled: Bool, daemon: KnownBloatedDaemon, uid: uid_t = getuid()) {
@@ -342,23 +402,63 @@ public enum MemoryDoctor {
         }
     }
 
+    /// Permanently disables autostart ("Not Launch") for a daemon family AND immediately terminates any running instances.
+    public static func disableAndStop(daemon: KnownBloatedDaemon, pids: [Int32], uid: uid_t = getuid()) async {
+        await Task.detached(priority: .userInitiated) {
+            setDaemonDisabled(true, daemon: daemon, uid: uid)
+        }.value
+        if !pids.isEmpty {
+            await reclaim(pids: pids)
+        }
+    }
+
+    /// Batch-disables all recommended background AI & Media daemons ("Not Launch") and terminates running instances.
+    public static func disableAllRecommended(in report: MemoryDiagnosisReport, uid: uid_t = getuid()) async {
+        let targets = KnownBloatedDaemon.recommendedNotLaunchDaemons
+        await Task.detached(priority: .userInitiated) {
+            for daemon in targets {
+                setDaemonDisabled(true, daemon: daemon, uid: uid)
+            }
+        }.value
+        let pidsToKill = report.items
+            .filter { targets.contains($0.daemon) }
+            .flatMap(\.pids)
+        if !pidsToKill.isEmpty {
+            await reclaim(pids: pidsToKill)
+        }
+    }
+
     public static func setServiceDisabled(_ disabled: Bool, service: String, uid: uid_t = getuid()) {
         if disabled {
             let p1 = Process()
             p1.executableURL = URL(fileURLWithPath: "/bin/launchctl")
             p1.arguments = ["disable", "gui/\(uid)/\(service)"]
+            p1.standardOutput = Pipe()
+            p1.standardError = Pipe()
             try? p1.run()
             p1.waitUntilExit()
 
             let p2 = Process()
             p2.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-            p2.arguments = ["bootout", "gui/\(uid)/\(service)"]
+            p2.arguments = ["kill", "SIGKILL", "gui/\(uid)/\(service)"]
+            p2.standardOutput = Pipe()
+            p2.standardError = Pipe()
             try? p2.run()
             p2.waitUntilExit()
+
+            let p3 = Process()
+            p3.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+            p3.arguments = ["bootout", "gui/\(uid)/\(service)"]
+            p3.standardOutput = Pipe()
+            p3.standardError = Pipe()
+            try? p3.run()
+            p3.waitUntilExit()
         } else {
             let p1 = Process()
             p1.executableURL = URL(fileURLWithPath: "/bin/launchctl")
             p1.arguments = ["enable", "gui/\(uid)/\(service)"]
+            p1.standardOutput = Pipe()
+            p1.standardError = Pipe()
             try? p1.run()
             p1.waitUntilExit()
         }

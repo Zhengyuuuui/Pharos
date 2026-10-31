@@ -15,11 +15,11 @@
   <img src="https://img.shields.io/badge/dependencies-none-brightgreen" alt="Dependencies">
   <img src="https://img.shields.io/badge/network-none-lightgrey" alt="No network">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-3.0-blue" alt="Version 3.0">
-  <img src="https://img.shields.io/badge/updated-2026--10--24-informational" alt="Last updated 2026-10-24">
+  <img src="https://img.shields.io/badge/version-3.1-blue" alt="Version 3.1">
+  <img src="https://img.shields.io/badge/updated-2026--10--31-informational" alt="Last updated 2026-10-31">
 </p>
 
-<p align="center"><sub>Last updated / 最后更新：2026-10-25 · v3.0 · Author / 作者：zys · Model / 模型：Gemini 4 Argon</sub></p>
+<p align="center"><sub>Last updated / 最后更新：2026-10-31 · v3.1 · Author / 作者：zys · Model / 模型：Gemini 4 Argon</sub></p>
 
 <p align="center"><b>English</b> · <a href="README_CN.md">简体中文</a> · <a href="CHANGELOG.md">Changelog / 更新记录</a></p>
 
@@ -90,6 +90,7 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 ### System memory
 - Used / Available (cached files counted as reclaimable), swap, memory pressure — same formulas as Activity Monitor
 - Composition bar: App / Wired / Compressed | Cached / Free
+- **Memory Bloat Doctor & Daemon Governance (`Not Launch`)**: detects 8 categories of notorious macOS background memory-bloating daemons (`mediaanalysisd` / `photoanalysisd`, `mds_stores`, `diagnosticd`, `bird`, `WallpaperVideoExtension`, `suggestd` / `intelligenceplatformd`, `commerce`, `SimLaunchHostService`); supports one-click safe `SIGTERM` reclamation as well as permanent user-domain `launchctl disable` (`Not Launch`) and one-click restore (`launchctl enable`)
 - Memory trend over the last hour
 - Top apps by memory (helper processes rolled up into their app, e.g. all Chrome helpers → “Google Chrome”)
 
@@ -304,6 +305,11 @@ make icon                           # regenerate the app icon from Scripts/make-
 ---
 
 ## Recent Updates
+
+### v3.1 (2026-10-31)
+- **Memory Bloat Doctor & Permanent System Daemon Governance (`Not Launch`)**: diagnoses 8 categories of macOS background memory-bloating daemons (`mediaanalysisd` / `photoanalysisd`, `mds_stores`, `diagnosticd`, `bird`, `WallpaperVideoExtension`, `suggestd` / `intelligenceplatformd`, `commerce`, `SimLaunchHostService`); supports both one-click safe `SIGTERM` memory reclamation and permanent user-domain `launchctl disable` (`Not Launch`) with one-click restore.
+- **Mission Control 4-Finger Swipe Fluency & Fan Speedometer GPU Optimization**: removed redundant offscreen `.drawingGroup()` and idle blur passes in `AmbientRailViews`, reducing CPU/GPU footprint on the Fans & Temperature page by over **90%** (~50.3% → ~4.3% CPU) while keeping 60 FPS mechanical needle inertia.
+- **Dual-Mechanism Adaptive Light / Dark App Icon**: fixed `AppIcon.icon/icon.json` layer specializations for `Assets.car` (macOS 26 Tahoe) and added runtime `PharosDark.icns` + `NSApp.effectiveAppearance` synchronization (`NSApp.applicationIconImage`) so Dock & App icons automatically switch between Light and Dark modes on macOS 14 / 15 / 26 with zero idle memory overhead.
 
 ### v3.0 (2026-10-24)
 - **Floating Sidebar Island & Controllable Traffic Lights Frosted Glass**: redesigned the main window with a rounded floating sidebar island housing the native macOS traffic lights (`NSToolbar` unified layout) and a bottom status/settings footer island; scrolling sidebar items underneath the top-left traffic lights row triggers real-time Gaussian frosted-glass blur (`NSClipView.boundsDidChangeNotification`), with a 0%–100% transparency slider and a live miniature top-left 3-buttons preview card in **Settings → Menu Bar & Appearance**.

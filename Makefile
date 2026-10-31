@@ -15,11 +15,14 @@ test:
 
 # Regenerates the committed icons from Scripts/make-icon.swift (Swift + iconutil only):
 #   Resources/Pharos.icns       light (default) icon, used everywhere
+#   Resources/PharosDark.icns   dark icon for runtime Dock appearance switching
 #   Resources/AppIcon.icon      Icon Composer source with Light + Dark layers for actool
 icon:
-	rm -rf .build/Pharos.iconset
+	rm -rf .build/Pharos.iconset .build/PharosDark.iconset
 	swift Scripts/make-icon.swift .build/Pharos.iconset light
 	iconutil -c icns .build/Pharos.iconset -o Resources/Pharos.icns
+	swift Scripts/make-icon.swift .build/PharosDark.iconset dark
+	iconutil -c icns .build/PharosDark.iconset -o Resources/PharosDark.icns
 	swift Scripts/make-icon.swift Resources/AppIcon.icon/Assets/light.png light layer
 	swift Scripts/make-icon.swift Resources/AppIcon.icon/Assets/dark.png dark layer
 
@@ -48,6 +51,7 @@ app: build assets
 	cp .build/release/pharos-battd $(DIST)/Contents/MacOS/pharos-battd
 	cp Resources/Info.plist $(DIST)/Contents/Info.plist
 	cp Resources/Pharos.icns $(DIST)/Contents/Resources/Pharos.icns
+	if [ -f Resources/PharosDark.icns ]; then cp Resources/PharosDark.icns $(DIST)/Contents/Resources/PharosDark.icns; fi
 	if [ -f .build/icon-assets/Assets.car ]; then cp .build/icon-assets/Assets.car $(DIST)/Contents/Resources/Assets.car; fi
 	codesign --force --sign - $(DIST)
 

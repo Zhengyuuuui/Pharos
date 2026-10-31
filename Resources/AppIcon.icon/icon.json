@@ -4,10 +4,16 @@
     {
       "layers" : [
         {
-          "image-name" : "light.png",
           "image-name-specializations" : [
             {
+              "value" : "light.png"
+            },
+            {
               "appearance" : "dark",
+              "value" : "dark.png"
+            },
+            {
+              "appearance" : "tinted",
               "value" : "dark.png"
             }
           ],

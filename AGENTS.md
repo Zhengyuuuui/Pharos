@@ -105,8 +105,8 @@ Swift 通过 **ARC（自动引用计数）** 管理内存：编译器自动插�
     前缘为近黑细线；三个捕获目标为黑环黑芯；不使用白色光晕、白色颗粒等只在暗底上可见的效果。
     16 / 32 px 小尺寸须减少细节，保证白底上仍清晰可辨。
   - 退役的图标草稿（如带琥珀色的浅色初版）存放在 `docs/icon-archive/`，仅供参考，不参与构建。
-  - 浅色为默认外观，深色为 Dark 变体。`Resources/Pharos.icns` 打包浅色版；深浅两版以 Icon Composer
-    格式 `Resources/AppIcon.icon`（`icon.json` + 浅/深两张 1024 px 全出血图层，系统自加圆角与阴影）提交，
+  - 浅色为默认外观，深色为 Dark 变体。`Resources/Pharos.icns` 打包浅色版，`Resources/PharosDark.icns` 打包深色版（运行时 `AppDelegate` 监听系统深浅色切换并按需设置 `NSApp.applicationIconImage`，使 macOS 14 / 15 的 Dock 与运行态图标也能随外观切换）；深浅两版同时以 Icon Composer
+    格式 `Resources/AppIcon.icon`（`icon.json` 必须仅用 `image-name-specializations` 而不写顶层 `image-name` + 浅/深两张 1024 px 全出血图层，系统自加圆角与阴影）提交，
     `make app` 用 `actool` 编译成 `Assets.car`（含 Any / Dark 两个外观）放进 `Contents/Resources`，
     `Info.plist` 同时声明 `CFBundleIconFile` 与 `CFBundleIconName`，系统按外观选择图标。
     （传统 `.appiconset` 在 macOS 上不支持 Dark 外观，actool 会丢弃深色图，不要用。）

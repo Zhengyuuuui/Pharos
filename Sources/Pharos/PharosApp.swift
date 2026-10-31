@@ -14,6 +14,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     let store: ProjectStore
     private var window: NSWindow?
+    private var appearanceObservation: NSKeyValueObservation?
+    private var themeNotificationObserver: NSObjectProtocol?
 
     override init() {
         // Before any store reads its settings.
@@ -28,7 +30,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         _ = FanStore.shared
         _ = BatteryStore.shared
         Notifier.shared.start(observing: store)
+        startAppearanceIconSync()
         showMainWindow()
+    }
+
+    private func startAppearanceIconSync() {
+        syncApplicationIcon()
+        appearanceObservation = NSApp.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
+            Task { @MainActor [weak self] in
+                self?.syncApplicationIcon()
+            }
+        }
+        themeNotificationObserver = DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("AppleInterfaceThemeChangedNotification"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.syncApplicationIcon()
+            }
+        }
+    }
+
+    private func syncApplicationIcon() {
+        let isDark = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        if isDark,
+           let url = Bundle.main.url(forResource: "PharosDark", withExtension: "icns"),
+           let darkIcon = NSImage(contentsOf: url) {
+            NSApp.applicationIconImage = darkIcon
+        } else {
+            NSApp.applicationIconImage = nil
+        }
+        NSApp.dockTile.display()
     }
 
     /// Clicking the Dock / Launchpad icon while running reopens the window.
@@ -39,6 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func showMainWindow(selecting select: MainWindowView.SidebarItem? = nil) {
         NSApp.setActivationPolicy(.regular)
+        syncApplicationIcon()
         if window != nil, let select {
             // Window already exists: switch its page instead of ignoring the request.
             WindowRouter.shared.request = select

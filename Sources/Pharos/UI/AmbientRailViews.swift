@@ -124,6 +124,7 @@ struct SystemMemoryInspectorView: View {
     @EnvironmentObject var store: ProjectStore
     @ObservedObject private var l10n = L10n.shared
     @State private var showConfirmReclaim = false
+    @State private var showConfirmDisableAIMedia = false
 
     var body: some View {
         let stats = store.system
@@ -139,10 +140,10 @@ struct SystemMemoryInspectorView: View {
                 dotLevel: pressure == .critical ? .critical : (pressure == .warning || isThrashing ? .warning : .normal)
             )
 
-            // [Bloat Alert Block] 守护进程异常膨胀治理联动卡片 (当检测到膨胀时置顶高亮展示)
-            if diagnosis.hasBloat {
-                PharosBentoCard(title: l10n.memoryBloatDiagnostics, systemImage: "cross.vial.fill") {
-                    VStack(alignment: .leading, spacing: 6) {
+            // [Daemon Governance Block] 守护进程治理与 Not Launch 永久禁启卡片
+            PharosBentoCard(title: l10n.memoryBloatDiagnostics, systemImage: "cross.vial.fill") {
+                VStack(alignment: .leading, spacing: 6) {
+                    if diagnosis.hasBloat {
                         HStack(spacing: 6) {
                             Image(systemName: diagnosis.criticalCount > 0 ? "xmark.octagon.fill" : "exclamationmark.triangle.fill")
                                 .foregroundStyle(diagnosis.criticalCount > 0 ? PharosColor.error : PharosColor.warning)
@@ -161,6 +162,20 @@ struct SystemMemoryInspectorView: View {
 
                         PharosActionPill(title: l10n.reclaimAllBloated, systemImage: "sparkles", isPrimary: true) {
                             showConfirmReclaim = true
+                        }
+                    } else {
+                        HStack(spacing: 5) {
+                            PharosStatusDot(level: .normal)
+                            Text(diagnosis.disabledCount > 0 ? l10n.disabledDaemonsCount(diagnosis.disabledCount) : l10n.allDaemonsHealthy)
+                                .font(.system(size: 10.5, weight: .medium))
+                                .foregroundStyle(PharosColor.textPrimary)
+                                .lineLimit(1)
+                        }
+                    }
+
+                    if !diagnosis.allRecommendedDisabled {
+                        PharosActionPill(title: l10n.disableAllAIMediaAutostart, systemImage: "nosign", isPrimary: !diagnosis.hasBloat) {
+                            showConfirmDisableAIMedia = true
                         }
                     }
                 }
@@ -243,6 +258,14 @@ struct SystemMemoryInspectorView: View {
             }
         } message: {
             Text(l10n.confirmReclaimDesc)
+        }
+        .alert(l10n.confirmDisableAllAIMediaTitle, isPresented: $showConfirmDisableAIMedia) {
+            Button(l10n.cancel, role: .cancel) {}
+            Button(l10n.confirmDisableAllAIMediaButton, role: .destructive) {
+                Task { await store.disableAllRecommendedDaemons() }
+            }
+        } message: {
+            Text(l10n.confirmDisableAllAIMediaDesc)
         }
     }
 }

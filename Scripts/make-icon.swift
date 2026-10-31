@@ -72,9 +72,16 @@ func heat(at p: CGPoint) -> CGFloat {
 
 // MARK: - Dark (original artwork, unchanged)
 
-func drawDark(_ ctx: CGContext) {
+func drawDark(_ ctx: CGContext, pixels: Int) {
     let amber: UInt32 = 0xFFC46B, gold: UInt32 = 0xC9954A, warmWhite: UInt32 = 0xFFF3DC
     let step: CGFloat = 32
+
+    if pixels > 32 && !layerMode {
+        ctx.saveGState()
+        ctx.setShadow(offset: CGSize(width: 0, height: -10), blur: 28, color: color(0x000000, 0.28))
+        ctx.addPath(body); ctx.setFillColor(color(0x03050C)); ctx.fillPath()
+        ctx.restoreGState()
+    }
 
     ctx.saveGState()
     ctx.addPath(body); ctx.clip()
@@ -324,7 +331,7 @@ func render(_ appearance: Appearance, pixels: Int, to url: URL) throws {
         ctx.translateBy(x: -100, y: -100)
     }
     switch appearance {
-    case .dark: drawDark(ctx)
+    case .dark: drawDark(ctx, pixels: pixels)
     case .light: drawLight(ctx, pixels: pixels)
     }
     guard let image = ctx.makeImage(),
