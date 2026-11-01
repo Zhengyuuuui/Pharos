@@ -359,6 +359,57 @@ struct AgentDatabaseCard: View {
             RoundedRectangle(cornerRadius: 8)
                 .strokeBorder(entry.isOrphaned ? Color.red.opacity(0.25) : Color.secondary.opacity(0.2), lineWidth: 1)
         )
+        .contextMenu {
+            Button {
+                store.optimizingEntry = entry
+            } label: {
+                Label(l10n.agentDeepDiagnostics, systemImage: "sparkles")
+            }
+
+            Button {
+                store.relocatingEntry = entry
+            } label: {
+                Label(l10n.agentProjectRelocation, systemImage: "arrow.triangle.branch")
+            }
+
+            Button {
+                store.exportAllSessionsMarkdown(entry: entry)
+            } label: {
+                Label(l10n.agentExportAllMarkdown, systemImage: "doc.text")
+            }
+
+            Divider()
+
+            if entry.workspacePath != nil && !entry.isOrphaned {
+                Button {
+                    store.openProjectInTerminal(entry)
+                } label: {
+                    Label(l10n.openInTerminal, systemImage: "terminal")
+                }
+            }
+
+            Button {
+                store.revealInFinder(entry)
+            } label: {
+                Label(l10n.revealInFinder, systemImage: "folder")
+            }
+
+            Button {
+                store.backupEntry(entry)
+            } label: {
+                Label(l10n.backupDatabase, systemImage: "arrow.down.doc")
+            }
+
+            let verdict = store.deleteVerdict(entry)
+            if case .allowed = verdict {
+                Divider()
+                Button(role: .destructive) {
+                    store.confirmAndDelete(entry)
+                } label: {
+                    Label(l10n.delete, systemImage: "trash")
+                }
+            }
+        }
     }
 
     private var titleBlock: some View {
@@ -383,6 +434,39 @@ struct AgentDatabaseCard: View {
                     .help("\(l10n.agentTabDatabases): \(entry.customEditorName ?? entry.editor.displayName)")
                 }
                 AgentScopeBadge(scope: entry.scope)
+                if entry.isEncrypted {
+                    Button {
+                        store.optimizingEntry = entry
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "lock.shield.fill")
+                                .font(.system(size: 8))
+                            Text(l10n.agentDbEncryptedBadge(for: entry.editor))
+                                .font(.system(size: 9.5, weight: .semibold))
+                        }
+                        .padding(.horizontal, 5).padding(.vertical, 1)
+                        .background(Capsule().fill(Color.purple.opacity(0.15)))
+                        .foregroundStyle(Color.purple)
+                    }
+                    .buttonStyle(.plain)
+                    .help(l10n.agentDbEncryptedTitle(for: entry.editor))
+                } else if entry.fileSizeBytes > 100_000_000 || entry.editor == .openCode || entry.editor == .cursor {
+                    Button {
+                        store.optimizingEntry = entry
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 8))
+                            Text(l10n.agentLosslessBadge)
+                                .font(.system(size: 9.5, weight: .semibold))
+                        }
+                        .padding(.horizontal, 5).padding(.vertical, 1)
+                        .background(Capsule().fill(Color.orange.opacity(0.15)))
+                        .foregroundStyle(Color.orange)
+                    }
+                    .buttonStyle(.plain)
+                    .help(l10n.agentDeepDiagnostics)
+                }
                 if entry.isOrphaned {
                     HStack(spacing: 3) {
                         Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 8))
@@ -426,6 +510,9 @@ struct AgentDatabaseCard: View {
         let verdict = store.deleteVerdict(entry)
         let deletable: Bool = { if case .allowed = verdict { return true } else { return false } }()
         return HStack(spacing: 5) {
+            IconButton(systemImage: "sparkles", help: l10n.agentDeepDiagnostics) {
+                store.optimizingEntry = entry
+            }
             if entry.workspacePath != nil && !entry.isOrphaned {
                 IconButton(systemImage: "terminal", help: l10n.openInTerminal) { store.openProjectInTerminal(entry) }
             }
@@ -593,6 +680,15 @@ struct AgentConversationRow: View {
             if isExpanded { details }
         }
         .background(RoundedRectangle(cornerRadius: 5).fill(Color.primary.opacity(isExpanded ? 0.05 : 0.02)))
+        .contextMenu {
+            if let entry = AgentChatStore.shared.entries.first(where: { $0.id == ref.entryId }) {
+                Button {
+                    AgentChatStore.shared.exportSessionMarkdown(entry: entry, sessionId: c.id, defaultTitle: c.title)
+                } label: {
+                    Label(l10n.agentExportMarkdown, systemImage: "square.and.arrow.up")
+                }
+            }
+        }
     }
 
     private var details: some View {
@@ -609,6 +705,11 @@ struct AgentConversationRow: View {
                         .textSelection(.enabled)
                     IconButton(systemImage: "folder", help: l10n.revealInFinder) {
                         AgentChatStore.shared.revealPath(ref.databasePath)
+                    }
+                    if let entry = AgentChatStore.shared.entries.first(where: { $0.id == ref.entryId }) {
+                        IconButton(systemImage: "square.and.arrow.up", help: l10n.agentExportMarkdown) {
+                            AgentChatStore.shared.exportSessionMarkdown(entry: entry, sessionId: c.id, defaultTitle: c.title)
+                        }
                     }
                     if let entry = AgentChatStore.shared.entries.first(where: { $0.id == ref.entryId }) {
                         Button {

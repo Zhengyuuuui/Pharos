@@ -37,6 +37,12 @@ struct AgentChatView: View {
                 store.resetSelection()
             }
         }
+        .sheet(item: $store.optimizingEntry) { entry in
+            AgentOptimizationView(entry: entry)
+        }
+        .sheet(item: $store.relocatingEntry) { entry in
+            AgentRelocationView(entry: entry)
+        }
     }
 }
 

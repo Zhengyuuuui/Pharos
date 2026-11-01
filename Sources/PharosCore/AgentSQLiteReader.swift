@@ -12,6 +12,18 @@ public struct AgentSQLiteReader {
         return header.hasPrefix("SQLite format 3")
     }
 
+    /// Checks if a file has a database extension (.db, .sqlite, .vscdb) but does not carry the plain SQLite 3 header (e.g. Trae's SQLCipher encrypted database.db).
+    public static func isEncryptedOrCustomDatabase(atPath path: String) -> Bool {
+        let ext = (path as NSString).pathExtension.lowercased()
+        guard ext == "db" || ext == "sqlite" || ext == "vscdb" else { return false }
+        guard let file = FileHandle(forReadingAtPath: path) else { return false }
+        defer { try? file.close() }
+        let data = file.readData(ofLength: 16)
+        guard data.count == 16 else { return false }
+        let header = String(decoding: data, as: UTF8.self)
+        return !header.hasPrefix("SQLite format 3")
+    }
+
     /// Reads Cursor Composer conversations from globalStorage or workspace state.vscdb.
     public static func readCursorConversations(dbPath: String) -> [AgentConversationSummary] {
         guard isSQLiteFile(atPath: dbPath) else { return [] }

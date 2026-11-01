@@ -202,6 +202,14 @@ func testSQLiteMagicHeader() {
     sqlite3_close(db)
 
     expectEq(AgentSQLiteReader.isSQLiteFile(atPath: tmp.path), true, "real sqlite file recognized")
+    expectEq(AgentSQLiteReader.isEncryptedOrCustomDatabase(atPath: tmp.path), false, "real sqlite is not encrypted")
+
+    // Encrypted dummy file (binary bytes without SQLite header)
+    try? FileManager.default.removeItem(at: tmp)
+    let encryptedData = Data([0x90, 0x3E, 0x89, 0x59, 0x65, 0x49, 0x46, 0x99, 0xA2, 0xF9, 0xB4, 0x21, 0xF7, 0xB8, 0x6A, 0xDF])
+    try? encryptedData.write(to: tmp)
+    expectEq(AgentSQLiteReader.isSQLiteFile(atPath: tmp.path), false, "encrypted bytes is not plain sqlite")
+    expectEq(AgentSQLiteReader.isEncryptedOrCustomDatabase(atPath: tmp.path), true, "encrypted .db recognized as encrypted")
 }
 
 private func makeEntry(

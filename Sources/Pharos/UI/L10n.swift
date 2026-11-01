@@ -1133,6 +1133,130 @@ final class L10n: ObservableObject {
     var agentConvId: String { en ? "Session ID" : "会话 ID" }
     var agentConvNoMatch: String { en ? "No conversations match." : "没有匹配的对话。" }
     var agentLastActive: String { en ? "Last active" : "最近活动" }
+
+    // MARK: - AI Agent Storage Profiling & Compaction
+    var agentHealthScore: String { en ? "Health Score" : "健康评分" }
+    var agentHealthHealthy: String { en ? "Healthy" : "健康良好" }
+    var agentHealthModerate: String { en ? "Moderate Bloat" : "轻度膨胀" }
+    var agentHealthBloated: String { en ? "Bloated" : "显著膨胀" }
+    var agentHealthCritical: String { en ? "Severely Bloated" : "严重膨胀" }
+    var agentReclaimableSpace: String { en ? "Lossless Reclaimable" : "可无损释放" }
+    var agentTotalStorage: String { en ? "Total Storage" : "总物理占用" }
+    var agentCoreStorage: String { en ? "Core Chat & Code" : "核心问答与代码" }
+    var agentRedundantStorage: String { en ? "Redundant Stream Events" : "冗余流式事件与碎片" }
+    var agentFreelistHoles: String { en ? "Freelist Holes" : "B-Tree 物理空洞" }
+    var agentDeepDiagnostics: String { en ? "Deep Diagnostics & Slimming" : "深度体检与无损瘦身" }
+    var agentDeepDiagnosticsDesc: String {
+        en ? "Inspect SQLite table breakdowns, strip intermediate typewriter events, checkpoint WAL, and reclaim APFS disk space with native VACUUM."
+           : "深度剖析内部表级占用，剥离中间打字机渲染事件，WAL 归档并通过原生 VACUUM 收缩物理磁盘空间。"
+    }
+    var agentLosslessBadge: String { en ? "Lossless Slimming" : "可无损瘦身" }
+    var agentDbEncryptedBadge: String { en ? "Encrypted" : "加密" }
+    func agentDbEncryptedBadge(for editor: AgentEditorKind) -> String {
+        if editor == .trae {
+            return en ? "Locally Encrypted" : "本地加密"
+        } else {
+            return en ? "Encrypted" : "加密"
+        }
+    }
+    var agentDbEncryptedTitle: String { en ? "Encrypted Database" : "数据库处于加密状态" }
+    func agentDbEncryptedTitle(for editor: AgentEditorKind) -> String {
+        if editor == .trae {
+            return en ? "Locally Encrypted Database" : "数据库处于本地加密状态"
+        } else {
+            return en ? "Encrypted Database" : "数据库处于加密状态"
+        }
+    }
+    var agentDbEncryptedDesc: String {
+        en ? "This database is encrypted with SQLCipher / AES-256 by the host editor. Standard SQLite engines cannot decrypt the ciphertext without the private key. You can still create safe backups or clean up orphaned projects."
+           : "此数据库由宿主编辑器使用 SQLCipher / AES-256 进行了加密存储。标准 SQLite 引擎未经密钥无法直接读取内部表；您仍可在此执行整库安全备份或清理失效工作区。"
+    }
+    func agentDbEncryptedDesc(for editor: AgentEditorKind) -> String {
+        if editor == .trae {
+            return en ? "This database is locally encrypted with SQLCipher / AES-256 by Trae. Standard SQLite engines cannot read the internal ciphertext without the key; Pharos safely indexes session metadata via sidecars. You can still create safe backups or clean up orphaned projects."
+                      : "此数据库由 Trae 在本地使用 SQLCipher / AES-256 进行了加密存储。标准 SQLite 引擎未经密钥无法直接读取内部表；Pharos 已通过沙盒元数据安全同步了会话列表。您仍可在此执行整库安全备份或清理失效工作区。"
+        } else {
+            return agentDbEncryptedDesc
+        }
+    }
+    var agentBloatCandidateBadge: String { en ? "Bloat Candidate" : "建议剥离" }
+    var agentTableRows: String { en ? "Rows" : "行" }
+    var agentTableSize: String { en ? "Size" : "占用" }
+
+    var agentEditorRunningWarning: String { en ? "Host Editor is Running" : "检测到宿主编辑器正在运行" }
+    func agentEditorRunningDesc(_ editor: String, pids: [Int32]) -> String {
+        let pidStr = pids.map(String.init).joined(separator: ", ")
+        return en ? "Please completely quit \(editor) (PID: \(pidStr)) first to prevent database locking or write conflicts."
+                  : "请先完全退出 \(editor)（PID：\(pidStr)），以避免数据库并发死锁或写入冲突。"
+    }
+    var agentProcessBlocked: String { en ? "Locked" : "已锁定" }
+
+    var agentCompactionTitle: String { en ? "Intelligent Storage Compaction" : "智能分级无损瘦身" }
+    var agentCompactionLevel1: String { en ? "Level 1: Lossless Stream Event Stripping (Recommended)" : "Level 1：无损流式事件剥离 (推荐)" }
+    var agentCompactionLevel1Desc: String {
+        en ? "Strips millions of typewriter & streaming event records while 100% preserving all user questions, assistant responses, and code blocks."
+           : "仅剥离百万条中间打字渲染与流式状态事件，100% 保留全部历史问答、模型答复与完整代码。"
+    }
+    var agentCompactionLevel2: String { en ? "Level 2: Checkpoint & Shadow Diff Pruning" : "Level 2：清理检查点与影子快照" }
+    var agentCompactionLevel2Desc: String {
+        en ? "Cleans abandoned cursor shadows, inline diff drafts, and ephemeral KV snapshots."
+           : "清理废弃的影子代码 Diff、自衍生快照与临时 KV 缓存。"
+    }
+    var agentCompactionLevel3: String { en ? "Level 3: Orphaned & Expired Context Archiving" : "Level 3：清理超期与幽灵会话" }
+    var agentCompactionLevel3Desc: String {
+        en ? "Prunes sessions older than 30 days and removes orphaned project contexts."
+           : "清理超过 30 天未打开的历史上下文与已物理删除项目的孤儿会话。"
+    }
+    var agentOptionPreflightBackup: String { en ? "Create pre-flight backup before optimization (One-click restore supported)" : "操作前自动建立预备份副本 (支持一键还原)" }
+    var agentOptionRunVacuum: String { en ? "Reclaim physical APFS disk space with native VACUUM" : "执行原生 VACUUM 收缩物理磁盘空间" }
+    var agentStartCompaction: String { en ? "Start Lossless Compaction & Reclaim Space" : "一键无损精简并释放空间" }
+    var agentCompacting: String { en ? "Optimizing & Reclaiming Disk Space…" : "正在执行无损瘦身与空间回收，请稍候…" }
+
+    func agentCompactionSuccess(orig: String, final: String, saved: String) -> String {
+        en ? "Compaction complete! Size reduced from \(orig) to \(final), successfully reclaimed \(saved) disk space!"
+           : "瘦身完成！数据库体积由 \(orig) 降至 \(final)，已为您成功夺回 \(saved) 硬盘空间！"
+    }
+    func agentCompactionFailed(_ reason: String) -> String { en ? "Compaction failed: \(reason)" : "瘦身失败：\(reason)" }
+
+    var agentBackupsListTitle: String { en ? "Safety Restore Points" : "安全预备份还原点" }
+    var agentNoBackupsFound: String { en ? "No pre-flight backups found." : "暂无历史预备份副本。" }
+    var agentRestoreBackupButton: String { en ? "Restore" : "一键还原" }
+    var agentRestoreConfirmTitle: String { en ? "Restore Database from Backup?" : "确认从备份还原数据库？" }
+    func agentRestoreConfirmMsg(_ path: String) -> String {
+        en ? "This will overwrite the current database with the backup at:\n\(path)\n\nPlease make sure the host editor is closed."
+           : "将用备份文件覆盖当前数据库：\n\(path)\n\n请确保宿主编辑器处于完全退出状态。"
+    }
+    var agentRestoreSuccess: String { en ? "Database restored successfully." : "数据库已成功还原。" }
+    func agentRestoreFailed(_ reason: String) -> String { en ? "Restore failed: \(reason)" : "还原失败：\(reason)" }
+
+    var agentTopHeavySessions: String { en ? "Top Heavy Sessions" : "巨型会话排行榜 (Top Heavy Sessions)" }
+    var agentExportMarkdown: String { en ? "Export Markdown" : "导出 Markdown" }
+    var agentExportAllMarkdown: String { en ? "Export All Sessions to Markdown…" : "导出全部会话为 Markdown…" }
+    func agentExportSuccess(_ path: String) -> String { en ? "Exported Markdown to: \(path)" : "已成功导出 Markdown 至：\(path)" }
+    func agentExportAllSuccess(_ count: Int, dir: String) -> String {
+        en ? "Successfully exported \(count) session(s) to: \(dir)" : "已成功导出 \(count) 条会话至：\(dir)"
+    }
+    func agentExportFailed(_ reason: String) -> String { en ? "Export failed: \(reason)" : "导出失败：\(reason)" }
+
+    var agentProjectRelocation: String { en ? "Project Relocation" : "项目工程重定位" }
+    var agentProjectRelocationDesc: String {
+        en ? "Fix broken session links when project folders are renamed or moved."
+           : "当本地工程文件夹被重命名或移动位置时，一键修复历史会话路径映射。"
+    }
+    func agentMissingProjectsFound(_ count: Int) -> String {
+        en ? "Found \(count) missing project path(s)" : "发现 \(count) 个丢失的本地工程路径"
+    }
+    var agentNoMissingProjects: String {
+        en ? "All project paths referenced in this database are valid on disk."
+           : "此数据库中的工程路径均在磁盘上正常存在。"
+    }
+    var agentSelectNewProjectFolder: String { en ? "Select New Folder…" : "选择新路径…" }
+    var agentRemapButton: String { en ? "Relocate" : "执行重定位" }
+    func agentRemapSuccess(_ count: Int) -> String {
+        en ? "Successfully remapped \(count) session(s)!" : "已成功重定向 \(count) 条会话！"
+    }
+    func agentRemapFailed(_ reason: String) -> String { en ? "Relocation failed: \(reason)" : "重定位失败：\(reason)" }
+
     var agentEditorLayoutTitle: String { en ? "AI chats: editor list style" : "AI 对话管理：编辑器入口样式" }
     func agentEditorLayoutOption(_ l: AgentEditorLayout) -> String {
         switch l {

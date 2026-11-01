@@ -2,7 +2,7 @@ import Darwin
 import Foundation
 
 /// Supported AI Agent Editors
-public enum AgentEditorKind: String, Codable, CaseIterable, Identifiable {
+public enum AgentEditorKind: String, Codable, CaseIterable, Identifiable, Sendable {
     case cursor = "cursor"
     case trae = "trae"
     case windsurf = "windsurf"
@@ -585,6 +585,11 @@ public struct AgentDatabaseEntry: Identifiable, Codable, Equatable {
             modificationDate: lastModified,
             isOrphaned: isOrphaned
         )
+    }
+
+    /// Whether this database file is encrypted or uses a non-standard SQLite container (such as Trae's SQLCipher core database).
+    public var isEncrypted: Bool {
+        AgentSQLiteReader.isEncryptedOrCustomDatabase(atPath: filePath)
     }
 }
 

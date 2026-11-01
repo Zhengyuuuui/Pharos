@@ -76,6 +76,32 @@ final class AgentChatStore: ObservableObject {
     @Published var statusMessage: String? = nil
     @Published var isSuccessMessage = true
 
+    // MARK: - Optimization, Compaction & Relocation State
+    @Published var optimizingEntry: AgentDatabaseEntry? = nil {
+        didSet {
+            if let entry = optimizingEntry {
+                profile(entry: entry)
+                loadBackups(for: entry)
+                compactionResult = nil
+                optimizationErrorMessage = nil
+            }
+        }
+    }
+    @Published var relocatingEntry: AgentDatabaseEntry? = nil {
+        didSet {
+            if let entry = relocatingEntry {
+                loadMissingProjects(for: entry)
+            }
+        }
+    }
+    @Published var profiles: [String: AgentDatabaseProfile] = [:]
+    @Published var isProfiling: [String: Bool] = [:]
+    @Published var isCompacting: [String: Bool] = [:]
+    @Published var compactionResult: CompactionResult? = nil
+    @Published var backupsForOptimizing: [AgentBackupSnapshot] = []
+    @Published var missingProjects: [MissingProjectItem] = []
+    @Published var optimizationErrorMessage: String? = nil
+
     @Published var editorLayout: AgentEditorLayout =
         AgentEditorLayout(rawValue: UserDefaults.standard.string(forKey: "agentEditorLayout") ?? "") ?? .grid {
         didSet { UserDefaults.standard.set(editorLayout.rawValue, forKey: "agentEditorLayout") }
@@ -444,5 +470,227 @@ final class AgentChatStore: ObservableObject {
         statusMessage = L10n.shared.agentOrphanedCleanResult(
             count: removed.count, size: ByteFormat.short(result.bytesFreed), skipped: result.skipped, failed: result.failed
         )
+    }
+
+    // MARK: - Storage Optimization & Compaction Pipeline
+
+    func updateEntrySize(id: String, newSizeBytes: UInt64) {
+        if let idx = entries.firstIndex(where: { $0.id == id }) {
+            let old = entries[idx]
+            entries[idx] = AgentDatabaseEntry(
+                id: old.id,
+                editor: old.editor,
+                scope: old.scope,
+                filePath: old.filePath,
+                fileName: old.fileName,
+                storageDirectory: old.storageDirectory,
+                fileSizeBytes: newSizeBytes,
+                lastModified: Date(),
+                workspacePath: old.workspacePath,
+                workspaceName: old.workspaceName,
+                isOrphaned: old.isOrphaned,
+                conversationCount: old.conversationCount,
+                conversations: old.conversations,
+                customEditorName: old.customEditorName,
+                customAppPath: old.customAppPath,
+                fingerprint: old.fingerprint
+            )
+        }
+    }
+
+    func profile(entry: AgentDatabaseEntry, force: Bool = false) {
+        if !force && profiles[entry.id] != nil {
+            return
+        }
+        isProfiling[entry.id] = true
+        let dbPath = entry.filePath
+        let editor = entry.editor
+        let entryId = entry.id
+
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let prof = autoreleasepool {
+                AgentStorageProfiler.profile(dbPath: dbPath, editor: editor)
+            }
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.profiles[entryId] = prof
+                self.isProfiling[entryId] = false
+            }
+        }
+    }
+
+    func loadBackups(for entry: AgentDatabaseEntry) {
+        backupsForOptimizing = AgentVacuumEngine.listBackups(for: entry.filePath)
+    }
+
+    func compact(entry: AgentDatabaseEntry, options: CompactionOptions) {
+        let (isRunning, pids) = ProcessExclusivityGuard.check(editor: entry.editor)
+        guard !isRunning else {
+            optimizationErrorMessage = L10n.shared.agentEditorRunningDesc(entry.editor.displayName, pids: pids)
+            return
+        }
+
+        isCompacting[entry.id] = true
+        optimizationErrorMessage = nil
+        compactionResult = nil
+
+        let dbPath = entry.filePath
+        let entryId = entry.id
+        let editor = entry.editor
+
+        Task.detached(priority: .userInitiated) { [weak self] in
+            do {
+                let res = try AgentVacuumEngine.compactAndVacuum(dbPath: dbPath, editor: editor, options: options)
+                let updatedProfile = AgentStorageProfiler.profile(dbPath: dbPath, editor: editor)
+                let backups = AgentVacuumEngine.listBackups(for: dbPath)
+
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
+                    self.isCompacting[entryId] = false
+                    self.compactionResult = res
+                    self.profiles[entryId] = updatedProfile
+                    self.backupsForOptimizing = backups
+                    self.updateEntrySize(id: entryId, newSizeBytes: res.finalSizeBytes)
+                    self.isSuccessMessage = true
+                    self.statusMessage = L10n.shared.agentCompactionSuccess(
+                        orig: ByteFormat.disk(res.initialSizeBytes),
+                        final: ByteFormat.disk(res.finalSizeBytes),
+                        saved: ByteFormat.disk(res.bytesReclaimed)
+                    )
+                }
+            } catch {
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
+                    self.isCompacting[entryId] = false
+                    self.optimizationErrorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    func restoreBackup(entry: AgentDatabaseEntry, backupPath: String) {
+        let (isRunning, pids) = ProcessExclusivityGuard.check(editor: entry.editor)
+        guard !isRunning else {
+            optimizationErrorMessage = L10n.shared.agentEditorRunningDesc(entry.editor.displayName, pids: pids)
+            return
+        }
+
+        let dbPath = entry.filePath
+        let entryId = entry.id
+        let editor = entry.editor
+
+        Task.detached(priority: .userInitiated) { [weak self] in
+            do {
+                try AgentVacuumEngine.restoreBackup(from: backupPath, to: dbPath)
+                let updatedProfile = AgentStorageProfiler.profile(dbPath: dbPath, editor: editor)
+                let backups = AgentVacuumEngine.listBackups(for: dbPath)
+                let newSizeBytes = (try? FileManager.default.attributesOfItem(atPath: dbPath)[.size] as? UInt64) ?? 0
+
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
+                    self.profiles[entryId] = updatedProfile
+                    self.backupsForOptimizing = backups
+                    self.updateEntrySize(id: entryId, newSizeBytes: newSizeBytes)
+                    self.isSuccessMessage = true
+                    self.statusMessage = L10n.shared.agentRestoreSuccess
+                }
+            } catch {
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
+                    self.optimizationErrorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    func exportSessionMarkdown(entry: AgentDatabaseEntry, sessionId: String, defaultTitle: String?) {
+        let l10n = L10n.shared
+        let panel = NSSavePanel()
+        let safeName = (defaultTitle ?? sessionId)
+            .components(separatedBy: CharacterSet(charactersIn: "/\\:?*\"<>|"))
+            .joined(separator: "_")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        panel.nameFieldStringValue = (safeName.isEmpty ? "session-\(sessionId)" : safeName) + ".md"
+        panel.canCreateDirectories = true
+        panel.title = l10n.agentExportMarkdown
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try AgentMarkdownExporter.exportSession(
+                dbPath: entry.filePath,
+                editor: entry.editor,
+                sessionId: sessionId,
+                to: url
+            )
+            isSuccessMessage = true
+            statusMessage = l10n.agentExportSuccess(url.lastPathComponent)
+        } catch {
+            isSuccessMessage = false
+            statusMessage = l10n.agentExportFailed(error.localizedDescription)
+        }
+    }
+
+    func exportAllSessionsMarkdown(entry: AgentDatabaseEntry) {
+        let l10n = L10n.shared
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.prompt = l10n.agentExportMarkdown
+        panel.title = l10n.agentExportAllMarkdown
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let dbPath = entry.filePath
+        let editor = entry.editor
+
+        Task.detached(priority: .userInitiated) { [weak self] in
+            do {
+                let exported = try AgentMarkdownExporter.exportAllSessions(
+                    dbPath: dbPath,
+                    editor: editor,
+                    toDirectory: url
+                )
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
+                    self.isSuccessMessage = true
+                    self.statusMessage = l10n.agentExportAllSuccess(exported.count, dir: url.lastPathComponent)
+                }
+            } catch {
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
+                    self.isSuccessMessage = false
+                    self.statusMessage = l10n.agentExportFailed(error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    func loadMissingProjects(for entry: AgentDatabaseEntry) {
+        let dbPath = entry.filePath
+        let editor = entry.editor
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let missing = AgentRelocation.findMissingProjects(dbPath: dbPath, editor: editor)
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.missingProjects = missing
+            }
+        }
+    }
+
+    func remapProject(entry: AgentDatabaseEntry, oldDir: String, newDir: String) {
+        do {
+            let count = try AgentRelocation.relocateProject(
+                dbPath: entry.filePath,
+                editor: entry.editor,
+                oldDirectory: oldDir,
+                newDirectory: newDir
+            )
+            loadMissingProjects(for: entry)
+            isSuccessMessage = true
+            statusMessage = L10n.shared.agentRemapSuccess(count)
+        } catch {
+            isSuccessMessage = false
+            statusMessage = L10n.shared.agentRemapFailed(error.localizedDescription)
+        }
     }
 }
