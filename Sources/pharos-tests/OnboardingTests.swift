@@ -5,6 +5,8 @@ func testOnboarding() {
     testOnboardingLaunchDecision()
     testOnboardingDraft()
     testBatteryInstallPlan()
+    testOnboardingSteps()
+    testOnboardingMotion()
 }
 
 private func testOnboardingLaunchDecision() {
@@ -72,4 +74,54 @@ private func testBatteryInstallPlan() {
     expectEq(plan(false, true, .system, false, 80), nil, "onboarding update in system mode stays system")
     // Target is clamped.
     expectEq(plan(true, false, .system, false, 30), .limit(maxPercent: 50), "target clamped")
+}
+
+private func testOnboardingSteps() {
+    expectEq(OnboardingStep.allCases.count, OnboardingPolicy.stepCount, "step count matches policy")
+    expectEq(OnboardingStep.welcome.previous, nil, "no step before welcome")
+    expectEq(OnboardingStep.completion.next, nil, "no step after completion")
+    expectEq(OnboardingStep.permissions.next, .preferences, "next")
+    expectEq(OnboardingStep.permissions.previous, .powerIntro, "previous")
+    expect(OnboardingStep.welcome.isFirst && OnboardingStep.completion.isLast, "first/last")
+    expectEq(OnboardingStep.at(2), .permissions, "index 2")
+    expectEq(OnboardingStep.at(6), .welcome, "out of range -> welcome")
+    expectEq(OnboardingStep.at(-1), .welcome, "negative -> welcome")
+    if case .showOnboarding(let i) = OnboardingPolicy.evaluateLaunch(completedVersion: nil, resumeStep: 4, presentKeys: []) {
+        expectEq(OnboardingStep.at(i), .menuBar, "resume index maps to step")
+    } else { expect(false, "resume should show onboarding") }
+}
+
+private func testOnboardingMotion() {
+    typealias L = OnboardingMotionLevel
+    expectEq(L.resolve(reduceMotion: true, lowPower: false, gauge3DEnabled: true), .minimal, "reduce motion wins")
+    expectEq(L.resolve(reduceMotion: true, lowPower: true, gauge3DEnabled: false), .minimal, "reduce motion wins over all")
+    expectEq(L.resolve(reduceMotion: false, lowPower: true, gauge3DEnabled: true), .reduced, "low power -> reduced")
+    expectEq(L.resolve(reduceMotion: false, lowPower: false, gauge3DEnabled: false), .reduced, "3D off -> reduced")
+    expectEq(L.resolve(reduceMotion: false, lowPower: false, gauge3DEnabled: true), .rich, "rich")
+    expect(!L.minimal.allowsScale && !L.minimal.allowsBlur, "minimal: fade only")
+    expect(L.reduced.allowsScale && !L.reduced.allowsBlur && !L.reduced.allowsContinuousFrames, "reduced: no blur/frames")
+    expect(L.rich.allowsBlur && L.rich.allowsContinuousFrames, "rich: everything")
+
+    typealias G = OnboardingTransitionGeometry
+    for level in [L.minimal, .reduced, .rich] {
+        for dir in [OnboardingNavigationDirection.forward, .backward] {
+            let rest = G.values(phase: .identity, direction: dir, level: level)
+            expectEq(rest, G.Values(scale: 1, offsetX: 0, blur: 0, opacity: 1), "rest is exact identity (\(level) \(dir))")
+            for phase in [G.Phase.willAppear, .didDisappear] {
+                let v = G.values(phase: phase, direction: dir, level: level)
+                expect(v.blur <= G.maxBlurRadius, "blur capped")
+                expectEq(v.opacity, 0, "transient phases are invisible")
+                if !level.allowsBlur { expectEq(v.blur, 0, "no blur below rich") }
+                if !level.allowsScale { expectEq(v.scale, 1, "no scale when minimal"); expectEq(v.offsetX, 0, "no offset when minimal") }
+            }
+        }
+    }
+    let fIn = G.values(phase: .willAppear, direction: .forward, level: .rich)
+    let fOut = G.values(phase: .didDisappear, direction: .forward, level: .rich)
+    let bIn = G.values(phase: .willAppear, direction: .backward, level: .rich)
+    let bOut = G.values(phase: .didDisappear, direction: .backward, level: .rich)
+    expectEq(fIn.scale, 1.06, "forward incoming from close"); expectEq(fIn.offsetX, 28, "forward incoming from right")
+    expectEq(fOut.scale, 0.93, "forward outgoing recedes"); expectEq(fOut.offsetX, -28, "forward outgoing to left")
+    expectEq(bIn.scale, 0.93, "backward mirrors"); expectEq(bIn.offsetX, -28, "backward incoming from left")
+    expectEq(bOut.scale, 1.06, "backward outgoing toward viewer"); expectEq(bOut.offsetX, 28, "backward outgoing to right")
 }

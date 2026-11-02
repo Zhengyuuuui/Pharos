@@ -1997,9 +1997,163 @@ final class L10n: ObservableObject {
            : "发现 \(count) 个异常膨胀守护进程，可释放 \(bytes)"
     }
     var ambientQuickReclaim: String { en ? "Quick Reclaim" : "一键体检治理" }
+
+    // MARK: - Onboarding
+
+    // Chrome
+    var onboardingSkip: String { en ? "Skip" : "跳过" }
+    var onboardingBack: String { en ? "Back" : "返回" }
+    var onboardingContinue: String { en ? "Continue" : "继续" }
+    var onboardingEnter: String { en ? "Enter Pharos" : "进入 Pharos" }
+    func onboardingStepIndicator(_ step: Int, of total: Int) -> String {
+        en ? "Step \(step) of \(total)" : "第 \(step) 步，共 \(total) 步"
+    }
+    var onboardingWindowTitle: String { en ? "Welcome to Pharos" : "欢迎使用 Pharos" }
+
+    // Step 01 — Welcome
+    var onboardingWelcomeTitle: String { en ? "Meet Pharos" : "认识 Pharos" }
+    var onboardingWelcomeSubtitle: String {
+        en ? "A lightweight menu bar companion that keeps an eye on your Mac's power, memory, ports and disk — all on-device."
+           : "一个轻量的菜单栏助手，替你守望 Mac 的电源、内存、端口与磁盘——全部在本机完成。"
+    }
+    var onboardingCapabilityPower: String { en ? "Charge Limit & Thermal Guard" : "电池限充与散热守护" }
+    var onboardingCapabilityMemory: String { en ? "Memory & Active Ports" : "内存与活跃端口透视" }
+    var onboardingCapabilityCleanup: String { en ? "Developer Cache Cleanup" : "开发者缓存无痕清理" }
+
+    // Step 02 — Power intro
+    var onboardingPowerTitle: String { en ? "Understand Your Power" : "读懂电源流向" }
+    var onboardingPowerSubtitle: String {
+        en ? "See how a charge limit lets the adapter power your Mac directly while the battery rests."
+           : "看看充电上限如何让电源适配器直接为 Mac 供电，同时让电池休息。"
+    }
+    var onboardingPowerDemoBadge: String { en ? "Interactive demo · System power unchanged" : "交互式原理演示 · 未修改系统电源" }
+    var onboardingPowerModeCharging: String { en ? "Normal Charging" : "常规充电" }
+    var onboardingPowerModeBypass: String { en ? "80% Limit Passthrough" : "80% 限充直通" }
+    var onboardingPowerModeBattery: String { en ? "On Battery" : "离电使用" }
+    var onboardingPowerNodeAdapter: String { en ? "Power Adapter" : "电源适配器" }
+    var onboardingPowerNodeLogicBoard: String { en ? "Mac Logic Board" : "Mac 主板" }
+    var onboardingPowerNodeBattery: String { en ? "Battery Cell" : "电池电芯" }
+    var onboardingPowerChargingCaption: String {
+        en ? "Power flows to both the logic board and the battery." : "电流同时流向主板与电芯。"
+    }
+    var onboardingPowerBypassCaption: String {
+        en ? "Battery branch cut to 0 mA; the adapter powers the board directly — no unplugging, no extra cycles."
+           : "电芯支路截断为 0 mA，适配器直通主板供电——无需拔插头，不消耗电池循环。"
+    }
+    var onboardingPowerBatteryCaption: String {
+        en ? "Adapter disconnected; the battery powers the logic board." : "适配器断开，由电池为主板供电。"
+    }
+    func onboardingPowerLiveReading(percent: Int, flow: String, amperage: Int) -> String {
+        en ? "This Mac now: \(percent)% · \(flow) · Cell current \(amperage) mA"
+           : "本机当前实测：\(percent)% · \(flow) · 电芯电流 \(amperage) mA"
+    }
+    var onboardingDesktopTitle: String { en ? "Live Hardware & Environment" : "实时硬件与运行环境透视" }
+    var onboardingDesktopSubtitle: String {
+        en ? "No battery on this Mac — Pharos focuses on temperatures, fans, memory and listening ports."
+           : "这台 Mac 没有电池——Pharos 将专注于温度、风扇、内存与监听端口。"
+    }
+    var onboardingDesktopPeakTemp: String { en ? "Peak Chip Temp" : "芯片峰值温度" }
+    var onboardingDesktopFan: String { en ? "Fan Speed" : "风扇转速" }
+    var onboardingDesktopMemory: String { en ? "Memory Used" : "物理内存占用" }
+    var onboardingDesktopPorts: String { en ? "Listening Ports" : "活跃监听端口" }
+
+    // Step 03 — Permissions
+    var onboardingPermissionsTitle: String { en ? "Give Pharos What It Needs" : "按需透明授权" }
+    var onboardingPermissionsSubtitle: String {
+        en ? "Nothing here is required to continue. Grant only what you want to use."
+           : "以下均非必需，可直接继续。只授予你想用的功能。"
+    }
+    var onboardingPermTelemetryTitle: String { en ? "System & Hardware Telemetry" : "系统与硬件遥测" }
+    var onboardingPermTelemetryDesc: String {
+        en ? "Memory, ports, battery health and chip temperatures are read as your user account. No extra permission."
+           : "内存、端口、电池健康与芯片温度均以普通用户身份只读采集，无需任何额外权限。"
+    }
+    var onboardingPermReady: String { en ? "Ready" : "已就绪" }
+    var onboardingPermHelperTitle: String { en ? "Charging Control Helper (pharos-battd)" : "充电控制特权守护（pharos-battd）" }
+    var onboardingPermHelperDesc: String {
+        en ? "Only needed for a charge limit. Installed once via the macOS administrator prompt; talks over a local socket only. Installing does not change charging."
+           : "仅在启用充电上限时需要。通过 macOS 原生管理员密码框一次性安装，仅本地通信。安装本身不会改变充电行为。"
+    }
+    var onboardingPermHelperInstall: String { en ? "Install Component" : "安装组件" }
+    var onboardingPermHelperInstalling: String { en ? "Installing…" : "正在安装…" }
+    var onboardingPermHelperInstalled: String { en ? "Installed" : "已安装就绪" }
+    var onboardingPermHelperUnsupported: String { en ? "Not supported on this Mac" : "当前硬件不支持" }
+    var onboardingPermFDATitle: String { en ? "Full Disk Access (Optional)" : "完全磁盘访问（可选）" }
+    var onboardingPermFDADesc: String {
+        en ? "Does not affect power or monitoring. Only used to scan Safari and protected system caches during cleanup."
+           : "不影响电源与监控功能，仅用于在清理时扫描 Safari 与受保护的系统缓存。"
+    }
+    var onboardingPermFDAGranted: String { en ? "Granted" : "已授权" }
+    var onboardingPermOpenSettings: String { en ? "Open System Settings" : "打开系统设置" }
+
+    // Step 04 — Preferences
+    var onboardingPrefsTitle: String { en ? "Make Pharos Yours" : "定制基础偏好" }
+    var onboardingPrefsSubtitle: String {
+        en ? "Nothing is applied until you continue. You can change all of this later in Settings."
+           : "点击继续前不会生效，之后也可随时在设置中修改。"
+    }
+    var onboardingPrefsChargingTitle: String { en ? "Charging Management" : "充电管理方式" }
+    var onboardingPrefsChargingSystem: String { en ? "macOS Default (No Changes)" : "macOS 系统默认（不干预）" }
+    var onboardingPrefsChargingLimit: String { en ? "Pharos Charge Limit" : "Pharos 充电上限保护" }
+    var onboardingPrefsLimitRecommended: String { en ? "80% (Recommended)" : "80%（日常推荐）" }
+    var onboardingPrefsPersistentGuard: String { en ? "Keep guarding when lid is closed or in background" : "合盖与后台持续守护" }
+    var onboardingPrefsLimitSafetyNote: String {
+        en ? "At the limit, charging pauses and the adapter powers your Mac directly — it never forces a discharge. If the helper is not installed, you will be asked for an administrator password when you continue."
+           : "达到上限后仅暂停充电、改由适配器直通供电，绝不强制断电放电；若守护组件未安装，点击继续时将请求管理员确认。"
+    }
+    var onboardingPrefsPinBattery: String { en ? "Show Battery card in the menu bar popover" : "在菜单栏弹窗展示「电池与充电」卡片" }
+    var onboardingPrefsPinBatteryDesc: String {
+        en ? "Click the menu bar icon to see limit status and a Charge to Full button."
+           : "开启后点击菜单栏图标即可查看限充状态与「立即充满」按钮。"
+    }
+    var onboardingPrefsMenuBarText: String { en ? "Next to the menu bar icon" : "菜单栏图标旁显示" }
+    var onboardingPrefsLaunchAtLogin: String { en ? "Launch at login" : "登录时自动启动" }
+    var onboardingInstallCancelledFallback: String {
+        en ? "Helper was not installed, so charging stays with macOS. You can enable the limit later in Battery."
+           : "守护组件未安装，充电仍由 macOS 管理。之后可在「电池」页随时开启限充。"
+    }
+
+    // Step 05 — Menu bar
+    var onboardingMenuBarTitle: String { en ? "Always Within Reach" : "常驻菜单栏" }
+    var onboardingMenuBarSubtitle: String {
+        en ? "Pharos lives in your menu bar. Click the icon any time for a quick look."
+           : "Pharos 常驻在菜单栏，随时点击图标即可快速查看。"
+    }
+    var onboardingMenuBarClickHint: String { en ? "Click the icon to try it" : "点击图标试试" }
+    var onboardingMenuBarTipRing: String {
+        en ? "The ring color shows memory pressure at a glance: green is fine, orange is busy, red needs attention."
+           : "图标圆环颜色一眼看出内存压力：绿色正常、橙色繁忙、红色需关注。"
+    }
+    var onboardingMenuBarTipBackground: String {
+        en ? "Closing the main window keeps Pharos running quietly in the menu bar with low power use."
+           : "关闭主窗口后，Pharos 会以低功耗在菜单栏后台常驻。"
+    }
+    var onboardingMenuBarTipFull: String {
+        en ? "Need 100% for a trip? Use Charge to Full Now in the Battery card."
+           : "出门需要满电？在电池卡片里点「立即充满电」即可。"
+    }
+
+    // Step 06 — Completion
+    var onboardingDoneTitle: String { en ? "You're All Set" : "准备就绪" }
+    var onboardingDoneSubtitle: String { en ? "Here is what is active right now." : "以下是当前真实生效的配置。" }
+    var onboardingDonePowerRow: String { en ? "Power Policy" : "电源策略" }
+    func onboardingDonePowerLimit(_ limit: Int) -> String {
+        en ? "Pharos Charge Limit (\(limit)%)" : "Pharos 充电上限保护（\(limit)%）"
+    }
+    var onboardingDonePowerSystem: String { en ? "macOS Default (charging unchanged)" : "macOS 系统默认（未改动硬件充电）" }
+    var onboardingDoneHelperRow: String { en ? "Helper" : "守护进程" }
+    var onboardingDoneHelperRunning: String { en ? "pharos-battd running" : "pharos-battd 运行中" }
+    var onboardingDoneHelperNotInstalled: String { en ? "Not installed (on demand)" : "未安装（按需启用）" }
+    var onboardingDoneMenuBarRow: String { en ? "Menu Bar" : "菜单栏" }
+    var onboardingDoneLaunchRow: String { en ? "Launch at Login" : "登录自启" }
+    var onboardingOn: String { en ? "On" : "开启" }
+    var onboardingOff: String { en ? "Off" : "关闭" }
+    var onboardingDoneReplayHint: String {
+        en ? "You can replay this guide any time from Main Window → Settings → Quick Actions."
+           : "可随时在「主窗口 → 设置 → 快捷操作」中重新打开引导。"
+    }
+    var onboardingReplay: String { en ? "Replay Onboarding" : "重新查看引导" }
+
+    // Phase 2 skeleton placeholder (replaced by real step views in Phase 3).
+    var onboardingPlaceholderNote: String { en ? "Content coming soon" : "内容即将呈现" }
 }
-
-
-
-
-
