@@ -28,6 +28,8 @@ final class ChromeStore: ObservableObject {
     private var loadingProfiles: Set<String> = []
     /// Instances that survived SIGTERM; UI offers force quit.
     @Published private(set) var stubborn: Set<String> = []
+    /// Instances with a quit in flight; cards show "Quitting…" until the browser exits.
+    @Published private(set) var quitting: Set<String> = []
     @Published var errorMessage: String?
 
     private static let key = "chromePresets.v1"
@@ -278,23 +280,39 @@ final class ChromeStore: ObservableObject {
         do { try p.run() } catch { errorMessage = l10n.chromeStartFailed(error.localizedDescription) }
     }
 
-    func quit(_ instance: ChromeInstance, then refresh: @escaping () async -> Void) {
+    /// SIGTERM the browser main process (a normal Chrome shutdown), then poll; the card
+    /// goes away as soon as it exits. Still alive after 3 s → offer force quit.
+    func quit(_ instance: ChromeInstance, removed: @escaping @MainActor (String) -> Void = { _ in },
+              then refresh: @escaping () async -> Void) {
         guard instance.pid > 1, instance.pid != getpid() else { return }
-        ProcessControl.send(.terminate, to: [instance.pid])
         let key = instance.id
+        quitting.insert(key)
+        ProcessControl.send(.terminate, to: [instance.pid])
         Task { [weak self] in
-            try? await Task.sleep(for: .seconds(3))
-            if ProcessControl.isAlive(instance.pid) { self?.stubborn.insert(key) }
+            let exited = await ProcessControl.waitForExit([instance.pid], timeout: 3)
+            guard let self else { return }
+            if exited {
+                removed(key)
+            } else {
+                self.stubborn.insert(key)
+            }
+            self.quitting.remove(key)
             await refresh()
         }
     }
 
-    func forceQuit(_ instance: ChromeInstance, then refresh: @escaping () async -> Void) {
+    func forceQuit(_ instance: ChromeInstance, removed: @escaping @MainActor (String) -> Void = { _ in },
+                   then refresh: @escaping () async -> Void) {
         let me = getpid()
-        ProcessControl.send(.kill, to: instance.allPIDs.filter { $0 > 1 && $0 != me })
-        stubborn.remove(instance.id)
-        Task {
-            try? await Task.sleep(for: .milliseconds(500))
+        let pids = instance.allPIDs.filter { $0 > 1 && $0 != me }
+        let key = instance.id
+        quitting.insert(key)
+        stubborn.remove(key)
+        ProcessControl.send(.kill, to: pids)
+        Task { [weak self] in
+            _ = await ProcessControl.waitForExit(pids, timeout: 1.5)
+            removed(key)
+            self?.quitting.remove(key)
             await refresh()
         }
     }

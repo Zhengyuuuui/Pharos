@@ -42,6 +42,11 @@ final class ProjectStore: ObservableObject {
     var hasViewers: Bool { viewers > 0 }
     /// Projects that survived SIGTERM; UI offers a force kill for these.
     @Published private(set) var stubborn: Set<String> = []
+    /// Projects with a signal in flight; rows show "Stopping…" until the processes are gone.
+    @Published private(set) var stopping: Set<String> = []
+    /// A refresh requested while a scan was running; replayed as soon as that scan ends
+    /// so a stop / quit is never left waiting for the next timer tick.
+    private var refreshQueued = false
 
     @Published var refreshSeconds: Int {
         didSet {
@@ -131,9 +136,18 @@ final class ProjectStore: ObservableObject {
     }
 
     func refresh() async {
-        guard !activity.isScanning else { return }
+        guard !activity.isScanning else {
+            refreshQueued = true
+            return
+        }
         activity.isScanning = true
-        defer { activity.isScanning = false }
+        defer {
+            activity.isScanning = false
+            if refreshQueued {
+                refreshQueued = false
+                Task { [weak self] in await self?.refresh() }
+            }
+        }
         // Not awaited: a slow or disconnected network share must not delay ports/memory.
         Task { await refreshVolumes() }
         Task { await refreshThermals() }
@@ -260,28 +274,55 @@ final class ProjectStore: ObservableObject {
 
     // MARK: - Actions
 
-    func terminate(_ project: Project) {
+    /// SIGTERM, then poll every 100 ms: the row disappears as soon as the processes exit
+    /// instead of after a fixed delay. Still alive after `graceSeconds` → offer force kill.
+    func terminate(_ project: Project, graceSeconds: Double = 3) {
         recentlyStopped[project.directory ?? project.id] = Date()
         let pids = killablePIDs(project)
+        stopping.insert(project.id)
         ProcessControl.send(.terminate, to: pids)
         Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(1500))
+            let exited = await ProcessControl.waitForExit(pids, timeout: graceSeconds)
             guard let self else { return }
-            if pids.contains(where: ProcessControl.isAlive) {
+            if exited {
+                self.removeLocally(project.id)
+            } else {
                 self.stubborn.insert(project.id)
             }
+            self.stopping.remove(project.id)
             await self.refresh()
         }
     }
 
     func forceKill(_ project: Project) {
         recentlyStopped[project.directory ?? project.id] = Date()
-        ProcessControl.send(.kill, to: killablePIDs(project))
+        let pids = killablePIDs(project)
+        stopping.insert(project.id)
         stubborn.remove(project.id)
+        ProcessControl.send(.kill, to: pids)
         Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(500))
-            await self?.refresh()
+            _ = await ProcessControl.waitForExit(pids, timeout: 1.5)
+            guard let self else { return }
+            self.removeLocally(project.id)
+            self.stopping.remove(project.id)
+            await self.refresh()
         }
+    }
+
+    /// Drop a stopped project right away; the following scan confirms it.
+    private func removeLocally(_ id: String) {
+        guard state.projects.contains(where: { $0.id == id }) else { return }
+        var next = state
+        next.projects.removeAll { $0.id == id }
+        state = next
+    }
+
+    /// Same for a quit browser instance.
+    func removeChromeLocally(_ id: String) {
+        guard state.chrome.contains(where: { $0.id == id }) else { return }
+        var next = state
+        next.chrome.removeAll { $0.id == id }
+        state = next
     }
 
     /// Project folders stopped from Pharos, so the "stopped unexpectedly"

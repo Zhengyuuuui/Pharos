@@ -184,4 +184,14 @@ public enum ProcessControl {
     public static func isAlive(_ pid: Int32) -> Bool {
         Darwin.kill(pid, 0) == 0
     }
+
+    /// Polls every `interval` until none of `pids` is alive; returns false on timeout.
+    public static func waitForExit(_ pids: [Int32], timeout: Double, interval: Double = 0.1) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while pids.contains(where: isAlive) {
+            if Date() >= deadline { return false }
+            try? await Task.sleep(for: .seconds(interval))
+        }
+        return true
+    }
 }
