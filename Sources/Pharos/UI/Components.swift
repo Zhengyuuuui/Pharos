@@ -138,28 +138,20 @@ struct RowButtonStyle: ButtonStyle {
     }
 }
 
-/// Small borderless icon button used in project rows.
+/// Legacy name kept for existing call sites; renders as `PharosIconButton` (ghost, circular).
 struct IconButton: View {
     let systemImage: String
     let help: String
     var tint: Color = PharosColor.textSecondary
     var size: CGFloat = 22
     let action: () -> Void
-    @State private var hovering = false
 
     var body: some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: size <= 20 ? 10 : 11, weight: .regular))
-                .frame(width: size, height: size)
-                .background(
-                    RoundedRectangle(cornerRadius: PharosRadius.small, style: .continuous)
-                        .fill(hovering ? PharosColor.fill : .clear)
-                )
-                .foregroundStyle(tint)
+        if systemImage == "xmark" {
+            // A bare × in these call sites always dismisses a banner or cancels; use the close style.
+            PharosCloseButton(help: help, size: max(18, size - 2), action: action)
+        } else {
+            PharosIconButton(systemImage: systemImage, help: help, tint: tint, size: size, action: action)
         }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .help(help)
     }
 }

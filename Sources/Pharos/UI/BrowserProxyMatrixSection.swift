@@ -135,11 +135,16 @@ struct BrowserProxyMatrixSection: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(PharosColor.textPrimary)
                     .lineLimit(1)
+                    .truncationMode(.tail)
+                    .layoutPriority(0)
 
-                Spacer()
+                Spacer(minLength: 4)
 
                 Text(badge)
                     .font(PharosFont.captionDigits)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .layoutPriority(1)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1)
                     .background(Capsule().fill(badgeColor.opacity(0.12)))

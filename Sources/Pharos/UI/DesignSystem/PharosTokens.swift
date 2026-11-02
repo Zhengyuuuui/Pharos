@@ -43,6 +43,11 @@ enum PharosColor {
         light: 0.84, dark: 0.29,
         lightContrast: 0.78, darkContrast: 0.35
     )
+    /// Between `fill` and `fillPressed`: hover feedback for buttons.
+    static let fillHover = dynamic(
+        light: 0.865, dark: 0.265,
+        lightContrast: 0.81, darkContrast: 0.32
+    )
 
     static let textPrimary = Color.primary
     static let textSecondary = Color.secondary
@@ -50,6 +55,16 @@ enum PharosColor {
     static let separator = Color(nsColor: .separatorColor)
 
     static let accent = Color.accentColor
+    /// Primary-button fill: monochrome to match the icon (near-black in light mode,
+    /// near-white in dark mode) instead of the system blue.
+    static let accentFill = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(white: 0.93, alpha: 1) : NSColor(white: 0.12, alpha: 1)
+    })
+    static let onAccent = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(white: 0.08, alpha: 1) : NSColor(white: 1, alpha: 1)
+    })
     static let success = Color.green
     static let warning = Color.orange
     static let error = Color.red
