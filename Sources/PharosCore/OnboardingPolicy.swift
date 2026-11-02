@@ -125,15 +125,17 @@ public enum OnboardingNavigationDirection: Sendable, Equatable {
 public enum OnboardingMotionLevel: Int, Comparable, Sendable {
     /// Reduce Motion: opacity crossfade only.
     case minimal
-    /// Low Power Mode or 3D acceleration off: spring scale/offset, no blur, no continuous frames.
+    /// Low Power Mode: spring scale/offset, no blur, no continuous frames.
     case reduced
     case rich
 
     public static func < (a: Self, b: Self) -> Bool { a.rawValue < b.rawValue }
 
-    public static func resolve(reduceMotion: Bool, lowPower: Bool, gauge3DEnabled: Bool) -> Self {
+    /// The in-app "3D gauge acceleration" preference is intentionally not an input: onboarding is
+    /// shown once, so it always plays in full. Only the system's Reduce Motion and Low Power Mode degrade it.
+    public static func resolve(reduceMotion: Bool, lowPower: Bool) -> Self {
         if reduceMotion { return .minimal }
-        if lowPower || !gauge3DEnabled { return .reduced }
+        if lowPower { return .reduced }
         return .rich
     }
 

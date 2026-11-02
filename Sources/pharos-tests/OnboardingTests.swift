@@ -96,11 +96,10 @@ private func testOnboardingSteps() {
 
 private func testOnboardingMotion() {
     typealias L = OnboardingMotionLevel
-    expectEq(L.resolve(reduceMotion: true, lowPower: false, gauge3DEnabled: true), .minimal, "reduce motion wins")
-    expectEq(L.resolve(reduceMotion: true, lowPower: true, gauge3DEnabled: false), .minimal, "reduce motion wins over all")
-    expectEq(L.resolve(reduceMotion: false, lowPower: true, gauge3DEnabled: true), .reduced, "low power -> reduced")
-    expectEq(L.resolve(reduceMotion: false, lowPower: false, gauge3DEnabled: false), .reduced, "3D off -> reduced")
-    expectEq(L.resolve(reduceMotion: false, lowPower: false, gauge3DEnabled: true), .rich, "rich")
+    expectEq(L.resolve(reduceMotion: true, lowPower: false), .minimal, "reduce motion wins")
+    expectEq(L.resolve(reduceMotion: true, lowPower: true), .minimal, "reduce motion wins over low power")
+    expectEq(L.resolve(reduceMotion: false, lowPower: true), .reduced, "low power -> reduced")
+    expectEq(L.resolve(reduceMotion: false, lowPower: false), .rich, "onboarding is rich regardless of in-app 3D setting")
     expect(!L.minimal.allowsScale && !L.minimal.allowsBlur, "minimal: fade only")
     expect(L.reduced.allowsScale && !L.reduced.allowsBlur && !L.reduced.allowsContinuousFrames, "reduced: no blur/frames")
     expect(L.rich.allowsBlur && L.rich.allowsContinuousFrames, "rich: everything")

@@ -2,15 +2,8 @@ import SwiftUI
 import PharosCore
 
 enum OnboardingMotion {
-    static let gauge3DKey = "pharos.gauge3DAcceleration"
-
     static func level(reduceMotion: Bool) -> OnboardingMotionLevel {
-        let gauge3D = UserDefaults.standard.object(forKey: gauge3DKey) as? Bool ?? true
-        return .resolve(
-            reduceMotion: reduceMotion,
-            lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled,
-            gauge3DEnabled: gauge3D
-        )
+        .resolve(reduceMotion: reduceMotion, lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled)
     }
 
     static func stepAnimation(_ level: OnboardingMotionLevel) -> Animation {

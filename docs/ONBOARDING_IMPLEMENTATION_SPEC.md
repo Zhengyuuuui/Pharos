@@ -229,16 +229,17 @@ struct OnboardingZoomBlurTransition: Transition {
 4. **`Canvas` / `TimelineView` 限时自动休眠**：
    - Step 01 的 `RadarBeamLogoCanvas` 仅在进入页面前 `2.2s` 开启 `TimelineView(.animation(minimumInterval: nil, paused: isSettled))`；扫描落位到标准图标角度（`25°–65°`）后立即将 `isSettled = true`，静止后 GPU 占用 **0%**。
 5. **三级节能与无障碍自动降级护栏**：
-   - 在 `OnboardingMotion.swift` 中统一封装判定：
+   - 判定为纯函数 `OnboardingMotionLevel.resolve`（`PharosCore/OnboardingPolicy.swift`，有单测），界面层 `OnboardingMotion.level(reduceMotion:)` 只负责读取系统状态：
      ```swift
-     static func isRichMotionEnabled(reduceMotion: Bool, gauge3DEnabled: Bool) -> Bool {
-         guard !reduceMotion else { return false }
-         guard !ProcessInfo.processInfo.isLowPowerModeEnabled else { return false }
-         return gauge3DEnabled
+     public static func resolve(reduceMotion: Bool, lowPower: Bool) -> OnboardingMotionLevel {
+         if reduceMotion { return .minimal }
+         if lowPower { return .reduced }
+         return .rich
      }
      ```
-   - 当 `reduceMotion == true` 时：禁用缩放、位移、模糊与光束旋转，所有切换降级为 `withAnimation(.easeInOut(duration: 0.16))` 的纯 `.opacity` 过渡；
-   - 当 `isLowPowerModeEnabled == true` 或 `gauge3DEnabled == false` 时：保留轻量弹簧缩放与透明度过渡，但关闭 `blur` 高斯卷积与连续 `Canvas` 帧动画，确保在任何低配或低电量 Mac 上都绝对丝滑。
+   - **引导强制走完整动效**：App 内「仪表盘 3D 渲染与动效加速」开关（`pharos.gauge3DAcceleration`）**不参与**引导的判定。引导只出现一次，雷达扫描 2.2s 后即停、转场模糊静止归零，持续开销可忽略，因此始终完整播放。只有系统级的「减弱动态效果」与「低电量模式」会降级。
+   - `.minimal`（`reduceMotion == true`）：禁用缩放、位移、模糊、光束旋转与电源演示自动轮播，所有切换降级为 `withAnimation(.easeInOut(duration: 0.16))` 的纯 `.opacity` 过渡；
+   - `.reduced`（`isLowPowerModeEnabled == true`）：保留轻量弹簧缩放与透明度过渡，关闭 `blur` 高斯卷积与连续 `Canvas` / `TimelineView` 帧动画；引导打开期间监听 `NSProcessInfoPowerStateDidChange`，切换低电量模式即时生效。
 
 ---
 
@@ -344,6 +345,8 @@ flowchart LR
     P4 --> P5["Phase 5 (P1/P2)<br/>内存压测与全矩阵验收"]
 ```
 
+> **实施状态（2026-11-02）**：Phase 1–5 代码均已合入 `main`（`9ff92af` / `b3226bd` / `0bcbded` 及后续修订），`make test` 1166 条断言全绿。Phase 5 中需人工完成的运行时验收项见文末「九、实施记录与待验收项」。
+
 ---
 
 ### Phase 1：纯逻辑策略层与电源安全底座解耦（优先级：P0）
@@ -430,3 +433,42 @@ flowchart LR
 - [ ] 在「设置 → 快捷操作」点击「重新查看引导」时，已有配置被完整回填，关闭引导不会重置已有设置。
 - [ ] 浅色模式、深色模式、高对比度、中英文实时切换、开启系统「减弱动态效果（Reduce Motion）」下均无排版错位或残影残留。
 - [ ] 内存验收：完成引导进入主界面并关闭主窗口后，通过 `vmmap --summary <pid>` 确认引导窗口的 `IOSurface` 图层已完全回收，常驻物理内存无上涨。
+
+---
+
+## 九、实施记录与待验收项（2026-11-02）
+
+### 9.1 各 Phase 交付
+| Phase | 提交 | 交付内容 |
+|---|---|---|
+| 1 | `9ff92af` | `OnboardingPolicy` / `OnboardingDraft`；`BatteryInstallPlan.modeAfterInstall` 纯函数（安装后恢复模式）；`BatteryStore.install(activateLimitAfterInstall:onComplete:)`，`runAsAdmin` 区分密码框取消（`-128`）；`PopoverBatteryBlock` 以 `isPharosManaging` 守卫限充目标与「立即充满」 |
+| 2 | `b3226bd` | `OnboardingWindowController`（720×520、顶部 44pt 拖拽、关窗置空 `contentViewController`）、`OnboardingCoordinator`、`OnboardingZoomBlurTransition`（几何参数在 Core 的 `OnboardingTransitionGeometry` 中单测静止态恒等）、全部双语文案 |
+| 3–5 | `0bcbded` | 六步页面 + `OnboardingStepScaffold`；Step 04→05 两阶段提交；`PharosApp` 启动分流与 Dock 重开置前；设置「重新查看引导」；`RadarBeamLogoCanvas`、`PowerFlowDiagramView`、`KeyframeAnimator` 完成徽章；`MenuBarText.battery`（`BatteryMenuBarMetric`） |
+| 修订 | 本次 | 引导不再受 App 内 3D 加速开关影响（见 §4.3 第 5 条） |
+
+### 9.2 与原规格的偏差（已定稿）
+1. **红叉关闭 = 视为完成**：用户点红叉关闭引导时写入 `onboardingCompletedVersion`，下次启动不再弹出，可从设置重看。唯一例外：已写入 `onboardingResumeStep`（Step 03 跳转系统设置、可能被 macOS 要求重启）时保留断点续接。切回前台未重启则清除断点。
+2. **密码框取消**：Step 04 选择「Pharos 充电上限保护」后取消管理员密码框，`draft.chargingChoice` 回退为 `.systemManaged`，停留在 Step 04 并显示温和提示（非红字错误），不前进。
+3. **重看模式下的关闭限充**：仅当 `isReplay == true` 且当前由 Pharos 托管时，Step 04 改选「系统默认」才会调用 `setSystemMode()`；首次引导选「系统默认」绝不触碰硬件。
+4. **共用布局**：新增 `Steps/OnboardingStepScaffold.swift`（标题 + 副标题 + 内容的统一布局），原文件清单未列出。
+5. **菜单栏组件可见性**：`MenuBarLabel` 与 `DynamicMenuBarIcon` 去掉 `private` 以便 Step 05 复用真实组件；`DynamicMenuBarIcon.image` 新增 `highIsBad` 参数，电量模式下满电不变红。
+6. **雷达徽标点阵**：136pt 下使用 54pt 步长（图标 1024px 为 32pt 步长），保证小尺寸可辨；构图角度、光源、三个目标环位置与 `make-icon.swift` 一致，浅色版严格 R=G=B。
+7. **电源导管动画**：每次状态切换后虚线仅流动 3s 即静止，满足「静止 5s 后 GPU 0%」。
+
+### 9.3 已验证
+- `swift build` 零错误、新增代码零警告；`make test` 1166 条断言通过（`OnboardingTests` 覆盖判定、草稿裁剪、安装恢复计划、步骤导航、动效分级、转场几何、雷达扫描时间曲线与热度、电源演示数据、电量菜单栏指标）。
+- 以独立配置域打包副本模拟全新用户：自动弹出 720×520 引导，Step 01 深色外观雷达构图正确落位。
+- 人工审计：六步转场与动画流畅。
+- 引导窗口打开时 `vmmap --summary`：Physical footprint 84.7 MB，IOSurface 脏内存 336 KB（窗口仍在显示，属正常）。
+
+### 9.4 待验收（需人工）
+- [ ] 完成引导并关闭主窗口后 `vmmap --summary $(pgrep -x Pharos)`：IOSurface 脏内存归零、常驻内存不上涨。
+- [ ] Step 03 / Step 04 管理员密码框点「取消」：无红字错误、不卡死、Step 04 回退为系统默认并显示提示。
+- [ ] Step 03 跳转系统设置授予 FDA 后切回：自动刷新为「已授权」；若被要求重启，重启后回到 Step 03。
+- [ ] 浅色 / 深色 × 增强对比度 × 中文 / 英文：六页无截断。
+- [ ] 开启「减弱动态效果」与「低电量模式」分别走查降级效果。
+- [ ] 无电池台式 Mac：Step 02 切换为硬件透视、Step 03 隐藏守护进程行、Step 04 隐藏充电管理。
+
+### 9.5 已知问题（与引导无关）
+- 直接运行 `.build/debug/Pharos`（非 `.app` 包）会在 `Notifier.refreshAuthorization()` 调用 `UNUserNotificationCenter.current()` 时中止（无 bundle）。运行时验证请使用 `make app` 产物。
+
