@@ -9,6 +9,11 @@ enum OnboardingMotion {
     static func stepAnimation(_ level: OnboardingMotionLevel) -> Animation {
         level == .minimal ? .easeInOut(duration: 0.16) : .spring(response: 0.38, dampingFraction: 0.86)
     }
+
+    /// High damping so the card below doesn't bounce when the section lands fully collapsed.
+    static func collapseAnimation(_ level: OnboardingMotionLevel) -> Animation {
+        level == .minimal ? .easeInOut(duration: 0.16) : .spring(response: 0.36, dampingFraction: 0.90)
+    }
 }
 
 /// Camera dolly + transient Gaussian blur. At rest (`.identity`) blur is exactly 0 and scale exactly 1,

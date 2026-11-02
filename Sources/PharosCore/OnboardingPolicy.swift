@@ -106,7 +106,7 @@ public enum BatteryInstallPlan {
 }
 
 public enum OnboardingStep: Int, CaseIterable, Sendable {
-    case welcome, powerIntro, permissions, preferences, menuBar, completion
+    case welcome, capabilities, permissions, preferences, menuBar, completion
 
     public var isFirst: Bool { self == .welcome }
     public var isLast: Bool { self == .completion }
@@ -182,6 +182,39 @@ public enum OnboardingTransitionGeometry {
     }
 }
 
+/// Per-frame values for a height-clipped collapsible section. Blur follows sin(π·p) so both rest
+/// states (fully collapsed / fully expanded) are exactly 0 and never keep an offscreen pass alive.
+public enum OnboardingCollapseGeometry {
+    public static let maxBlur: Double = 3.0
+
+    public struct Values: Equatable, Sendable {
+        public var heightFraction: Double
+        public var opacity: Double
+        public var scaleY: Double
+        public var blur: Double
+
+        public init(heightFraction: Double, opacity: Double, scaleY: Double, blur: Double) {
+            self.heightFraction = heightFraction
+            self.opacity = opacity
+            self.scaleY = scaleY
+            self.blur = blur
+        }
+    }
+
+    public static func values(progress: Double, level: OnboardingMotionLevel) -> Values {
+        let p = Swift.min(Swift.max(progress, 0), 1)
+        // Snap rest states exactly so floating-point sin(π) residue can't leave a blur pass on.
+        let blur: Double = (!level.allowsBlur || p == 0 || p == 1) ? 0 : sin(p * .pi) * maxBlur
+        return Values(
+            heightFraction: p,
+            // Content fades slightly ahead of the clipping edge on collapse.
+            opacity: Swift.min(Swift.max((p - 0.12) / 0.88, 0), 1),
+            scaleY: level.allowsScale ? 0.96 + 0.04 * p : 1,
+            blur: blur
+        )
+    }
+}
+
 /// Geometry of `Scripts/make-icon.swift` (1024 pt space, lamp bottom-left, y up) plus the
 /// onboarding entrance sweep. Shared so the animated logo lands exactly on the icon's composition.
 public enum RadarBeamGeometry {
@@ -232,24 +265,103 @@ public enum RadarBeamGeometry {
     }
 }
 
-/// Animated cell-current figure for the power demo (mA). Numbers are illustrative, not measured.
-public enum PowerDemoFlow: CaseIterable, Sendable {
-    case charging, passthrough, onBattery
+/// One beat of a simulated-cursor script: glide → aim → press → release + dwell.
+public struct OnboardingCursorStep: Equatable, Sendable {
+    public let targetID: String
+    public let moveDuration: Double
+    public let aimPause: Double
+    public let pressDuration: Double
+    public let dwellAfterClick: Double
 
-    public var cellMilliamps: Int {
-        switch self {
-        case .charging: 1500
-        case .passthrough: 0
-        case .onBattery: -1200
-        }
+    public init(_ targetID: String, moveDuration: Double = 0.50, aimPause: Double = 0.14,
+                pressDuration: Double = 0.10, dwellAfterClick: Double = 1.05) {
+        self.targetID = targetID
+        self.moveDuration = Swift.max(0, moveDuration)
+        self.aimPause = Swift.max(0, aimPause)
+        self.pressDuration = Swift.max(0, pressDuration)
+        self.dwellAfterClick = Swift.max(0, dwellAfterClick)
     }
-    public var adapterConnected: Bool { self != .onBattery }
-    public var cellBranchActive: Bool { self != .passthrough }
-    /// Energy direction on the board↔cell conduit.
-    public var cellFlowsIntoBattery: Bool { self == .charging }
 
-    /// Auto tour: one gentle pass, ending on passthrough (the point of the demo).
-    public static let tour: [PowerDemoFlow] = [.passthrough, .onBattery, .passthrough]
+    public var totalDuration: Double { moveDuration + aimPause + pressDuration + dwellAfterClick }
+}
+
+/// A one-shot cursor tour. Played at most once per page appearance, then the cursor fades and the page rests.
+public struct OnboardingCursorScript: Equatable, Sendable {
+    public let initialDelay: Double
+    public let steps: [OnboardingCursorStep]
+    public static let fadeOutDuration: Double = 0.16
+    /// Upper bound so a tour can never become a long-running animation.
+    public static let maxTotalDuration: Double = 10
+
+    public init(initialDelay: Double, steps: [OnboardingCursorStep]) {
+        self.initialDelay = Swift.max(0, initialDelay)
+        self.steps = steps
+    }
+
+    public var totalDuration: Double { initialDelay + steps.reduce(0) { $0 + $1.totalDuration } + Self.fadeOutDuration }
+
+    public enum Target {
+        public static func tab(_ kind: OnboardingCapabilityKind) -> String { "cap.tab.\(kind.rawValue)" }
+        public static func action(_ kind: OnboardingCapabilityKind) -> String { "cap.act.\(kind.rawValue)" }
+        public static let menuBarIcon = "menubar.icon"
+        public static let menuBarSecondTab = "menubar.secondTab"
+    }
+
+    /// Step 02: one pass through all four sandboxes, ending on cleanup (its sweep needs the longest dwell).
+    public static func capabilities(hasBattery: Bool) -> Self {
+        let third: OnboardingCapabilityKind = hasBattery ? .power : .thermals
+        func tab(_ k: OnboardingCapabilityKind) -> OnboardingCursorStep {
+            OnboardingCursorStep(Target.tab(k), moveDuration: 0.42, dwellAfterClick: 0.25)
+        }
+        func act(_ k: OnboardingCapabilityKind, dwell: Double = 0.8) -> OnboardingCursorStep {
+            OnboardingCursorStep(Target.action(k), moveDuration: 0.42, dwellAfterClick: dwell)
+        }
+        return Self(initialDelay: 0.45, steps: [
+            act(.memory),
+            tab(.ports), act(.ports),
+            tab(third), act(third),
+            tab(.cleanup), act(.cleanup, dwell: 1.2),
+        ])
+    }
+
+    /// Step 05: open the popover from the menu bar icon, then (if there are tabs) switch to the second.
+    public static func menuBar(hasSecondTab: Bool) -> Self {
+        var steps = [OnboardingCursorStep(Target.menuBarIcon, dwellAfterClick: 1.1)]
+        if hasSecondTab { steps.append(OnboardingCursorStep(Target.menuBarSecondTab, dwellAfterClick: 0.85)) }
+        return Self(initialDelay: 0.45, steps: steps)
+    }
+}
+
+/// The four capability sandboxes on Step 02. Desktops (no battery) swap the battery card for thermals.
+public enum OnboardingCapabilityKind: String, CaseIterable, Sendable {
+    case memory, ports, power, thermals, cleanup
+
+    public static func lineup(hasBattery: Bool) -> [Self] {
+        [.memory, .ports, hasBattery ? .power : .thermals, .cleanup]
+    }
+}
+
+/// Sandbox state for Step 02. Purely local and illustrative: nothing here touches processes, files or power.
+public struct OnboardingCapabilityDemo: Equatable, Sendable {
+    public static let memoryBefore = 78, memoryAfter = 61
+    public static let portsBefore = 2, portsAfter = 1
+    public static let cellMilliampsBefore = 1480, cellMilliampsAfter = 0
+    public static let cacheGBBefore = 6.8, cacheGBAfter = 0.0
+
+    public private(set) var done: Set<OnboardingCapabilityKind> = []
+
+    public init() {}
+
+    public mutating func perform(_ kind: OnboardingCapabilityKind) { done.insert(kind) }
+    public mutating func reset() { done.removeAll() }
+    public func isDone(_ kind: OnboardingCapabilityKind) -> Bool { done.contains(kind) }
+
+    public var memoryPercent: Int { isDone(.memory) ? Self.memoryAfter : Self.memoryBefore }
+    public var memoryHealthy: Bool { memoryPercent < 70 }
+    public var listeningPorts: Int { isDone(.ports) ? Self.portsAfter : Self.portsBefore }
+    public var cellMilliamps: Int { isDone(.power) ? Self.cellMilliampsAfter : Self.cellMilliampsBefore }
+    public var reclaimableCacheGB: Double { isDone(.cleanup) ? Self.cacheGBAfter : Self.cacheGBBefore }
+    public var showsThermalDetail: Bool { isDone(.thermals) }
 }
 
 /// Menu bar "battery %" option: ring fill and warning level. Low charge is the concern, so the

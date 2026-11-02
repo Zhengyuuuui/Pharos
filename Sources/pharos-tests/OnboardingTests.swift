@@ -8,7 +8,8 @@ func testOnboarding() {
     testOnboardingSteps()
     testOnboardingMotion()
     testRadarBeamGeometry()
-    testPowerDemoFlow()
+    testCapabilityDemo()
+    testCursorScripts()
     testBatteryMenuBarMetric()
 }
 
@@ -84,7 +85,7 @@ private func testOnboardingSteps() {
     expectEq(OnboardingStep.welcome.previous, nil, "no step before welcome")
     expectEq(OnboardingStep.completion.next, nil, "no step after completion")
     expectEq(OnboardingStep.permissions.next, .preferences, "next")
-    expectEq(OnboardingStep.permissions.previous, .powerIntro, "previous")
+    expectEq(OnboardingStep.permissions.previous, .capabilities, "previous")
     expect(OnboardingStep.welcome.isFirst && OnboardingStep.completion.isLast, "first/last")
     expectEq(OnboardingStep.at(2), .permissions, "index 2")
     expectEq(OnboardingStep.at(6), .welcome, "out of range -> welcome")
@@ -126,6 +127,24 @@ private func testOnboardingMotion() {
     expectEq(fOut.scale, 0.93, "forward outgoing recedes"); expectEq(fOut.offsetX, -28, "forward outgoing to left")
     expectEq(bIn.scale, 0.93, "backward mirrors"); expectEq(bIn.offsetX, -28, "backward incoming from left")
     expectEq(bOut.scale, 1.06, "backward outgoing toward viewer"); expectEq(bOut.offsetX, 28, "backward outgoing to right")
+
+    typealias C = OnboardingCollapseGeometry
+    for level in [L.minimal, .reduced, .rich] {
+        let closed = C.values(progress: 0, level: level)
+        let open = C.values(progress: 1, level: level)
+        expectEq(closed.blur, 0, "collapsed rest has no blur (\(level))")
+        expectEq(open.blur, 0, "expanded rest has no blur (\(level))")
+        expectEq(closed.heightFraction, 0, "collapsed height 0")
+        expectEq(closed.opacity, 0, "collapsed invisible")
+        expectEq(open, C.Values(heightFraction: 1, opacity: 1, scaleY: 1, blur: 0), "expanded is identity (\(level))")
+        if !level.allowsBlur { expectEq(C.values(progress: 0.5, level: level).blur, 0, "no blur below rich") }
+        if !level.allowsScale { expectEq(C.values(progress: 0.3, level: level).scaleY, 1, "no scale when minimal") }
+    }
+    let mid = C.values(progress: 0.5, level: .rich)
+    expect(mid.blur > 0 && mid.blur <= C.maxBlur, "rich mid-collapse blurs within cap")
+    expectEq(C.values(progress: 0.1, level: .rich).opacity, 0, "content fades before clip edge")
+    expectEq(C.values(progress: -1, level: .rich).heightFraction, 0, "progress clamped low")
+    expectEq(C.values(progress: 2, level: .rich).heightFraction, 1, "progress clamped high")
 }
 
 private func testRadarBeamGeometry() {
@@ -169,14 +188,50 @@ private func testRadarBeamGeometry() {
     }
 }
 
-private func testPowerDemoFlow() {
-    expectEq(PowerDemoFlow.passthrough.cellMilliamps, 0, "passthrough is 0 mA")
-    expect(PowerDemoFlow.charging.cellMilliamps > 0, "charging positive")
-    expect(PowerDemoFlow.onBattery.cellMilliamps < 0, "on battery negative")
-    expect(!PowerDemoFlow.onBattery.adapterConnected, "adapter off on battery")
-    expect(PowerDemoFlow.passthrough.adapterConnected && !PowerDemoFlow.passthrough.cellBranchActive, "passthrough cuts cell branch")
-    expect(PowerDemoFlow.charging.cellFlowsIntoBattery && !PowerDemoFlow.onBattery.cellFlowsIntoBattery, "flow direction")
-    expectEq(PowerDemoFlow.tour.last, .passthrough, "tour ends on passthrough")
+private func testCapabilityDemo() {
+    typealias K = OnboardingCapabilityKind
+    expectEq(K.lineup(hasBattery: true), [.memory, .ports, .power, .cleanup], "laptop lineup")
+    expectEq(K.lineup(hasBattery: false), [.memory, .ports, .thermals, .cleanup], "desktop lineup")
+    expectEq(OnboardingStep.capabilities.rawValue, 1, "capabilities keeps resume index 1")
+    expectEq(OnboardingStep.allCases.count, 6, "still six steps")
+
+    var d = OnboardingCapabilityDemo()
+    expectEq(d.memoryPercent, 78, "memory before"); expect(!d.memoryHealthy, "memory high before")
+    expectEq(d.listeningPorts, 2, "ports before")
+    expectEq(d.cellMilliamps, 1480, "cell before")
+    expectEq(d.reclaimableCacheGB, 6.8, "cache before")
+    expect(!d.showsThermalDetail, "thermal summary before")
+    for k in K.allCases { d.perform(k) }
+    expectEq(d.memoryPercent, 61, "memory after"); expect(d.memoryHealthy, "memory healthy after")
+    expectEq(d.listeningPorts, 1, "ports after")
+    expectEq(d.cellMilliamps, 0, "cell passthrough 0 mA")
+    expectEq(d.reclaimableCacheGB, 0, "cache cleared")
+    expect(d.showsThermalDetail, "thermal detail after")
+    d.perform(.memory)
+    expectEq(d.memoryPercent, 61, "perform is idempotent")
+    d.reset()
+    expectEq(d, OnboardingCapabilityDemo(), "reset restores initial state")
+}
+
+private func testCursorScripts() {
+    let scripts = [OnboardingCursorScript.capabilities(hasBattery: true), .capabilities(hasBattery: false),
+                   .menuBar(hasSecondTab: true), .menuBar(hasSecondTab: false)]
+    for s in scripts {
+        expect(!s.steps.isEmpty, "script has steps")
+        expect(s.totalDuration < OnboardingCursorScript.maxTotalDuration, "script under 10s (\(s.totalDuration))")
+        for step in s.steps {
+            expect(step.moveDuration >= 0 && step.aimPause >= 0 && step.pressDuration >= 0 && step.dwellAfterClick >= 0,
+                   "non-negative timings")
+        }
+    }
+    let neg = OnboardingCursorStep("x", moveDuration: -1, aimPause: -1, pressDuration: -1, dwellAfterClick: -1)
+    expectEq(neg.totalDuration, 0, "negative timings clamp to 0")
+    expect(OnboardingCursorScript.capabilities(hasBattery: false).steps.contains { $0.targetID == "cap.act.thermals" },
+           "desktop tour acts on thermals")
+    expectEq(OnboardingCursorScript.capabilities(hasBattery: true).steps.last?.targetID, "cap.act.cleanup",
+             "tour ends on the cleanup sweep")
+    expectEq(OnboardingCursorScript.menuBar(hasSecondTab: false).steps.map(\.targetID), ["menubar.icon"], "single tab: icon only")
+    expectEq(OnboardingCursorScript.menuBar(hasSecondTab: true).steps.last?.targetID, "menubar.secondTab", "then second tab")
 }
 
 private func testBatteryMenuBarMetric() {

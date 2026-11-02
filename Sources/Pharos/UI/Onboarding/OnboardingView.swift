@@ -63,7 +63,7 @@ struct OnboardingView: View {
     private var stepView: some View {
         switch coordinator.step {
         case .welcome: OnboardingWelcomeStepView(level: level)
-        case .powerIntro: OnboardingPowerIntroStepView(level: level)
+        case .capabilities: OnboardingCapabilitiesStepView(level: level)
         case .permissions: OnboardingPermissionsStepView(coordinator: coordinator, level: level)
         case .preferences: OnboardingPreferencesStepView(coordinator: coordinator, level: level)
         case .menuBar: OnboardingMenuBarStepView(level: level)

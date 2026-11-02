@@ -25,6 +25,8 @@ struct OnboardingPreferencesStepView: View {
                     }
                     generalCard
                 }
+                // One transaction for the whole stack so the cards below follow the collapsing edge.
+                .animation(OnboardingMotion.collapseAnimation(level), value: coordinator.draft.chargingChoice)
                 .frame(maxWidth: 600)
                 .frame(maxWidth: .infinity)
             }
@@ -35,21 +37,20 @@ struct OnboardingPreferencesStepView: View {
 
     private var chargingCard: some View {
         PharosCard(padding: 14) {
-            VStack(alignment: .leading, spacing: PharosSpacing.m) {
-                Text(l10n.onboardingPrefsChargingTitle).font(PharosFont.rowLabel)
-                Picker("", selection: $coordinator.draft.chargingChoice) {
-                    Text(l10n.onboardingPrefsChargingSystem).tag(OnboardingDraft.ChargingChoice.systemManaged)
-                    Text(l10n.onboardingPrefsChargingLimit).tag(OnboardingDraft.ChargingChoice.pharosLimit)
+            VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: PharosSpacing.m) {
+                    Text(l10n.onboardingPrefsChargingTitle).font(PharosFont.rowLabel)
+                    Picker("", selection: $coordinator.draft.chargingChoice) {
+                        Text(l10n.onboardingPrefsChargingSystem).tag(OnboardingDraft.ChargingChoice.systemManaged)
+                        Text(l10n.onboardingPrefsChargingLimit).tag(OnboardingDraft.ChargingChoice.pharosLimit)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-
-                if coordinator.draft.chargingChoice == .pharosLimit {
-                    limitPanel
-                        .transition(.opacity.combined(with: .move(edge: .top)))
+                OnboardingCollapsibleSection(isExpanded: coordinator.draft.chargingChoice == .pharosLimit, level: level) {
+                    limitPanel.padding(.top, PharosSpacing.m)
                 }
             }
-            .animation(OnboardingMotion.stepAnimation(level), value: coordinator.draft.chargingChoice)
         }
     }
 
@@ -95,8 +96,10 @@ struct OnboardingPreferencesStepView: View {
     private var ring: some View {
         let limit = coordinator.draft.targetLimit
         return ZStack {
-            Circle().stroke(PharosColor.fill, lineWidth: 6)
+            // Inset strokes keep the ring inside its frame; the collapsible section clips anything outside.
+            Circle().inset(by: 3).stroke(PharosColor.fill, lineWidth: 6)
             Circle()
+                .inset(by: 3)
                 .trim(from: 0, to: CGFloat(limit) / 100)
                 .stroke(Color.teal, style: StrokeStyle(lineWidth: 6, lineCap: .round))
                 .rotationEffect(.degrees(-90))
@@ -105,6 +108,8 @@ struct OnboardingPreferencesStepView: View {
                 .contentTransition(.numericText(value: Double(limit)))
         }
         .frame(width: 64, height: 64)
+        .padding(.horizontal, PharosSpacing.s)
+        .padding(.vertical, 2)
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: limit)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(limit)%")

@@ -2021,42 +2021,66 @@ final class L10n: ObservableObject {
     var onboardingCapabilityMemory: String { en ? "Memory & Active Ports" : "内存与活跃端口透视" }
     var onboardingCapabilityCleanup: String { en ? "Developer Cache Cleanup" : "开发者缓存无痕清理" }
 
-    // Step 02 — Power intro
-    var onboardingPowerTitle: String { en ? "Understand Your Power" : "读懂电源流向" }
-    var onboardingPowerSubtitle: String {
-        en ? "See how a charge limit lets the adapter power your Mac directly while the battery rests."
-           : "看看充电上限如何让电源适配器直接为 Mac 供电，同时让电池休息。"
+    // Step 02 — Capabilities tour
+    var onboardingCapsTitle: String { en ? "What Pharos Does" : "核心能力速览" }
+    var onboardingCapsSubtitle: String {
+        en ? "Four things Pharos handles from the menu bar. Click around — it's a sandbox."
+           : "Pharos 在菜单栏里替你处理的四件事。随便点点看——这是沙盒演示。"
     }
-    var onboardingPowerDemoBadge: String { en ? "Interactive demo · System power unchanged" : "交互式原理演示 · 未修改系统电源" }
-    var onboardingPowerModeCharging: String { en ? "Normal Charging" : "常规充电" }
-    var onboardingPowerModeBypass: String { en ? "80% Limit Passthrough" : "80% 限充直通" }
-    var onboardingPowerModeBattery: String { en ? "On Battery" : "离电使用" }
-    var onboardingPowerNodeAdapter: String { en ? "Power Adapter" : "电源适配器" }
-    var onboardingPowerNodeLogicBoard: String { en ? "Mac Logic Board" : "Mac 主板" }
-    var onboardingPowerNodeBattery: String { en ? "Battery Cell" : "电池电芯" }
-    var onboardingPowerChargingCaption: String {
-        en ? "Power flows to both the logic board and the battery." : "电流同时流向主板与电芯。"
+    var onboardingCapsBadge: String { en ? "Interactive preview · Leaves your Mac untouched" : "交互演示 · 不修改本机进程与文件" }
+    var onboardingCapsReset: String { en ? "Reset Demo" : "重置演示" }
+    func onboardingCapsTab(_ kind: OnboardingCapabilityKind) -> String {
+        switch kind {
+        case .memory: en ? "Memory" : "内存治理"
+        case .ports: en ? "Ports" : "活跃端口"
+        case .power: en ? "Battery" : "电池护航"
+        case .thermals: en ? "Thermals" : "散热风扇"
+        case .cleanup: en ? "Cleanup" : "缓存清理"
+        }
     }
-    var onboardingPowerBypassCaption: String {
-        en ? "Battery branch cut to 0 mA; the adapter powers the board directly — no unplugging, no extra cycles."
-           : "电芯支路截断为 0 mA，适配器直通主板供电——无需拔插头，不消耗电池循环。"
+    func onboardingCapsAction(_ kind: OnboardingCapabilityKind) -> String {
+        switch kind {
+        case .memory: en ? "Free Up" : "一键释放"
+        case .ports: en ? "Stop" : "结束服务"
+        case .power: en ? "Enable 80% Passthrough" : "开启 80% 限充直通"
+        case .thermals: en ? "Show Sensors" : "切换散热视图"
+        case .cleanup: en ? "Clean Expired" : "清理超期缓存"
+        }
     }
-    var onboardingPowerBatteryCaption: String {
-        en ? "Adapter disconnected; the battery powers the logic board." : "适配器断开，由电池为主板供电。"
+    var onboardingCapsMemoryPressure: String { en ? "Memory pressure" : "内存压力" }
+    var onboardingCapsMemoryHigh: String { en ? "High" : "偏高" }
+    var onboardingCapsMemoryHealthy: String { en ? "Healthy" : "健康" }
+    var onboardingCapsReclaimed: String { en ? "Reclaimed" : "已安全回收" }
+    var onboardingCapsMemoryCaption: String {
+        en ? "Spot bloated background processes and quit them with a confirmation."
+           : "揪出膨胀的后台进程，二次确认后结束。"
     }
-    func onboardingPowerLiveReading(percent: Int, flow: String, amperage: Int) -> String {
-        en ? "This Mac now: \(percent)% · \(flow) · Cell current \(amperage) mA"
-           : "本机当前实测：\(percent)% · \(flow) · 电芯电流 \(amperage) mA"
+    var onboardingCapsPortsListening: String { en ? "Listening ports" : "监听端口" }
+    var onboardingCapsPortsCaption: String {
+        en ? "No more lsof + kill to free a stuck dev server port." : "告别 lsof + kill，一键释放残留的开发端口。"
     }
-    var onboardingDesktopTitle: String { en ? "Live Hardware & Environment" : "实时硬件与运行环境透视" }
-    var onboardingDesktopSubtitle: String {
-        en ? "No battery on this Mac — Pharos focuses on temperatures, fans, memory and listening ports."
-           : "这台 Mac 没有电池——Pharos 将专注于温度、风扇、内存与监听端口。"
+    var onboardingCapsCellCurrent: String { en ? "Cell current" : "电芯电流" }
+    var onboardingCapsPluggedIn: String { en ? "Power connected" : "电源已连接" }
+    var onboardingCapsPowerCaptionBefore: String {
+        en ? "Plugged in all day keeps the cell charging at full stress." : "整天插着电源，电芯一直处于充电压力下。"
     }
-    var onboardingDesktopPeakTemp: String { en ? "Peak Chip Temp" : "芯片峰值温度" }
-    var onboardingDesktopFan: String { en ? "Fan Speed" : "风扇转速" }
-    var onboardingDesktopMemory: String { en ? "Memory Used" : "物理内存占用" }
-    var onboardingDesktopPorts: String { en ? "Listening Ports" : "活跃监听端口" }
+    var onboardingCapsPowerCaptionAfter: String {
+        en ? "Adapter powers the board directly — zero cycle wear." : "适配器直通主板供电，零循环损耗。"
+    }
+    var onboardingCapsPeakTemp: String { en ? "Peak chip temp" : "芯片峰值温度" }
+    var onboardingCapsFan: String { en ? "Fan" : "风扇" }
+    var onboardingCapsThermalCaption: String {
+        en ? "Per-sensor temperatures and fan speeds, with optional fan control."
+           : "逐传感器温度与风扇转速，可选风扇控制。"
+    }
+    var onboardingCapsCleanupRule: String { en ? "Only expired files · folders kept" : "仅清理超期文件 · 保留目录" }
+    func onboardingCapsFreed(_ gb: String) -> String { en ? "Safely freed \(gb)" : "已安全释放 \(gb)" }
+    var onboardingCapsReclaimable: String { en ? "Reclaimable" : "可释放" }
+    func onboardingCapsLive(_ text: String) -> String { en ? "This Mac now: \(text)" : "本机当前：\(text)" }
+    func onboardingCapsLiveMemory(_ p: Int) -> String { en ? "memory \(p)% used" : "内存已用 \(p)%" }
+    func onboardingCapsLivePorts(_ n: Int) -> String { en ? "\(n) listening ports" : "\(n) 个监听端口" }
+    func onboardingCapsLiveBattery(_ p: Int) -> String { en ? "battery \(p)%" : "电池 \(p)%" }
+    func onboardingCapsLiveTemp(_ t: String) -> String { en ? "peak \(t)" : "峰值 \(t)" }
 
     // Step 03 — Permissions
     var onboardingPermissionsTitle: String { en ? "Give Pharos What It Needs" : "按需透明授权" }
@@ -2120,6 +2144,7 @@ final class L10n: ObservableObject {
         en ? "Pharos lives in your menu bar. Click the icon any time for a quick look."
            : "Pharos 常驻在菜单栏，随时点击图标即可快速查看。"
     }
+    var onboardingMenuDemoSample: String { en ? "Sample data" : "示例数据" }
     var onboardingMenuBarClickHint: String { en ? "Click the icon to try it" : "点击图标试试" }
     var onboardingMenuBarTipRing: String {
         en ? "The ring color shows memory pressure at a glance: green is fine, orange is busy, red needs attention."
