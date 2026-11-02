@@ -209,6 +209,7 @@ final class L10n: ObservableObject {
         case .ports: return en ? "Port count" : "端口数"
         case .memory: return en ? "Memory used %" : "内存占用 %"
         case .disk: return en ? "Startup disk used %" : "启动磁盘占用 %"
+        case .battery: return en ? "Battery %" : "电池电量 %"
         }
     }
     var maxProjectsCapacity: String { en ? "Max projects capacity" : "最多项目数（容量上限）" }
@@ -2153,7 +2154,4 @@ final class L10n: ObservableObject {
            : "可随时在「主窗口 → 设置 → 快捷操作」中重新打开引导。"
     }
     var onboardingReplay: String { en ? "Replay Onboarding" : "重新查看引导" }
-
-    // Phase 2 skeleton placeholder (replaced by real step views in Phase 3).
-    var onboardingPlaceholderNote: String { en ? "Content coming soon" : "内容即将呈现" }
 }

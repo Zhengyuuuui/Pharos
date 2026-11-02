@@ -371,6 +371,9 @@ struct MainSettingsView: View {
                             CapsuleActionButton(title: l10n.importSettings, systemImage: "square.and.arrow.down") {
                                 backupMessage = BackupActions.importFile() ?? backupMessage
                             }
+                            CapsuleActionButton(title: l10n.onboardingReplay, systemImage: "sparkles") {
+                                OnboardingWindowController.shared.show(store: store, isReplay: true)
+                            }
                             CapsuleActionButton(title: l10n.resetAllSettings, systemImage: "arrow.counterclockwise", isDestructive: true) {
                                 showResetAlert = true
                             }
@@ -714,6 +717,7 @@ struct MainSettingsView: View {
                 trafficLightGlassTransparency = 0.75
                 UserDefaults.standard.removeObject(forKey: "pharos.fanViewMode")
                 UserDefaults.standard.removeObject(forKey: "popoverTab")
+                // OnboardingPolicy.completedVersionKey is deliberately kept: resetting preferences must not re-trigger onboarding.
                 if launchAtLogin {
                     try? SMAppService.mainApp.unregister()
                     launchAtLogin = SMAppService.mainApp.status == .enabled

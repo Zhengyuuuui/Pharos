@@ -179,3 +179,93 @@ public enum OnboardingTransitionGeometry {
         )
     }
 }
+
+/// Geometry of `Scripts/make-icon.swift` (1024 pt space, lamp bottom-left, y up) plus the
+/// onboarding entrance sweep. Shared so the animated logo lands exactly on the icon's composition.
+public enum RadarBeamGeometry {
+    public static let tileOrigin: Double = 100
+    public static let tileSize: Double = 824
+    public static let lamp = (x: 290.0, y: 290.0)
+    public static let restLeadingDegrees: Double = 65
+    public static let restTrailingDegrees: Double = 25
+    public static let spreadDegrees: Double = 40
+    public static let trailFeatherDegrees: Double = 6
+    public static let length: Double = 900
+    public static let targets: [(ring: Double, frac: Double)] = [(316, 0.62), (462, 0.86), (608, 0.38)]
+
+    /// Entrance: leading edge starts at -90° and sweeps one full turn plus the rest angle, easing out.
+    public static let sweepDuration: Double = 2.2
+    /// -450° ≡ -90°: one full extra turn before easing onto the rest angle.
+    public static let sweepStartDegrees: Double = -90 - 360
+
+    /// Leading-edge angle (degrees) at `elapsed` seconds; exactly the rest angle once settled.
+    public static func leadingDegrees(elapsed: Double) -> Double {
+        guard elapsed < sweepDuration else { return restLeadingDegrees }
+        let t = Swift.max(0, elapsed) / sweepDuration
+        let eased = 1 - pow(1 - t, 3)
+        return sweepStartDegrees + (restLeadingDegrees - sweepStartDegrees) * eased
+    }
+
+    public static func isSettled(elapsed: Double) -> Bool { elapsed >= sweepDuration }
+
+    /// 0 outside the beam, rising to 1 at the leading edge (same curve as make-icon `heat`).
+    public static func heat(x: Double, y: Double, leadingDegrees: Double) -> Double {
+        let a0 = (leadingDegrees - spreadDegrees - trailFeatherDegrees) * .pi / 180
+        let span = (spreadDegrees + trailFeatherDegrees) * .pi / 180
+        var a = atan2(y - lamp.y, x - lamp.x)
+        // Normalise into [a0, a0 + 2π) so the wedge works at any rotation.
+        while a < a0 { a += 2 * .pi }
+        while a >= a0 + 2 * .pi { a -= 2 * .pi }
+        var t = (a - a0) / span
+        t = (t < 0 || t > 1.02) ? 0 : Swift.min(1, t)
+        return pow(t, 1.6)
+    }
+
+    /// Captured targets only light up once the beam has reached them in the final pass.
+    public static func targetVisibility(frac: Double, leadingDegrees: Double) -> Double {
+        let targetDeg = restTrailingDegrees + spreadDegrees * frac
+        let delta = leadingDegrees - targetDeg
+        // The outermost target (frac 0.86) is only 5.6° behind the rest edge, so the fade must be shorter.
+        return Swift.min(1, Swift.max(0, delta / 5))
+    }
+}
+
+/// Animated cell-current figure for the power demo (mA). Numbers are illustrative, not measured.
+public enum PowerDemoFlow: CaseIterable, Sendable {
+    case charging, passthrough, onBattery
+
+    public var cellMilliamps: Int {
+        switch self {
+        case .charging: 1500
+        case .passthrough: 0
+        case .onBattery: -1200
+        }
+    }
+    public var adapterConnected: Bool { self != .onBattery }
+    public var cellBranchActive: Bool { self != .passthrough }
+    /// Energy direction on the board↔cell conduit.
+    public var cellFlowsIntoBattery: Bool { self == .charging }
+
+    /// Auto tour: one gentle pass, ending on passthrough (the point of the demo).
+    public static let tour: [PowerDemoFlow] = [.passthrough, .onBattery, .passthrough]
+}
+
+/// Menu bar "battery %" option: ring fill and warning level. Low charge is the concern, so the
+/// thresholds run the opposite way from memory/disk.
+public enum BatteryMenuBarMetric {
+    public enum Level: Equatable, Sendable { case normal, warning, critical }
+
+    public static func fraction(percent: Int) -> Double { Double(Swift.min(100, Swift.max(0, percent))) / 100 }
+
+    public static func level(percent: Int, onAC: Bool) -> Level {
+        guard !onAC else { return .normal }
+        if percent <= 10 { return .critical }
+        if percent <= 20 { return .warning }
+        return .normal
+    }
+
+    /// nil on Macs without a battery, so the menu bar falls back to the icon only.
+    public static func label(percent: Int, hasBattery: Bool) -> String? {
+        hasBattery ? "\(Swift.min(100, Swift.max(0, percent)))%" : nil
+    }
+}

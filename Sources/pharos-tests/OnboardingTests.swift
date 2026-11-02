@@ -7,6 +7,9 @@ func testOnboarding() {
     testBatteryInstallPlan()
     testOnboardingSteps()
     testOnboardingMotion()
+    testRadarBeamGeometry()
+    testPowerDemoFlow()
+    testBatteryMenuBarMetric()
 }
 
 private func testOnboardingLaunchDecision() {
@@ -124,4 +127,69 @@ private func testOnboardingMotion() {
     expectEq(fOut.scale, 0.93, "forward outgoing recedes"); expectEq(fOut.offsetX, -28, "forward outgoing to left")
     expectEq(bIn.scale, 0.93, "backward mirrors"); expectEq(bIn.offsetX, -28, "backward incoming from left")
     expectEq(bOut.scale, 1.06, "backward outgoing toward viewer"); expectEq(bOut.offsetX, 28, "backward outgoing to right")
+}
+
+private func testRadarBeamGeometry() {
+    typealias R = RadarBeamGeometry
+    expectEq(R.leadingDegrees(elapsed: 0), -450, "sweep starts at -90° (plus one turn)")
+    expectEq(R.leadingDegrees(elapsed: R.sweepDuration), R.restLeadingDegrees, "lands exactly on rest angle")
+    expectEq(R.leadingDegrees(elapsed: 99), R.restLeadingDegrees, "stays at rest afterwards")
+    expectEq(R.leadingDegrees(elapsed: -1), -450, "negative elapsed clamps to start")
+    expect(!R.isSettled(elapsed: 2.19) && R.isSettled(elapsed: 2.2), "settles at 2.2 s")
+    var last = R.leadingDegrees(elapsed: 0)
+    var monotonic = true
+    for i in 1...44 {
+        let v = R.leadingDegrees(elapsed: Double(i) * 0.05)
+        if v < last { monotonic = false }
+        last = v
+    }
+    expect(monotonic, "sweep never reverses")
+    let early = R.leadingDegrees(elapsed: 0.2) - R.leadingDegrees(elapsed: 0)
+    let late = R.leadingDegrees(elapsed: 2.2) - R.leadingDegrees(elapsed: 2.0)
+    expect(early > late, "eases out (decelerates)")
+    expectEq(R.restLeadingDegrees - R.restTrailingDegrees, R.spreadDegrees, "rest wedge matches icon 25°–65°")
+
+    // Heat matches make-icon at rest: 1 at leading edge, 0 outside.
+    let lamp = R.lamp
+    func at(_ deg: Double, _ d: Double = 400) -> (Double, Double) {
+        (lamp.x + cos(deg * .pi / 180) * d, lamp.y + sin(deg * .pi / 180) * d)
+    }
+    let edge = at(64.9), mid = at(45), outside = at(80), behind = at(10)
+    expect(R.heat(x: edge.0, y: edge.1, leadingDegrees: 65) > 0.95, "hot at leading edge")
+    let m = R.heat(x: mid.0, y: mid.1, leadingDegrees: 65)
+    expect(m > 0.1 && m < 0.9, "partial in middle")
+    expectEq(R.heat(x: outside.0, y: outside.1, leadingDegrees: 65), 0, "cold ahead of beam")
+    expectEq(R.heat(x: behind.0, y: behind.1, leadingDegrees: 65), 0, "cold behind beam")
+    // Rotation invariance: same relative point, beam turned by a full revolution.
+    expect(abs(R.heat(x: mid.0, y: mid.1, leadingDegrees: 65 - 360) - m) < 1e-9, "heat works for any turn")
+
+    for t in R.targets {
+        expectEq(R.targetVisibility(frac: t.frac, leadingDegrees: R.restLeadingDegrees), 1,
+                 "targets fully visible at rest (\(t.frac))")
+        expectEq(R.targetVisibility(frac: t.frac, leadingDegrees: -90), 0, "targets hidden at start")
+    }
+}
+
+private func testPowerDemoFlow() {
+    expectEq(PowerDemoFlow.passthrough.cellMilliamps, 0, "passthrough is 0 mA")
+    expect(PowerDemoFlow.charging.cellMilliamps > 0, "charging positive")
+    expect(PowerDemoFlow.onBattery.cellMilliamps < 0, "on battery negative")
+    expect(!PowerDemoFlow.onBattery.adapterConnected, "adapter off on battery")
+    expect(PowerDemoFlow.passthrough.adapterConnected && !PowerDemoFlow.passthrough.cellBranchActive, "passthrough cuts cell branch")
+    expect(PowerDemoFlow.charging.cellFlowsIntoBattery && !PowerDemoFlow.onBattery.cellFlowsIntoBattery, "flow direction")
+    expectEq(PowerDemoFlow.tour.last, .passthrough, "tour ends on passthrough")
+}
+
+private func testBatteryMenuBarMetric() {
+    typealias B = BatteryMenuBarMetric
+    expectEq(B.fraction(percent: 80), 0.8, "fraction")
+    expectEq(B.fraction(percent: 130), 1, "fraction clamps high")
+    expectEq(B.fraction(percent: -5), 0, "fraction clamps low")
+    expectEq(B.level(percent: 100, onAC: false), .normal, "full battery is fine")
+    expectEq(B.level(percent: 20, onAC: false), .warning, "20% warns")
+    expectEq(B.level(percent: 21, onAC: false), .normal, "21% fine")
+    expectEq(B.level(percent: 10, onAC: false), .critical, "10% critical")
+    expectEq(B.level(percent: 5, onAC: true), .normal, "on AC never warns")
+    expectEq(B.label(percent: 76, hasBattery: true), "76%", "label")
+    expectEq(B.label(percent: 76, hasBattery: false), nil, "desktop: no label")
 }

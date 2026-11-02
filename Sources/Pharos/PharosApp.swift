@@ -31,7 +31,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         _ = BatteryStore.shared
         Notifier.shared.start(observing: store)
         startAppearanceIconSync()
-        showMainWindow()
+        if OnboardingCoordinator.shouldPresentOnLaunch() {
+            OnboardingWindowController.shared.show(store: store, isReplay: false)
+        } else {
+            showMainWindow()
+        }
     }
 
     private func startAppearanceIconSync() {
@@ -66,7 +70,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     /// Clicking the Dock / Launchpad icon while running reopens the window.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
-        if !hasVisibleWindows { showMainWindow() }
+        if OnboardingWindowController.shared.isVisible {
+            OnboardingWindowController.shared.bringToFront()
+        } else if !hasVisibleWindows {
+            showMainWindow()
+        }
         return true
     }
 
@@ -227,18 +235,20 @@ struct PharosApp: App {
     }
 }
 
-private enum DynamicMenuBarIcon {
+enum DynamicMenuBarIcon {
     private struct CacheKey: Hashable {
         let percent: Int
         let pressure: MemoryPressure
+        let highIsBad: Bool
     }
 
     @MainActor private static var cache: [CacheKey: NSImage] = [:]
 
     @MainActor
-    static func image(fraction: Double, pressure: MemoryPressure) -> NSImage {
+    /// `highIsBad: false` for battery, where a full ring is good and only `pressure` sets the colour.
+    static func image(fraction: Double, pressure: MemoryPressure, highIsBad: Bool = true) -> NSImage {
         let percent = min(100, max(0, Int((fraction * 100).rounded())))
-        let key = CacheKey(percent: percent, pressure: pressure)
+        let key = CacheKey(percent: percent, pressure: pressure, highIsBad: highIsBad)
         if let cached = cache[key] {
             return cached
         }
@@ -270,8 +280,8 @@ private enum DynamicMenuBarIcon {
                 case .warning:
                     ringColor = .systemOrange
                 case .normal:
-                    if percent >= 95 { ringColor = .systemRed }
-                    else if percent >= 85 { ringColor = .systemOrange }
+                    if highIsBad, percent >= 95 { ringColor = .systemRed }
+                    else if highIsBad, percent >= 85 { ringColor = .systemOrange }
                     else { ringColor = .labelColor }
                 }
 
@@ -303,9 +313,10 @@ private enum DynamicMenuBarIcon {
 }
 
 /// Icon plus the optional number chosen in Settings → "Menu bar shows".
-private struct MenuBarLabel: View {
+struct MenuBarLabel: View {
     @ObservedObject var store: ProjectStore
     @ObservedObject private var settings = MenuBarSettings.shared
+    @ObservedObject private var battery = BatteryStore.shared
 
     private var activeMetric: (fraction: Double, pressure: MemoryPressure) {
         switch settings.text {
@@ -326,6 +337,15 @@ private struct MenuBarLabel: View {
             let frac = Double(store.totalPorts) / Double(cap)
             let press: MemoryPressure = frac >= 1.0 ? .critical : (frac >= 0.85 ? .warning : .normal)
             return (min(1.0, frac), press)
+        case .battery:
+            let r = battery.reading
+            guard r.hasBattery else { return (store.system?.usedFraction ?? 0, store.system?.pressure ?? .normal) }
+            let press: MemoryPressure = switch BatteryMenuBarMetric.level(percent: r.currentPercent, onAC: r.powerSource == .acPower) {
+            case .critical: .critical
+            case .warning: .warning
+            case .normal: .normal
+            }
+            return (BatteryMenuBarMetric.fraction(percent: r.currentPercent), press)
         case .none:
             return (store.system?.usedFraction ?? 0, store.system?.pressure ?? .normal)
         }
@@ -336,7 +356,8 @@ private struct MenuBarLabel: View {
         HStack(spacing: 4) {
             Image(nsImage: DynamicMenuBarIcon.image(
                 fraction: metric.fraction,
-                pressure: metric.pressure
+                pressure: metric.pressure,
+                highIsBad: !(settings.text == .battery && battery.reading.hasBattery)
             ))
             if let text = settings.label(for: store) {
                 Text(text).monospacedDigit()

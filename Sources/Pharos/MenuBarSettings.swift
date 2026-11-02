@@ -1,9 +1,10 @@
 import AppKit
 import Carbon.HIToolbox
+import PharosCore
 
 /// What the menu bar shows next to the icon.
 enum MenuBarText: String, CaseIterable, Identifiable {
-    case none, projects, ports, memory, disk
+    case none, projects, ports, memory, disk, battery
     var id: String { rawValue }
 }
 
@@ -90,6 +91,9 @@ final class MenuBarSettings: ObservableObject {
         case .ports: return "\(store.totalPorts)"
         case .memory: return store.system.map { "\(Int(($0.usedFraction * 100).rounded()))%" }
         case .disk: return store.volumes.first { $0.kind == .startup }.map { "\(Int(($0.usedFraction * 100).rounded()))%" }
+        case .battery:
+            let r = BatteryStore.shared.reading
+            return BatteryMenuBarMetric.label(percent: r.currentPercent, hasBattery: r.hasBattery)
         }
     }
 

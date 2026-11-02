@@ -7,8 +7,13 @@ struct OnboardingView: View {
     @ObservedObject var coordinator: OnboardingCoordinator
     @ObservedObject private var l10n = L10n.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Bumped when Low Power Mode toggles so `level` is re-read while the window is open.
+    @State private var powerStateTick = 0
 
-    private var level: OnboardingMotionLevel { OnboardingMotion.level(reduceMotion: reduceMotion) }
+    private var level: OnboardingMotionLevel {
+        _ = powerStateTick
+        return OnboardingMotion.level(reduceMotion: reduceMotion)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -21,6 +26,9 @@ struct OnboardingView: View {
         .frame(width: OnboardingWindowController.contentSize.width,
                height: OnboardingWindowController.contentSize.height)
         .background(PharosColor.windowGradient)
+        .onReceive(NotificationCenter.default.publisher(for: .NSProcessInfoPowerStateDidChange).receive(on: RunLoop.main)) { _ in
+            powerStateTick &+= 1
+        }
     }
 
     // MARK: Bars
@@ -32,6 +40,7 @@ struct OnboardingView: View {
             if !coordinator.step.isLast {
                 Button(l10n.onboardingSkip) { coordinator.skip() }
                     .buttonStyle(.pharos)
+                    .disabled(coordinator.isCommitting)
                     .controlSize(.small)
             }
         }
@@ -43,11 +52,23 @@ struct OnboardingView: View {
 
     private var stage: some View {
         ZStack {
-            OnboardingStepPlaceholder(step: coordinator.step, level: level)
+            stepView
                 .id(coordinator.step)
                 .transition(OnboardingZoomBlurTransition(direction: coordinator.direction, level: level))
         }
         .animation(OnboardingMotion.stepAnimation(level), value: coordinator.step)
+    }
+
+    @ViewBuilder
+    private var stepView: some View {
+        switch coordinator.step {
+        case .welcome: OnboardingWelcomeStepView(level: level)
+        case .powerIntro: OnboardingPowerIntroStepView(level: level)
+        case .permissions: OnboardingPermissionsStepView(coordinator: coordinator, level: level)
+        case .preferences: OnboardingPreferencesStepView(coordinator: coordinator, level: level)
+        case .menuBar: OnboardingMenuBarStepView(level: level)
+        case .completion: OnboardingCompletionStepView(coordinator: coordinator, level: level)
+        }
     }
 
     private var bottomBar: some View {
@@ -60,12 +81,19 @@ struct OnboardingView: View {
             if coordinator.canGoBack {
                 Button(l10n.onboardingBack) { coordinator.goBack() }
                     .buttonStyle(.pharos)
+                    .disabled(coordinator.isCommitting)
             }
-            Button(coordinator.step.isLast ? l10n.onboardingEnter : l10n.onboardingContinue) {
+            Button {
                 coordinator.goForward()
+            } label: {
+                HStack(spacing: 6) {
+                    if coordinator.isCommitting { ProgressView().controlSize(.mini) }
+                    Text(coordinator.step.isLast ? l10n.onboardingEnter : l10n.onboardingContinue)
+                }
             }
             .buttonStyle(.pharosPrimary)
             .keyboardShortcut(.defaultAction)
+            .disabled(coordinator.isCommitting)
         }
         .padding(.horizontal, PharosSpacing.xl)
         .frame(height: 64)
@@ -124,50 +152,5 @@ private struct OnboardingProgressDots: View {
             }
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: current)
-    }
-}
-
-/// Phase 2 stand-in: real step views replace this in Phase 3.
-private struct OnboardingStepPlaceholder: View {
-    let step: OnboardingStep
-    let level: OnboardingMotionLevel
-    @ObservedObject private var l10n = L10n.shared
-
-    private var content: (icon: String, title: String, subtitle: String) {
-        switch step {
-        case .welcome: ("sparkles", l10n.onboardingWelcomeTitle, l10n.onboardingWelcomeSubtitle)
-        case .powerIntro: ("powerplug.fill", l10n.onboardingPowerTitle, l10n.onboardingPowerSubtitle)
-        case .permissions: ("lock.shield", l10n.onboardingPermissionsTitle, l10n.onboardingPermissionsSubtitle)
-        case .preferences: ("slider.horizontal.3", l10n.onboardingPrefsTitle, l10n.onboardingPrefsSubtitle)
-        case .menuBar: ("menubar.rectangle", l10n.onboardingMenuBarTitle, l10n.onboardingMenuBarSubtitle)
-        case .completion: ("checkmark.circle.fill", l10n.onboardingDoneTitle, l10n.onboardingDoneSubtitle)
-        }
-    }
-
-    var body: some View {
-        let c = content
-        VStack(spacing: PharosSpacing.m) {
-            Image(systemName: c.icon)
-                .font(.system(size: 44, weight: .regular))
-                .foregroundStyle(PharosColor.textPrimary)
-                .frame(width: 96, height: 96)
-                .background(RoundedRectangle(cornerRadius: PharosRadius.container, style: .continuous)
-                    .fill(PharosColor.surface))
-                .onboardingEntrance(0, level: level)
-            Text(c.title)
-                .font(PharosFont.pageTitle)
-                .foregroundStyle(PharosColor.textPrimary)
-                .onboardingEntrance(1, level: level)
-            Text(c.subtitle)
-                .font(PharosFont.body)
-                .foregroundStyle(PharosColor.textSecondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 460)
-                .fixedSize(horizontal: false, vertical: true)
-                .onboardingEntrance(2, level: level)
-            PharosTag(l10n.onboardingPlaceholderNote)
-                .onboardingEntrance(3, level: level)
-        }
-        .padding(PharosSpacing.xl)
     }
 }

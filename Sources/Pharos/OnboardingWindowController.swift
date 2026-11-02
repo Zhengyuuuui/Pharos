@@ -23,8 +23,8 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
         }
         let start: OnboardingStep = isReplay ? .welcome : OnboardingCoordinator.launchStartStep()
         let coordinator = OnboardingCoordinator(isReplay: isReplay, startStep: start)
-        coordinator.onFinish = { [weak self] completed in
-            self?.finish(completed: completed)
+        coordinator.onFinish = { [weak self] select in
+            self?.finish(select: select)
         }
         self.coordinator = coordinator
 
@@ -58,8 +58,9 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
     }
 
     /// Main window opens first so the Dock icon does not flicker between policies.
-    private func finish(completed: Bool) {
-        AppDelegate.shared?.showMainWindow()
+    private func finish(select: MainWindowView.SidebarItem?) {
+        if let select, select == .batteryAndThermals { WindowRouter.shared.batteryThermalTab = .battery }
+        AppDelegate.shared?.showMainWindow(selecting: select)
         window?.close()
     }
 
@@ -67,6 +68,12 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
         guard let closing = notification.object as? NSWindow, closing === window else { return }
         closing.delegate = nil
         let mainWindowOpen = NSApp.windows.contains { $0 !== closing && $0.isVisible && $0.canBecomeMain }
+        // Red button: a deliberate dismissal, so it is not shown again on next launch (replay from Settings).
+        // A pending FDA resume point is kept — that relaunch is macOS's doing, not the user's.
+        if let coordinator, !coordinator.isFinished,
+           UserDefaults.standard.object(forKey: OnboardingPolicy.resumeStepKey) == nil {
+            coordinator.markCompleted()
+        }
         coordinator?.onFinish = nil
         coordinator = nil
         DispatchQueue.main.async { [weak self] in

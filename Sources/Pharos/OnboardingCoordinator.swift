@@ -9,10 +9,20 @@ final class OnboardingCoordinator: ObservableObject {
     @Published private(set) var direction: OnboardingNavigationDirection = .forward
     @Published var draft: OnboardingDraft
 
+    /// Step 04 → 05 is waiting on the admin prompt / daemon.
+    @Published private(set) var isCommitting = false
+    /// Gentle, non-error notice shown on Step 04 (e.g. password prompt cancelled).
+    @Published var preferencesNotice: String?
+    @Published private(set) var launchAtLoginError: String?
+
     let isReplay: Bool
-    /// Called once when the user finishes or skips. Held strongly only by this coordinator,
-    /// which the window controller drops on close — no cycle survives the window.
-    var onFinish: (@MainActor (_ completed: Bool) -> Void)?
+    /// Set when this session turned the charge limit on, so we can land on the battery page.
+    private(set) var enabledLimitThisSession = false
+    private(set) var isFinished = false
+
+    /// Called once when the user finishes or skips, with the page the main window should open on.
+    /// Held only by this coordinator, which the window controller drops on close — no cycle survives.
+    var onFinish: (@MainActor (_ select: MainWindowView.SidebarItem?) -> Void)?
 
     init(isReplay: Bool, startStep: OnboardingStep = .welcome) {
         self.isReplay = isReplay
@@ -51,7 +61,24 @@ final class OnboardingCoordinator: ObservableObject {
     var canGoBack: Bool { !step.isFirst }
 
     func goForward() {
-        guard let next = step.next else { finish(); return }
+        guard !isCommitting else { return }
+        if step == .preferences {
+            commitPreferences { [weak self] proceed in
+                guard let self, proceed else { return }
+                self.advance()
+            }
+            return
+        }
+        if step.isLast {
+            applyLaunchAtLogin()
+            finish(select: enabledLimitThisSession ? .batteryAndThermals : nil)
+            return
+        }
+        advance()
+    }
+
+    private func advance() {
+        guard let next = step.next else { return }
         direction = .forward
         step = next
     }
@@ -62,20 +89,110 @@ final class OnboardingCoordinator: ObservableObject {
         step = previous
     }
 
-    func skip() { finish() }
+    /// Skipping applies nothing that was not already confirmed on Step 04.
+    func skip() { finish(select: nil) }
 
     /// Only Step 03 → System Settings may need a relaunch; remember where to come back to.
     func rememberResumePoint() {
         UserDefaults.standard.set(step.rawValue, forKey: OnboardingPolicy.resumeStepKey)
     }
 
-    private func finish() {
+    /// Back in the app without a relaunch: the resume point is no longer needed.
+    func clearResumePoint() {
+        UserDefaults.standard.removeObject(forKey: OnboardingPolicy.resumeStepKey)
+    }
+
+    /// Also used when the window is closed with the red button: the user dismissed it deliberately,
+    /// and Settings → Replay brings it back.
+    func markCompleted() {
         let d = UserDefaults.standard
         d.set(OnboardingPolicy.currentVersion, forKey: OnboardingPolicy.completedVersionKey)
         d.removeObject(forKey: OnboardingPolicy.resumeStepKey)
+        CleanupStoreHolder.shared.dismissFirstLaunchPermissionPrompt()
+    }
+
+    private func finish(select: MainWindowView.SidebarItem?) {
+        guard !isFinished else { return }
+        isFinished = true
+        markCompleted()
         let callback = onFinish
         onFinish = nil
-        callback?(true)
+        callback?(select)
+    }
+
+    // MARK: Two-phase commit
+
+    var canOfferChargeLimit: Bool {
+        let b = BatteryStore.shared
+        return b.reading.hasBattery && b.capabilities.isSupported
+    }
+
+    /// Phase one (leaving Step 04): side-effect-free UI prefs first, so the Step 05 preview already
+    /// shows them; then the charge limit, which may need the admin prompt. Cancelling the prompt
+    /// falls back to macOS-managed charging and keeps the user on Step 04 with a notice.
+    private func commitPreferences(_ done: @escaping @MainActor (_ proceed: Bool) -> Void) {
+        applyUIPreferences()
+        let battery = BatteryStore.shared
+        guard canOfferChargeLimit else { done(true); return }
+
+        switch draft.chargingChoice {
+        case .systemManaged:
+            // Only an explicit change on replay touches hardware; first launch never does.
+            if isReplay, battery.isPharosManaging { battery.setSystemMode() }
+            done(true)
+        case .pharosLimit:
+            if battery.persistentGuard != draft.persistentGuard { battery.persistentGuard = draft.persistentGuard }
+            let limit = draft.targetLimit
+            if battery.helper == .ready {
+                enableLimit(limit)
+                done(true)
+                return
+            }
+            isCommitting = true
+            preferencesNotice = nil
+            battery.install(activateLimitAfterInstall: false) { [weak self] ok in
+                guard let self else { return }
+                self.isCommitting = false
+                if ok {
+                    self.enableLimit(limit)
+                    done(true)
+                } else {
+                    self.draft.chargingChoice = .systemManaged
+                    self.preferencesNotice = L10n.shared.onboardingInstallCancelledFallback
+                    done(false)
+                }
+            }
+        }
+    }
+
+    private func enableLimit(_ limit: Int) {
+        let battery = BatteryStore.shared
+        if !battery.isPharosManaging || battery.activeLimit != limit { enabledLimitThisSession = true }
+        battery.selectLimit(limit)
+    }
+
+    private func applyUIPreferences() {
+        if let text = MenuBarText(rawValue: draft.menuBarTextRaw), MenuBarSettings.shared.text != text {
+            MenuBarSettings.shared.text = text
+        }
+        let layoutStore = PopoverLayoutStore.shared
+        let pinned = layoutStore.layout.tab(of: .battery) != nil
+        if draft.pinBatteryInPopover, !pinned {
+            layoutStore.update { $0.insert(.battery, into: .overview, before: $0.overview.first) }
+        } else if !draft.pinBatteryInPopover, pinned {
+            layoutStore.update { $0.remove(.battery) }
+        }
+    }
+
+    /// Phase two (Step 06 → Enter): login item. Failure is shown but never blocks entering.
+    private func applyLaunchAtLogin() {
+        let enabled = SMAppService.mainApp.status == .enabled
+        guard draft.launchAtLogin != enabled else { return }
+        do {
+            if draft.launchAtLogin { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+        } catch {
+            launchAtLoginError = error.localizedDescription
+        }
     }
 
     // MARK: Draft
