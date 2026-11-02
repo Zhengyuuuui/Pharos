@@ -308,10 +308,18 @@ final class BatteryStore: ObservableObject {
 
     // MARK: - Install / Uninstall
 
-    func install() {
+    /// - Parameters:
+    ///   - activateLimitAfterInstall: `false` installs the daemon only and leaves charging to macOS
+    ///     (onboarding). A limit the user already had is still restored.
+    ///   - onComplete: `true` once the daemon answers; `false` on cancel, failure or timeout.
+    func install(
+        activateLimitAfterInstall: Bool = true,
+        onComplete: (@MainActor (Bool) -> Void)? = nil
+    ) {
         let l10n = L10n.shared
         guard let helperURL = Bundle.main.url(forAuxiliaryExecutable: "pharos-battd") else {
             errorMessage = l10n.batteryHelperMissing
+            onComplete?(false)
             return
         }
         let plistURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(BatteryHelperInstall.label).plist")
@@ -319,16 +327,27 @@ final class BatteryStore: ObservableObject {
             try BatteryHelperInstall.plist(uid: getuid()).write(to: plistURL, atomically: true, encoding: .utf8)
         } catch {
             errorMessage = error.localizedDescription
+            onComplete?(false)
             return
         }
         // An update restarts the daemon in `.system`; put back whatever the user had.
-        let restore: BatteryMode = (helper == .ready && mode != .system) ? mode : .limit(maxPercent: targetLimit)
-        let restoreLimit = helper != .ready || limitEnabled || mode != .system
+        let restore = BatteryInstallPlan.modeAfterInstall(
+            activateLimit: activateLimitAfterInstall,
+            helperWasReady: helper == .ready,
+            currentMode: mode,
+            limitEnabled: limitEnabled,
+            targetLimit: targetLimit
+        )
         let script = BatteryHelperInstall.installScript(helperSource: helperURL.path, plistSource: plistURL.path)
-        runAsAdmin(script, prompt: l10n.batteryInstallPrompt) { [weak self] error in
+        runAsAdmin(script, prompt: l10n.batteryInstallPrompt) { [weak self] error, cancelled in
             try? FileManager.default.removeItem(at: plistURL)
             if let error {
                 self?.errorMessage = error
+                onComplete?(false)
+                return
+            }
+            if cancelled {
+                onComplete?(false)
                 return
             }
             Task { @MainActor [weak self] in
@@ -340,7 +359,7 @@ final class BatteryStore: ObservableObject {
                     if reply != nil {
                         self.handle(reply, failure: nil)
                         self.errorMessage = nil
-                        if restoreLimit {
+                        if let restore {
                             if case .limit = restore { self.limitEnabled = true }
                             self.apply(restore)
                         }
@@ -352,22 +371,25 @@ final class BatteryStore: ObservableObject {
                         }
                         self.refreshHelperState()
                         self.beat()
+                        onComplete?(true)
                         return
                     }
                     try? await Task.sleep(nanoseconds: 200_000_000)
                 }
                 self?.refreshHelperState()
+                onComplete?(false)
             }
         }
     }
 
     func uninstall() {
         let l10n = L10n.shared
-        runAsAdmin(BatteryHelperInstall.uninstallScript, prompt: l10n.batteryUninstallPrompt) { [weak self] error in
+        runAsAdmin(BatteryHelperInstall.uninstallScript, prompt: l10n.batteryUninstallPrompt) { [weak self] error, cancelled in
             if let error {
                 self?.errorMessage = error
                 return
             }
+            if cancelled { return }
             self?.helper = .notInstalled
             self?.mode = .system
             self?.isHolding = false
@@ -384,7 +406,7 @@ final class BatteryStore: ObservableObject {
         }
     }
 
-    private func runAsAdmin(_ script: String, prompt: String, done: @escaping @MainActor (String?) -> Void) {
+    private func runAsAdmin(_ script: String, prompt: String, done: @escaping @MainActor (_ error: String?, _ cancelled: Bool) -> Void) {
         busy = true
         let escaped = script.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
         let source = "do shell script \"\(escaped)\" with prompt \"\(prompt)\" with administrator privileges"
@@ -396,7 +418,7 @@ final class BatteryStore: ObservableObject {
             let message: String? = ok || code == -128 ? nil : (errorInfo?[NSAppleScript.errorMessage] as? String ?? "error \(code ?? 0)")
             await MainActor.run {
                 self.busy = false
-                done(message)
+                done(message, code == -128)
             }
         }
     }

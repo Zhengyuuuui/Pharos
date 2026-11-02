@@ -1555,6 +1555,7 @@ final class L10n: ObservableObject {
     func batteryChargingTo(_ target: Int) -> String {
         en ? "Charging to \(target)%" : "正在充电至 \(target)%"
     }
+    var batteryCharging: String { en ? "Charging" : "正在充电" }
     var batteryDischarging: String { en ? "On Battery" : "正在使用电池" }
     var batteryFullyCharged: String { en ? "Fully Charged" : "已充满电" }
     var batteryChargeToFullNow: String { en ? "Charge to Full Now" : "立即充满电" }

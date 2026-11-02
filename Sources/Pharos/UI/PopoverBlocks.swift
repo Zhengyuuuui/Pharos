@@ -234,6 +234,9 @@ private struct PopoverBatteryBlock: View {
 
     var body: some View {
         let r = battery.reading
+        // Target % and "charge to full" only mean something while the daemon enforces a limit;
+        // in macOS-managed mode (or without the helper) they would misstate what is happening.
+        let managing = battery.isPharosManaging
         let isHolding = battery.isHolding || (!r.isCharging && r.powerSource == .acPower && r.currentPercent < 100)
         VStack(alignment: .leading, spacing: 4) {
             HStack {
@@ -270,17 +273,17 @@ private struct PopoverBatteryBlock: View {
                     HStack(spacing: 4) {
                         Text("\(r.currentPercent)%")
                             .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                        if isHolding {
+                        if managing, isHolding {
                             Text("(\(battery.targetLimit)%)")
                                 .font(.system(size: 10.5))
                                 .foregroundStyle(.teal)
-                        } else if r.isCharging {
+                        } else if managing, r.isCharging {
                             Text("→ \(battery.targetLimit)%")
                                 .font(.system(size: 10.5))
                                 .foregroundStyle(.green)
                         }
                     }
-                    Text(isHolding ? l10n.batteryHoldingSubtitle : (r.isCharging ? l10n.batteryChargingTo(battery.targetLimit) : l10n.batteryDischarging))
+                    Text(isHolding ? l10n.batteryHoldingSubtitle : (r.isCharging ? (managing ? l10n.batteryChargingTo(battery.targetLimit) : l10n.batteryCharging) : l10n.batteryDischarging))
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -288,12 +291,12 @@ private struct PopoverBatteryBlock: View {
 
                 Spacer(minLength: 4)
 
-                if isHolding {
+                if managing, isHolding {
                     Button(l10n.batteryChargeToFullNow) {
                         battery.chargeToFullNow()
                     }
                     .controlSize(.mini)
-                } else if case .full = battery.mode {
+                } else if managing, case .full = battery.mode {
                     Button(l10n.batteryResumeLimit) {
                         battery.resumeLimit()
                     }
