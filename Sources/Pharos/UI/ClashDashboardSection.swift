@@ -145,7 +145,7 @@ struct ClashDashboardSection: View {
 
                     PharosActionButton(
                         l10n.clashCopyTerminalProxy,
-                        systemImage: "terminal.fill",
+                        systemImage: "doc.on.clipboard",
                         role: .standard
                     ) {
                         clash.copyTerminalProxySnippet()
@@ -154,7 +154,7 @@ struct ClashDashboardSection: View {
 
                     PharosActionButton(
                         l10n.clashCopyTerminalUnset,
-                        systemImage: "xmark.circle",
+                        systemImage: "terminal",
                         role: .standard
                     ) {
                         clash.copyTerminalUnsetSnippet()
@@ -167,7 +167,7 @@ struct ClashDashboardSection: View {
                 // Banners
                 if let note = clash.notificationBanner {
                     PharosBanner(kind: .info, text: note) {
-                        IconButton(systemImage: "xmark", help: l10n.dismiss) { clash.notificationBanner = nil }
+                        PharosCloseButton(help: l10n.dismiss) { clash.notificationBanner = nil }
                     }
                     .task(id: note) {
                         try? await Task.sleep(for: .seconds(3))
@@ -176,7 +176,7 @@ struct ClashDashboardSection: View {
                 }
                 if let err = clash.errorMessage {
                     PharosBanner(kind: .error, text: err) {
-                        IconButton(systemImage: "xmark", help: l10n.dismiss) { clash.errorMessage = nil }
+                        PharosCloseButton(help: l10n.dismiss) { clash.errorMessage = nil }
                     }
                 }
             }

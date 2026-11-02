@@ -110,6 +110,7 @@ struct BrowserNetworkView: View {
             Button { editing = chrome.addPreset(browser: active) } label: {
                 Label(l10n.newChromePreset, systemImage: "plus")
             }
+            .buttonStyle(.pharosPrimary)
             .controlSize(.small)
         } else if chrome.installedBrowsers.count > 1 {
             Menu {
@@ -127,6 +128,7 @@ struct BrowserNetworkView: View {
             Button { editing = chrome.addPreset() } label: {
                 Label(l10n.newChromePreset, systemImage: "plus")
             }
+            .buttonStyle(.pharosPrimary)
             .controlSize(.small)
         }
     }
@@ -160,7 +162,6 @@ private struct ChromeCard: View {
     @ObservedObject private var l10n = L10n.shared
     let entry: ChromeStore.Entry
     @Binding var editing: String?
-    @State private var armedQuit = false
     @State private var armedRemove = false
 
     var body: some View {
@@ -169,28 +170,24 @@ private struct ChromeCard: View {
             VStack(alignment: .leading, spacing: PharosSpacing.m) {
                 HStack(alignment: .center, spacing: PharosSpacing.s) {
                     RunDot(running: entry.isRunning)
-                    Text(entry.preset?.name ?? defaultName(c))
-                        .font(PharosFont.rowLabel)
-                        .lineLimit(1)
-                    if let port = c.debugPort {
-                        Text(":\(String(port))")
-                            .font(PharosFont.captionDigits)
-                            .padding(.horizontal, 6).padding(.vertical, 1)
-                            .background(Capsule().fill(PharosColor.accent.opacity(0.13)))
-                            .foregroundStyle(PharosColor.accent)
-                    }
-                    proxyBadge(c.proxyStrategy)
-                    if entry.preset == nil {
-                        Text(l10n.notSaved).font(PharosFont.caption).foregroundStyle(PharosColor.textTertiary)
-                    } else if !entry.isRunning {
-                        Text(l10n.savedStopped).font(PharosFont.caption).foregroundStyle(PharosColor.textTertiary)
-                    }
-                    Spacer()
-                    if let r = entry.running {
-                        Text("\(ByteFormat.short(r.memoryBytes)) · \(l10n.processCount(r.processCount))")
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 6) {
+                            Text(entry.preset?.name ?? defaultName(c))
+                                .font(PharosFont.rowLabel)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            if let port = c.debugPort {
+                                PharosTag(":\(String(port))", tint: PharosColor.accent, monospaced: true)
+                            }
+                            proxyBadge(c.proxyStrategy)
+                        }
+                        Text(subtitle(c))
                             .font(PharosFont.captionDigits)
                             .foregroundStyle(PharosColor.textSecondary)
+                            .lineLimit(1)
                     }
+                    .layoutPriority(1)
+                    Spacer(minLength: PharosSpacing.s)
                     actions
                 }
 
@@ -213,7 +210,7 @@ private struct ChromeCard: View {
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(PharosColor.textSecondary)
 
-                    HStack(spacing: 4) {
+                    HStack(spacing: 2) {
                         proxyPillButton(
                             title: l10n.proxyDirectPill,
                             isSelected: c.proxyStrategy == .direct,
@@ -246,6 +243,8 @@ private struct ChromeCard: View {
                             applyProxyStrategy(.followSystem)
                         }
                     }
+                    .padding(2)
+                    .background(Capsule(style: .continuous).fill(PharosColor.fill))
 
                     Spacer()
 
@@ -257,22 +256,23 @@ private struct ChromeCard: View {
                         } label: {
                             Label(l10n.relaunchWithProxy, systemImage: "arrow.clockwise")
                         }
+                        .buttonStyle(.pharos)
                         .controlSize(.small)
-                        .buttonStyle(.bordered)
                     } else {
                         Button {
                             chrome.start(entry.preset?.config ?? c, running: store.chrome, listening: store.state.listeningPorts)
                         } label: {
-                            Label(l10n.startWithProxy, systemImage: "play.fill")
+                            Label(l10n.startWithProxy, systemImage: "play")
                         }
+                        .buttonStyle(.pharos)
                         .controlSize(.small)
-                        .buttonStyle(.borderedProminent)
                     }
                 }
-                .padding(6)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
                 .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(PharosColor.surfaceSecondary.opacity(0.5))
+                    RoundedRectangle(cornerRadius: PharosRadius.control, style: .continuous)
+                        .fill(PharosColor.surfaceSecondary)
                 )
 
                 LaunchCommandRow(config: entry.preset?.config ?? c)
@@ -282,6 +282,7 @@ private struct ChromeCard: View {
                         Label(l10n.presetDiffers, systemImage: "arrow.triangle.2.circlepath")
                             .font(PharosFont.caption).foregroundStyle(PharosColor.warning)
                         Button(l10n.updatePreset) { chrome.adopt(r, into: preset.id) }
+                            .buttonStyle(.pharos)
                             .controlSize(.mini)
                     }
                 }
@@ -309,7 +310,7 @@ private struct ChromeCard: View {
                 .background(Capsule().fill(PharosColor.success.opacity(0.13)))
                 .foregroundStyle(PharosColor.success)
         case .clashMixedPort(let port):
-            Text("Clash :\(port)")
+            Text("Clash :\(String(port))")
                 .font(PharosFont.captionDigits)
                 .padding(.horizontal, 6).padding(.vertical, 1)
                 .background(Capsule().fill(PharosColor.accent.opacity(0.13)))
@@ -327,17 +328,17 @@ private struct ChromeCard: View {
 
     private func proxyPillButton(title: String, isSelected: Bool, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title)
-                .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(
-                    Capsule().fill(isSelected ? color.opacity(0.18) : PharosColor.fill.opacity(0.4))
-                )
-                .overlay(
-                    Capsule().stroke(isSelected ? color : Color.clear, lineWidth: 1)
-                )
-                .foregroundStyle(isSelected ? color : PharosColor.textSecondary)
+            HStack(spacing: 4) {
+                Circle().fill(color).frame(width: 5, height: 5).opacity(isSelected ? 1 : 0.5)
+                Text(title)
+            }
+            .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+            .padding(.horizontal, 9)
+            .frame(minHeight: 22)
+            .background(Capsule(style: .continuous).fill(isSelected ? PharosColor.surface : Color.clear))
+            .shadow(color: isSelected ? .black.opacity(0.08) : .clear, radius: 1.5, y: 0.5)
+            .foregroundStyle(isSelected ? PharosColor.textPrimary : PharosColor.textSecondary)
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -353,44 +354,52 @@ private struct ChromeCard: View {
         }
     }
 
+    /// One visible primary action (Quit while running, Start when stopped); everything
+    /// secondary lives in the overflow menu so the header never truncates.
     @ViewBuilder
     private var actions: some View {
         let c = entry.config
-        HStack(spacing: 4) {
-            if let port = c.debugPort, entry.isRunning {
-                IconButton(systemImage: "ladybug", help: l10n.openDevToolsList) { chrome.openDevToolsList(port: port) }
-            }
-            IconButton(systemImage: "folder", help: l10n.revealInFinder) { chrome.reveal(c) }
-            if let r = entry.running {
-                if let preset = entry.preset {
-                    IconButton(systemImage: "star.fill", help: l10n.unsaveChromePreset, tint: .yellow) {
-                        chrome.remove(id: preset.id)
-                    }
-                } else {
-                    IconButton(systemImage: "star", help: l10n.saveChromePreset, tint: .secondary) { chrome.save(r) }
+        HStack(spacing: PharosSpacing.xs) {
+            PharosMoreMenu(help: l10n.moreActions) {
+                if let port = c.debugPort, entry.isRunning {
+                    Button { chrome.openDevToolsList(port: port) } label: { Label(l10n.openDevToolsList, systemImage: "ladybug") }
                 }
+                Button { chrome.reveal(c) } label: { Label(l10n.revealInFinder, systemImage: "folder") }
+                Button { chrome.copyCommand(entry.preset?.config ?? c) } label: { Label(l10n.copyLaunchCommand, systemImage: "doc.on.doc") }
+                if let r = entry.running, entry.preset == nil {
+                    Button { chrome.save(r) } label: { Label(l10n.saveChromePreset, systemImage: "star") }
+                }
+                if let preset = entry.preset {
+                    Button { editing = editing == preset.id ? nil : preset.id } label: { Label(l10n.editCommand, systemImage: "pencil") }
+                    Divider()
+                    Button(role: .destructive) { armedRemove = true } label: {
+                        Label(entry.isRunning ? l10n.unsaveChromePreset : l10n.removeFavorite, systemImage: "trash")
+                    }
+                }
+            }
+            if armedRemove, let preset = entry.preset {
+                Button { chrome.remove(id: preset.id); armedRemove = false } label: {
+                    Label(l10n.removeConfirm, systemImage: "trash")
+                }
+                .buttonStyle(.pharosDestructive)
+                .controlSize(.small)
+                .task {
+                    try? await Task.sleep(for: .seconds(3))
+                    armedRemove = false
+                }
+            } else if let r = entry.running {
                 quitButton(r)
             } else if let preset = entry.preset {
-                IconButton(systemImage: "pencil", help: l10n.editCommand) {
-                    editing = editing == preset.id ? nil : preset.id
-                }
-                if armedRemove {
-                    Button(l10n.removeFavorite) { chrome.remove(id: preset.id) }
-                        .buttonStyle(.pharosDestructive).controlSize(.small)
-                    IconButton(systemImage: "xmark", help: l10n.cancel) { armedRemove = false }
-                } else {
-                    IconButton(systemImage: "trash", help: l10n.removeFavorite) { armedRemove = true }
-                }
                 Button {
                     chrome.start(preset.config, running: store.chrome, listening: store.state.listeningPorts)
                     Task {
-                        try? await Task.sleep(for: .seconds(2))
+                        try? await Task.sleep(for: .seconds(1))
                         await store.refresh()
                     }
                 } label: {
                     Label(l10n.startChrome, systemImage: "play.fill")
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.pharosPrimary)
                 .controlSize(.small)
             }
         }
@@ -399,27 +408,39 @@ private struct ChromeCard: View {
     @ViewBuilder
     private func quitButton(_ r: ChromeInstance) -> some View {
         if chrome.stubborn.contains(r.id) {
-            Button(l10n.forceKill) { chrome.forceQuit(r) { await store.refresh() } }
-                .buttonStyle(.pharosDestructive).controlSize(.small)
-                .help(l10n.stillRunning)
-        } else if armedQuit {
-            Button(l10n.quitChrome) {
-                armedQuit = false
-                chrome.quit(r) { await store.refresh() }
-            }
-            .buttonStyle(.pharosDestructive).controlSize(.small)
-            IconButton(systemImage: "xmark", help: l10n.cancel) { armedQuit = false }
-                .task {
-                    try? await Task.sleep(for: .seconds(4))
-                    armedQuit = false
-                }
-        } else {
-            Button(role: .destructive) { armedQuit = true } label: {
-                Label(l10n.quitChrome, systemImage: "power")
+            Button {
+                chrome.forceQuit(r, removed: store.removeChromeLocally) { await store.refresh() }
+            } label: {
+                Label(l10n.forceKill, systemImage: "bolt.fill")
             }
             .buttonStyle(.pharosDestructive)
             .controlSize(.small)
+            .help(l10n.stillRunning)
+        } else {
+            PharosConfirmButton(
+                title: l10n.quitChrome,
+                systemImage: "power",
+                confirmTitle: l10n.quitConfirm,
+                workingTitle: l10n.quitting,
+                isWorking: chrome.quitting.contains(r.id)
+            ) {
+                chrome.quit(r, removed: store.removeChromeLocally) { await store.refresh() }
+            }
         }
+    }
+
+    private func subtitle(_ c: ChromeConfig) -> String {
+        var parts: [String] = []
+        if c.browser != .chrome { parts.append(c.browser.appName) }
+        if let r = entry.running {
+            parts.append(ByteFormat.short(r.memoryBytes))
+            parts.append(l10n.processCount(r.processCount))
+        } else if entry.preset == nil {
+            parts.append(l10n.notSaved)
+        } else {
+            parts.append(l10n.savedStopped)
+        }
+        return parts.joined(separator: " · ")
     }
 
     private func row(_ title: String, _ value: String, mono: Bool) -> some View {
@@ -526,7 +547,7 @@ private struct ChromePresetEditor: View {
             }
             HStack {
                 Spacer()
-                Button(l10n.cancel, action: onDone).controlSize(.small)
+                Button(l10n.cancel, action: onDone).buttonStyle(.pharos).controlSize(.small)
                 Button(l10n.save) {
                     var p = preset
                     p.name = name.trimmingCharacters(in: .whitespaces).isEmpty ? preset.name : name
@@ -541,7 +562,7 @@ private struct ChromePresetEditor: View {
                     chrome.update(p)
                     onDone()
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.pharosPrimary)
                 .controlSize(.small)
                 .disabled(validation != nil)
             }
@@ -578,7 +599,8 @@ private extension String {
     var nilIfEmpty: String? { isEmpty ? nil : self }
 }
 
-/// The exact launch, shown as a pasteable terminal command.
+/// The exact launch, shown as a pasteable terminal command. Long commands wrap at argument
+/// boundaries (one flag per line) instead of mid-word; copy stays pinned top-right.
 private struct LaunchCommandRow: View {
     @ObservedObject private var chrome = ChromeStore.shared
     @ObservedObject private var l10n = L10n.shared
@@ -586,27 +608,54 @@ private struct LaunchCommandRow: View {
     @State private var copied = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 6) {
-            Text(l10n.launchCommand).font(.system(size: 10)).foregroundStyle(.secondary)
-            Text(ChromeInstances.shellCommand(config))
-                .font(.system(size: 10, design: .monospaced))
+        let command = ChromeInstances.shellCommand(config)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(l10n.launchCommand)
+                    .font(PharosFont.caption)
+                    .foregroundStyle(PharosColor.textSecondary)
+                Spacer()
+                Button {
+                    chrome.copyCommand(config)
+                    copied = true
+                } label: {
+                    Label(copied ? l10n.copied : l10n.copyLaunchCommand, systemImage: copied ? "checkmark" : "doc.on.doc")
+                }
+                .buttonStyle(.pharos)
+                .controlSize(.mini)
+                .task(id: copied) {
+                    guard copied else { return }
+                    try? await Task.sleep(for: .seconds(1.5))
+                    copied = false
+                }
+            }
+            Text(Self.wrapped(command))
+                .font(.system(size: 10.5, design: .monospaced))
+                .foregroundStyle(PharosColor.textPrimary.opacity(0.85))
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            IconButton(systemImage: copied ? "checkmark" : "doc.on.doc",
-                       help: copied ? l10n.copied : l10n.copyLaunchCommand,
-                       tint: copied ? .green : .secondary) {
-                chrome.copyCommand(config)
-                copied = true
-            }
-            .task(id: copied) {
-                guard copied else { return }
-                try? await Task.sleep(for: .seconds(1.5))
-                copied = false
-            }
         }
-        .padding(8)
-        .background(RoundedRectangle(cornerRadius: 6).fill((Color.primary as Color).opacity(0.04)))
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: PharosRadius.control, style: .continuous).fill(PharosColor.surfaceSecondary))
+    }
+
+    /// Puts each ` --flag` on its own continuation line (shell-valid with `\`) and keeps
+    /// paths unbreakable so lines never split inside a word.
+    static func wrapped(_ command: String) -> String {
+        // Keep `open -na 'App' --args` together; break before every real flag after it.
+        let head: String, tail: String
+        if let r = command.range(of: " --args ") {
+            head = String(command[..<r.upperBound]).trimmingCharacters(in: .whitespaces)
+            tail = String(command[r.upperBound...])
+        } else {
+            head = ""
+            tail = command
+        }
+        let flags = tail.components(separatedBy: " --").enumerated().map { i, p in i == 0 ? p : "--" + p }
+        guard !head.isEmpty else { return command }
+        let lines = [head] + flags.map { "  " + $0 }
+        return lines.joined(separator: " \\\n")
     }
 }
 
@@ -650,7 +699,6 @@ private struct PopoverChromeRow: View {
     @ObservedObject private var chrome = ChromeStore.shared
     @ObservedObject private var l10n = L10n.shared
     let entry: ChromeStore.Entry
-    @State private var armed = false
     @State private var hovering = false
 
     var body: some View {
@@ -686,10 +734,10 @@ private struct PopoverChromeRow: View {
                 quit(r)
             } else if let preset = entry.preset {
                 IconButton(systemImage: "doc.on.doc", help: l10n.copyLaunchCommand) { chrome.copyCommand(preset.config) }
-                IconButton(systemImage: "play.fill", help: l10n.startChrome, tint: .green) {
+                IconButton(systemImage: "play.fill", help: l10n.startChrome, tint: PharosColor.textPrimary) {
                     chrome.start(preset.config, running: store.chrome, listening: store.state.listeningPorts)
                     Task {
-                        try? await Task.sleep(for: .seconds(2))
+                        try? await Task.sleep(for: .seconds(1))
                         await store.refresh()
                     }
                 }
@@ -697,7 +745,8 @@ private struct PopoverChromeRow: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
-        .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? Color.primary.opacity(0.05) : .clear))
+        .background(RoundedRectangle(cornerRadius: PharosRadius.small + 2, style: .continuous).fill(hovering ? PharosColor.fill.opacity(0.6) : .clear))
+        .animation(.easeOut(duration: 0.12), value: hovering)
         .onHover { hovering = $0 }
         .help(c.profileKey)
     }
@@ -705,23 +754,23 @@ private struct PopoverChromeRow: View {
     @ViewBuilder
     private func quit(_ r: ChromeInstance) -> some View {
         if chrome.stubborn.contains(r.id) {
-            Button(l10n.forceKill) { chrome.forceQuit(r) { await store.refresh() } }
-                .buttonStyle(.borderedProminent).tint(.red).controlSize(.small)
-        } else if armed {
-            HStack(spacing: 4) {
-                Button(l10n.quitChrome) {
-                    armed = false
-                    chrome.quit(r) { await store.refresh() }
-                }
-                .buttonStyle(.borderedProminent).tint(.red).controlSize(.small)
-                IconButton(systemImage: "xmark", help: l10n.cancel) { armed = false }
+            Button { chrome.forceQuit(r, removed: store.removeChromeLocally) { await store.refresh() } } label: {
+                Label(l10n.forceKill, systemImage: "bolt.fill")
             }
-            .task {
-                try? await Task.sleep(for: .seconds(4))
-                armed = false
-            }
+            .buttonStyle(.pharosDestructive)
+            .controlSize(.small)
+            .help(l10n.stillRunning)
         } else {
-            IconButton(systemImage: "power", help: l10n.quitChrome, tint: .red.opacity(0.8)) { armed = true }
+            PharosConfirmButton(
+                title: l10n.quitChrome,
+                systemImage: "power",
+                confirmTitle: l10n.quitConfirm,
+                workingTitle: l10n.quitting,
+                isWorking: chrome.quitting.contains(r.id),
+                iconOnly: true
+            ) {
+                chrome.quit(r, removed: store.removeChromeLocally) { await store.refresh() }
+            }
         }
     }
 

@@ -2,41 +2,73 @@ import SwiftUI
 
 /// Button roles from DESIGN.md §2.3/§2.4: neutral fill by default, accent fill for the
 /// single primary action, destructive = neutral fill with red text (never a red fill).
+/// Hover brightens the fill, press dims and scales slightly (no scale with Reduce Motion).
 struct PharosActionButtonStyle: ButtonStyle {
     enum Role { case standard, primary, destructive }
 
     var role: Role = .standard
 
+    func makeBody(configuration: Configuration) -> some View {
+        PharosActionButtonBody(configuration: configuration, role: role)
+    }
+}
+
+private struct PharosActionButtonBody: View {
+    let configuration: ButtonStyleConfiguration
+    let role: PharosActionButtonStyle.Role
+
     @Environment(\.controlSize) private var controlSize
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var hovering = false
 
     private var compact: Bool { controlSize == .small || controlSize == .mini }
 
-    func makeBody(configuration: Configuration) -> some View {
+    var body: some View {
+        let pressed = configuration.isPressed
         configuration.label
-            .font(compact ? .system(size: 11.5, weight: .medium) : .system(size: 13, weight: role == .primary ? .semibold : .regular))
+            .font(compact ? .system(size: 11.5, weight: .medium) : .system(size: 13, weight: role == .primary ? .semibold : .medium))
+            .labelStyle(PharosButtonLabelStyle())
             .lineLimit(1)
+            .fixedSize()
             .foregroundStyle(foreground)
-            .padding(.horizontal, compact ? 10 : 16)
-            .frame(minHeight: compact ? 22 : 28)
-            .background(Capsule(style: .continuous).fill(background(pressed: configuration.isPressed)))
+            .padding(.horizontal, compact ? 11 : 16)
+            .frame(minHeight: compact ? 24 : 30)
+            .background(Capsule(style: .continuous).fill(background(pressed: pressed)))
             .contentShape(Capsule(style: .continuous))
+            .scaleEffect(pressed && !reduceMotion ? 0.97 : 1)
             .opacity(isEnabled ? 1 : 0.45)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .onHover { hovering = $0 && isEnabled }
+            .animation(.easeOut(duration: 0.12), value: pressed)
+            .animation(.easeOut(duration: 0.12), value: hovering)
     }
 
     private var foreground: Color {
         switch role {
         case .standard: return PharosColor.textPrimary
-        case .primary: return .white
+        case .primary: return PharosColor.onAccent
         case .destructive: return PharosColor.error
         }
     }
 
     private func background(pressed: Bool) -> Color {
         switch role {
-        case .primary: return pressed ? PharosColor.accent.opacity(0.8) : PharosColor.accent
-        case .standard, .destructive: return pressed ? PharosColor.fillPressed : PharosColor.fill
+        case .primary:
+            return PharosColor.accentFill.opacity(pressed ? 0.78 : (hovering ? 0.9 : 1))
+        case .standard:
+            return pressed ? PharosColor.fillPressed : (hovering ? PharosColor.fillHover : PharosColor.fill)
+        case .destructive:
+            return pressed ? PharosColor.error.opacity(0.22) : (hovering ? PharosColor.error.opacity(0.14) : PharosColor.fill)
+        }
+    }
+}
+
+/// Icon + title with tight, consistent spacing inside capsule buttons.
+struct PharosButtonLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 5) {
+            configuration.icon.imageScale(.small)
+            configuration.title
         }
     }
 }
@@ -70,6 +102,185 @@ struct PharosActionButton: View {
             }
         }
         .buttonStyle(PharosActionButtonStyle(role: role))
+    }
+}
+
+/// Circular icon-only button. `ghost` is transparent until hovered (dense rows),
+/// `filled` sits on a neutral disc (standalone). `help` doubles as the accessibility label.
+struct PharosIconButton: View {
+    enum Variant { case ghost, filled }
+
+    let systemImage: String
+    let help: String
+    var tint: Color = PharosColor.textSecondary
+    var variant: Variant = .ghost
+    var size: CGFloat = 24
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: size * 0.46, weight: .medium))
+                .foregroundStyle(tint)
+                .frame(width: size, height: size)
+        }
+        .buttonStyle(PharosIconButtonStyle(variant: variant))
+        .help(help)
+        .accessibilityLabel(help)
+    }
+}
+
+struct PharosIconButtonStyle: ButtonStyle {
+    var variant: PharosIconButton.Variant = .ghost
+
+    func makeBody(configuration: Configuration) -> some View {
+        PharosIconButtonBody(configuration: configuration, variant: variant)
+    }
+}
+
+private struct PharosIconButtonBody: View {
+    let configuration: ButtonStyleConfiguration
+    let variant: PharosIconButton.Variant
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var hovering = false
+
+    var body: some View {
+        let pressed = configuration.isPressed
+        configuration.label
+            .background(Circle().fill(fill(pressed: pressed)))
+            .contentShape(Circle())
+            .scaleEffect(pressed && !reduceMotion ? 0.92 : 1)
+            .opacity(isEnabled ? 1 : 0.4)
+            .onHover { hovering = $0 && isEnabled }
+            .animation(.easeOut(duration: 0.12), value: pressed)
+            .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+
+    private func fill(pressed: Bool) -> Color {
+        if pressed { return PharosColor.fillPressed }
+        if hovering { return PharosColor.fillHover }
+        return variant == .filled ? PharosColor.fill : .clear
+    }
+}
+
+/// Dismiss button for banners, sheets and panels: a small neutral disc with a bold ×.
+/// Only for closing UI — cancelling a confirmation is done by `PharosConfirmButton` itself.
+struct PharosCloseButton: View {
+    let help: String
+    var size: CGFloat = 20
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: size * 0.42, weight: .bold))
+                .foregroundStyle(PharosColor.textSecondary)
+                .frame(width: size, height: size)
+        }
+        .buttonStyle(PharosIconButtonStyle(variant: .filled))
+        .help(help)
+        .accessibilityLabel(help)
+    }
+}
+
+/// Two-step destructive action in place: the first click turns the same capsule into a red
+/// "confirm" prompt (no extra × button, no layout jump); a second click runs `action`.
+/// It disarms on its own after `timeout`, when the pointer leaves, or with Esc.
+/// While `isWorking`, it shows a spinner with `workingTitle` and ignores clicks.
+struct PharosConfirmButton: View {
+    let title: String
+    var systemImage: String? = nil
+    let confirmTitle: String
+    var workingTitle: String? = nil
+    var isWorking = false
+    /// Icon-only resting state for dense rows; still expands into the confirm capsule.
+    var iconOnly = false
+    var timeout: Double = 3
+    let action: () -> Void
+
+    @State private var armed = false
+    @State private var hovering = false
+
+    var body: some View {
+        Group {
+            if isWorking {
+                HStack(spacing: 5) {
+                    ProgressView().controlSize(.mini)
+                    if let workingTitle { Text(workingTitle) }
+                }
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(PharosColor.textSecondary)
+                .padding(.horizontal, 11)
+                .frame(minHeight: 24)
+                .background(Capsule(style: .continuous).fill(PharosColor.fill))
+                .fixedSize()
+            } else if armed {
+                Button {
+                    armed = false
+                    action()
+                } label: {
+                    Label(confirmTitle, systemImage: "exclamationmark.circle")
+                }
+                .buttonStyle(.pharosDestructive)
+                // No Return shortcut: with several rows armed, or focus in a text field,
+                // Return could kill the wrong process. Destructive confirm must be a click.
+                .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                .task {
+                    try? await Task.sleep(for: .seconds(timeout))
+                    withAnimation(.easeOut(duration: 0.15)) { armed = false }
+                }
+                .background(
+                    // Esc disarms without needing a separate cancel button.
+                    Button("") { withAnimation(.easeOut(duration: 0.15)) { armed = false } }
+                        .keyboardShortcut(.cancelAction)
+                        .opacity(0)
+                        .allowsHitTesting(false)
+                )
+            } else if iconOnly, let systemImage {
+                PharosIconButton(systemImage: systemImage, help: title, tint: PharosColor.error.opacity(0.85)) {
+                    withAnimation(.easeOut(duration: 0.15)) { armed = true }
+                }
+            } else {
+                Button {
+                    withAnimation(.easeOut(duration: 0.15)) { armed = true }
+                } label: {
+                    if let systemImage { Label(title, systemImage: systemImage) } else { Text(title) }
+                }
+                .buttonStyle(.pharosDestructive)
+            }
+        }
+        .controlSize(.small)
+        .onHover { inside in
+            if hovering && !inside && armed {
+                withAnimation(.easeOut(duration: 0.15)) { armed = false }
+            }
+            hovering = inside
+        }
+        .accessibilityHint(armed ? confirmTitle : "")
+    }
+}
+
+/// "⋯" overflow menu for secondary row actions, styled like a ghost icon button.
+struct PharosMoreMenu<Content: View>: View {
+    let help: String
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        Menu {
+            content
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(PharosColor.textSecondary)
+                .frame(width: 24, height: 24)
+                .contentShape(Circle())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(help)
+        .accessibilityLabel(help)
     }
 }
 
@@ -306,10 +517,11 @@ struct PharosSearchField: View {
                     text = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 11))
+                        .font(.system(size: 12))
                         .foregroundStyle(PharosColor.textTertiary)
                 }
                 .buttonStyle(.plain)
+                .help(L10n.shared.clearSearch)
             }
         }
         .padding(.horizontal, PharosSpacing.s + 2)

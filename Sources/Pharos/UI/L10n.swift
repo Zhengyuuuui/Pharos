@@ -107,6 +107,13 @@ final class L10n: ObservableObject {
     var stop: String { en ? "Stop" : "结束" }
     var stopProject: String { en ? "Stop Project" : "结束项目" }
     var forceKill: String { en ? "Force Kill" : "强制结束" }
+    var stopConfirm: String { en ? "Confirm Stop" : "确认结束" }
+    var stopping: String { en ? "Stopping…" : "正在结束…" }
+    var quitConfirm: String { en ? "Confirm Quit" : "确认退出" }
+    var quitting: String { en ? "Quitting…" : "正在退出…" }
+    var removeConfirm: String { en ? "Confirm Remove" : "确认移除" }
+    var moreActions: String { en ? "More Actions" : "更多操作" }
+    var clearSearch: String { en ? "Clear" : "清除" }
     var cancel: String { en ? "Cancel" : "取消" }
     var confirm: String { en ? "Confirm" : "确认" }
     func confirmStopTitle(_ name: String) -> String { en ? "Stop \(name)?" : "结束「\(name)」？" }
@@ -354,10 +361,10 @@ final class L10n: ObservableObject {
     var relaunchWithProxy: String { en ? "Relaunch with Proxy" : "以该代理重启" }
     var startWithProxy: String { en ? "Start with Proxy" : "以该代理启动" }
     var currentRunningProxy: String { en ? "Running with this proxy" : "当前已生效" }
-    var proxyDirectPill: String { en ? "Direct (direct://)" : "⚡ 纯净直连" }
-    var proxyAPill: String { en ? "Proxy A (7890)" : "🌐 代理 A (7890)" }
-    var proxyBPill: String { en ? "Proxy B (7897)" : "🌐 代理 B (7897)" }
-    var proxySystemPill: String { en ? "System" : "🔄 跟随系统" }
+    var proxyDirectPill: String { en ? "Direct" : "直连" }
+    var proxyAPill: String { en ? "Proxy A · 7890" : "代理 A · 7890" }
+    var proxyBPill: String { en ? "Proxy B · 7897" : "代理 B · 7897" }
+    var proxySystemPill: String { en ? "System" : "跟随系统" }
     var proxyCustomPill: String { en ? "Custom…" : "⚙️ 自定义…" }
     var clashControlHub: String { en ? "Clash / Mihomo Network Hub" : "Clash / Mihomo 实时网络控制中心" }
     var clashClientRunning: String { en ? "Running" : "运行中" }

@@ -299,46 +299,33 @@ struct PopoverProjectRow: View {
     }
 }
 
-/// Two-step stop: first click arms, second click sends SIGTERM. If the project
-/// survives SIGTERM the button becomes a force kill.
+/// Two-step stop in place (see `PharosConfirmButton`): SIGTERM on confirm, "Stopping…"
+/// while the processes exit, and a force kill only if the project survives SIGTERM.
 struct StopButton: View {
     @EnvironmentObject var store: ProjectStore
     @ObservedObject private var l10n = L10n.shared
     let project: Project
     var compact = false
-    @State private var armed = false
 
     var body: some View {
         if store.stubborn.contains(project.id) {
-            Button(l10n.forceKill) { store.forceKill(project) }
-                .buttonStyle(.borderedProminent)
-                .tint(.red)
-                .controlSize(.small)
-                .help(l10n.stillRunning)
-        } else if armed {
-            HStack(spacing: 4) {
-                Button(compact ? l10n.stop : l10n.stopProject) {
-                    armed = false
-                    store.terminate(project)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.red)
-                .controlSize(.small)
-                IconButton(systemImage: "xmark", help: l10n.cancel) { armed = false }
+            Button { store.forceKill(project) } label: {
+                Label(l10n.forceKill, systemImage: "bolt.fill")
             }
-            .task {
-                try? await Task.sleep(for: .seconds(4))
-                armed = false
-            }
-        } else if compact {
-            IconButton(systemImage: "stop.circle", help: l10n.stop, tint: .red.opacity(0.8)) {
-                armed = true
-            }
-        } else {
-            Button(role: .destructive) { armed = true } label: {
-                Label(l10n.stopProject, systemImage: "stop.circle")
-            }
+            .buttonStyle(.pharosDestructive)
             .controlSize(.small)
+            .help(l10n.stillRunning)
+        } else {
+            PharosConfirmButton(
+                title: compact ? l10n.stop : l10n.stopProject,
+                systemImage: "stop.circle",
+                confirmTitle: l10n.stopConfirm,
+                workingTitle: l10n.stopping,
+                isWorking: store.stopping.contains(project.id),
+                iconOnly: compact
+            ) {
+                store.terminate(project)
+            }
         }
     }
 }
