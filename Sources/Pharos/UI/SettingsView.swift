@@ -372,7 +372,11 @@ struct MainSettingsView: View {
                                 backupMessage = BackupActions.importFile() ?? backupMessage
                             }
                             CapsuleActionButton(title: l10n.onboardingReplay, systemImage: "sparkles") {
-                                OnboardingWindowController.shared.show(store: store, isReplay: true)
+                                // The controller closes the main window first; defer so this button's own
+                                // view tree isn't torn down mid-action.
+                                DispatchQueue.main.async {
+                                    OnboardingWindowController.shared.show(store: store, isReplay: true)
+                                }
                             }
                             CapsuleActionButton(title: l10n.resetAllSettings, systemImage: "arrow.counterclockwise", isDestructive: true) {
                                 showResetAlert = true

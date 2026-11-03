@@ -27,7 +27,7 @@ struct OnboardingMenuBarStepView: View {
                             popover.transition(popoverTransition)
                         }
                     }
-                    .frame(width: 320, height: 350, alignment: .top)
+                    .frame(width: 320, height: 285, alignment: .top)
                 }
                 .animation(OnboardingMotion.stepAnimation(level), value: expanded)
 
@@ -60,7 +60,6 @@ struct OnboardingMenuBarStepView: View {
 
     private static let sampleProjects: [Project] = [
         sampleProject("web-dashboard", pid: 101, ports: [3000], args: ["node", "next", "dev"], mem: 412 * mb),
-        sampleProject("design-system", pid: 102, ports: [5173], args: ["node", "vite"], mem: 186 * mb),
         sampleProject("api-server", pid: 103, ports: [8080, 9229], args: ["python3", "manage.py", "runserver"], mem: 128 * mb),
     ]
 
@@ -109,7 +108,7 @@ struct OnboardingMenuBarStepView: View {
     // MARK: Popover (mirrors PopoverView: header, segmented tabs, blocks, footer)
 
     private var popover: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
                 Text(l10n.appTitle).font(.system(size: 14, weight: .bold))
                 Spacer()
@@ -128,7 +127,7 @@ struct OnboardingMenuBarStepView: View {
                 .id(tab)
                 .transition(tabTransition)
             }
-            .frame(height: 182, alignment: .top)
+            .frame(height: 148, alignment: .top)
             .clipped()
             .allowsHitTesting(false)
             .animation(OnboardingMotion.collapseAnimation(level), value: tab)
@@ -139,10 +138,11 @@ struct OnboardingMenuBarStepView: View {
                 Spacer()
                 Text(l10n.onboardingMenuDemoSample).font(.system(size: 10)).foregroundStyle(.tertiary)
             }
-            .font(PharosFont.body)
+            .font(.system(size: 11))
+            .frame(height: 16)
             .padding(.horizontal, PharosSpacing.s)
         }
-        .padding(14)
+        .padding(10)
         .frame(width: 320, alignment: .topLeading)
         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.regularMaterial))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(PharosColor.separator.opacity(0.6), lineWidth: 0.5))
@@ -173,8 +173,8 @@ struct OnboardingMenuBarStepView: View {
     /// Mirrors `MemoryBlock` + `DevProjectsBlock`.
     private var overview: some View {
         let s = Self.sampleMemory
-        return VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
+        return VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(l10n.systemMemory).font(.system(size: 12, weight: .semibold))
                     Spacer()
@@ -184,7 +184,7 @@ struct OnboardingMenuBarStepView: View {
                         .font(.system(size: 11, weight: .medium).monospacedDigit())
                         .foregroundStyle(.green)
                 }
-                MemoryCompositionBar(stats: s, height: 10, showLegend: false)
+                MemoryCompositionBar(stats: s, height: 8, showLegend: false)
                 HStack {
                     PressureBadge(pressure: s.pressure)
                     Spacer()
@@ -193,7 +193,7 @@ struct OnboardingMenuBarStepView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(l10n.devProjects).font(.system(size: 12, weight: .semibold))
                     Spacer()

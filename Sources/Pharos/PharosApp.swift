@@ -79,42 +79,82 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func showMainWindow(selecting select: MainWindowView.SidebarItem? = nil) {
+        // While onboarding is on screen it owns the stage; entry points (popover, Dock) bring it forward instead.
+        if OnboardingWindowController.shared.isVisible {
+            OnboardingWindowController.shared.bringToFront()
+            return
+        }
         NSApp.setActivationPolicy(.regular)
         syncApplicationIcon()
         if window != nil, let select {
             // Window already exists: switch its page instead of ignoring the request.
             WindowRouter.shared.request = select
         }
-        if window == nil {
-            let hosting = NSHostingController(
-                rootView: MainWindowView(initialSelection: select).environmentObject(store)
-            )
-            let w = PharosMainWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 1040, height: 700),
-                styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
-                backing: .buffered,
-                defer: false
-            )
-            w.contentViewController = hosting
-            w.title = "Pharos"
-            w.titlebarAppearsTransparent = true
-            w.titleVisibility = .hidden
-            w.toolbar = NSToolbar()
-            w.toolbarStyle = .unified
-            w.titlebarSeparatorStyle = .none
-            w.isMovableByWindowBackground = false
-            w.isOpaque = true
-            w.backgroundColor = .windowBackgroundColor
-            w.minSize = NSSize(width: 940, height: 620)
-            w.setContentSize(NSSize(width: 1040, height: 700))
-            w.isReleasedWhenClosed = false
-            w.center()
-            w.delegate = self
-            window = w
-        }
-        if window?.isMiniaturized == true { window?.deminiaturize(nil) }
-        window?.makeKeyAndOrderFront(nil)
+        let w = window ?? makeMainWindow(selecting: select)
+        if w.isMiniaturized { w.deminiaturize(nil) }
+        w.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func makeMainWindow(selecting select: MainWindowView.SidebarItem?) -> NSWindow {
+        let hosting = NSHostingController(
+            rootView: MainWindowView(initialSelection: select).environmentObject(store)
+        )
+        let w = PharosMainWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1040, height: 700),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        w.contentViewController = hosting
+        w.title = "Pharos"
+        w.titlebarAppearsTransparent = true
+        w.titleVisibility = .hidden
+        w.toolbar = NSToolbar()
+        w.toolbarStyle = .unified
+        w.titlebarSeparatorStyle = .none
+        w.isMovableByWindowBackground = false
+        w.isOpaque = true
+        w.backgroundColor = .windowBackgroundColor
+        w.minSize = NSSize(width: 940, height: 620)
+        w.setContentSize(NSSize(width: 1040, height: 700))
+        w.isReleasedWhenClosed = false
+        w.center()
+        w.delegate = self
+        window = w
+        return w
+    }
+
+    /// Onboarding takes the whole stage: release the main window the same way `windowWillClose` does,
+    /// but keep `.regular` so the Dock icon does not blink out and back in.
+    func dismissMainWindowForOnboarding() {
+        guard let w = window else { return }
+        w.delegate = nil
+        window = nil
+        w.orderOut(nil)
+        AgentChatStore.shared.releaseHeavyCache()
+        PackageStore.shared.releaseHeavyCache()
+        // Deferred: this can be called from a button inside the window's own view tree.
+        DispatchQueue.main.async {
+            w.contentViewController = nil
+            w.close()
+        }
+    }
+
+    /// Builds (or reuses) the main window invisibly below `onboarding` at `frame`, for the hand-off.
+    func prepareMainWindowForReveal(selecting select: MainWindowView.SidebarItem?, frame: NSRect,
+                                    below onboarding: NSWindow) -> NSWindow {
+        NSApp.setActivationPolicy(.regular)
+        syncApplicationIcon()
+        if window != nil, let select { WindowRouter.shared.request = select }
+        let w = window ?? makeMainWindow(selecting: select)
+        if w.isMiniaturized { w.deminiaturize(nil) }
+        w.alphaValue = 0
+        w.setFrame(frame, display: false)
+        w.order(.below, relativeTo: onboarding.windowNumber)
+        w.layoutIfNeeded()
+        w.displayIfNeeded()
+        return w
     }
 
     func windowWillEnterFullScreen(_ notification: Notification) {
