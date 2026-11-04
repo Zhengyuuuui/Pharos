@@ -150,6 +150,14 @@ public struct ChromeInstance: Identifiable, Hashable, Sendable {
     public let processCount: Int
     public let helperPIDs: [Int32]
 
+    public init(pid: Int32, config: ChromeConfig, memoryBytes: UInt64, processCount: Int, helperPIDs: [Int32] = []) {
+        self.pid = pid
+        self.config = config
+        self.memoryBytes = memoryBytes
+        self.processCount = processCount
+        self.helperPIDs = helperPIDs
+    }
+
     /// Browser + profile folder: each browser allows one process per folder.
     public var id: String { config.browser.rawValue + ":" + config.profileKey }
     public var allPIDs: [Int32] { [pid] + helperPIDs }

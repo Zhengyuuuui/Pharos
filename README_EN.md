@@ -14,14 +14,38 @@
   <img src="https://img.shields.io/badge/Swift-6.0-orange" alt="Swift">
   <img src="https://img.shields.io/badge/dependencies-none-brightgreen" alt="Dependencies">
   <img src="https://img.shields.io/badge/network-none-lightgrey" alt="No network">
-  <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.8-blue" alt="Version 2.8">
-  <img src="https://img.shields.io/badge/updated-2026--10--19-informational" alt="Last updated 2026-10-19">
+  <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License">
+  <img src="https://img.shields.io/badge/version-3.1-blue" alt="Version 3.1">
+  <img src="https://img.shields.io/badge/updated-2026--10--31-informational" alt="Last updated 2026-10-31">
 </p>
 
-<p align="center"><sub>Last updated / 最后更新：2026-10-19 13:20 (UTC+8) · v2.8 · Author / 作者：zys · Model / 模型：Gemini 4 Argon</sub></p>
+<p align="center"><sub>Last updated / 最后更新：2026-10-31 · v3.1 · Author / 作者：zys · Model / 模型：Gemini 4 Argon</sub></p>
 
 <p align="center"><b>English</b> · <a href="README_CN.md">简体中文</a> · <a href="CHANGELOG.md">Changelog / 更新记录</a></p>
+
+---
+
+<p align="center">
+  <img src="img/01-dashboard-ports.png" width="880" alt="Pharos Dashboard & Ports Overview">
+</p>
+
+---
+
+## ⚡ Quick Install
+
+Requires **macOS 14+** (Sonoma / Sequoia · Apple Silicon & Intel).
+
+### Option 1: Direct Download (DMG)
+Download the latest [**Pharos-3.0.0.dmg**](https://github.com/Zhengyuuuui/Pharos/releases/latest) from GitHub Releases, open it, and drag `Pharos.app` to your `/Applications` folder.
+
+### Option 2: Homebrew
+```sh
+brew install --cask https://raw.githubusercontent.com/Zhengyuuuui/Pharos/main/Casks/pharos.rb
+```
+Or via tap:
+```sh
+brew tap zhengyuuuui/tap && brew install --cask pharos
+```
 
 ---
 
@@ -39,14 +63,37 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 |---|---|
 | **Ports & memory** | Every dev project listening on a TCP port, grouped by folder, with memory incl. child processes; machine-wide memory, pressure and a 1-hour trend |
 | **Disk usage** | Startup disk, external drives, network shares and disk images — used / available like Finder, updated the moment a drive is plugged in |
-| **Battery charge limit** | macOS 15 native-style "Not Charging" plug state: hold the battery at 80 / 85 / 90 / 95 / 100 %, adapter powers the Mac directly (0 mA cell current), never cuts the adapter; one click back to macOS |
+| **Battery charge limit** | macOS 15 native-style "Not Charging" plug state: hold the battery at 80 / 85 / 90 / 95 / 100 %, adapter powers the Mac directly (0 mA cell current), never cuts the adapter; optional **Persistent Lid-Closed & Background Guard** survives lid sleep, app exit, and reboots via state-persisted root daemon; one click back to macOS |
 | **Fans & temperature** | Fan speeds and CPU / GPU / memory / SSD / battery temperatures; automotive cockpit speedometer dials (60 FPS mechanical inertia engine & dynamic motion blur) & classic horizontal bars; optional fan control (fixed speed or max) with built-in safety rules |
 | **Stop processes** | `SIGTERM` first, `SIGKILL` only if it refuses; never system or other users' processes |
-| **Disk cleanup** | Temp folders and dev caches, file by file, with a retention window; the size shown is exactly what gets freed |
-| **Favorite projects** | Save project folders, start commands detected automatically, open in Terminal with one click |
-| **Browser instances** | Chrome, Chrome Beta / Canary, Chromium, Edge and Brave — every profile folder with its debug port, proxy and memory; save favorites that stay listed with their launch command after quitting; start and quit |
-| **AI agent chat databases** | Inspect, clean and backup local chat / session databases from 23+ AI IDEs and editors (Cursor, Trae, Windsurf, VS Code, Antigravity, OpenCode, Claude Code, MiniMax…); detect orphaned workspaces; manually add and scan any custom application under `/Applications` with native icon extraction and custom SQLite parsing |
-| **Packages & CLI tools** | Real Homebrew Cellar formula & Caskroom package scanning, diagnostics (`brew doctor`/`services`) and cache cleanup; global CLI tools (Node, Homebrew, Rust, Python, Go) with terminal run, reveal and uninstall; multi-root project dependency scanning across 10 developer workspace directories (.venv, node_modules, .build, target); language cache repos overview |
+| **Disk cleanup** | 4 specialized cleaning hubs: System & Caches (with sub-directory inspection & single-item clean), Orphaned App Leftovers scanner, npkill-style Project Purge (dormancy detection & batch release), and Dev & AI Tools (Homebrew multi-versions, Ollama/HuggingFace model weights with layer blob GC, Docker.raw & Xcode simulators) |
+| **Favorite projects & portable start contract** | Cross-ecosystem project start engine (peels through wrappers like `cross-env`/`dotenv` to match `package.json`, detects `go.mod`, `Cargo.toml`, `uv`/`poetry`/Django, Gradle/Maven), offering 100% portable start commands across developer machines; open in Terminal or copy command |
+| **Browsers & Proxy** | Clash / Mihomo network control hub (automatic detection of all major clients, UDS & HTTP dual-channel, hot mode switching & connection reset) and Chromium proxy isolation matrix (pure direct `direct://` for local debugging vs Clash rule proxy); manage Chrome, Edge, Brave profiles |
+| **AI agent chat databases** | Inspect, clean and backup local chat / session databases from 23+ AI IDEs and editors (Cursor, Trae, Windsurf, VS Code, Antigravity, OpenCode, Claude Code, MiniMax…); nanosecond-precision incremental fingerprint cache (`DB + WAL` size/mtime) skips unchanged databases; detect orphaned workspaces; manually add and scan any custom application under `/Applications` |
+| **Packages & CLI tools** | Real Homebrew Cellar formula & Caskroom package scanning, diagnostics (`brew doctor`/`services`) and cache cleanup; global CLI tools (Node, Homebrew, Rust, Python, Go) with terminal run, reveal and uninstall; two-stage progressive project dependency scanning with `mtime` + lockfile fingerprint cache across 10 developer workspace directories (`.venv`, `node_modules`, `.build`, `target`); language cache repos overview |
+| **Design system & sidebar** | Strict 3-step lightness hierarchy (`background` → `surface` → `fill` with calibrated high-contrast tokens and `Font.TextStyle` dynamic typography), floating sidebar island with native traffic lights and customizable frosted-glass scroll blur (0%–100% slider + live top-left 3-buttons preview in Settings), zero AppKit blue highlight clashing, and adaptive responsive popover customizer (`ViewThatFits`) |
+
+---
+
+## 📸 Interface Showcase
+
+<details open>
+<summary><b>Click to expand high-resolution Retina screenshots (9 core views)</b></summary>
+<br>
+
+| View & Module | High-Resolution Retina Screenshot |
+| :--- | :--- |
+| **01. Ports & Dashboard**<br>Active dev ports (`:3000`, `:5173`), LAN exposure markers, and system overview | <img src="img/01-dashboard-ports.png" width="620" alt="Ports Overview"> |
+| **02. System Memory & Doctor**<br>Physical memory composition, 1-hour swap curve, and Memory Bloat Doctor | <img src="img/02-system-memory.png" width="620" alt="System Memory"> |
+| **03. Battery & Thermals**<br>80% charge limit bypass (0 mA cell current) & cockpit fan speedometer | <img src="img/03-battery-thermals.png" width="620" alt="Battery & Thermals"> |
+| **04. Browsers & Clash Hub**<br>Chromium proxy matrix & Clash/Mihomo real-time daemon integration | <img src="img/04-clash-network.png" width="620" alt="Browsers & Clash Hub"> |
+| **05. 4-Tier Disk Cleanup**<br>System caches, app leftovers, npkill-style project purge, and AI tool blobs | <img src="img/05-disk-cleanup.png" width="620" alt="Disk Cleanup"> |
+| **06. AI Agent Conversations**<br>Inspect, optimize and vacuum session databases from 23+ AI IDEs | <img src="img/06-ai-agent-chats.png" width="620" alt="AI Agent Conversations"> |
+| **07. Packages & Global CLI**<br>Homebrew formulae & global CLI run, reveal, and cache cleanup | <img src="img/07-packages-cli.png" width="620" alt="Packages & Dependencies"> |
+| **08. Native Menu Bar Popover**<br>Frosted-glass dropdown with customizable widget cards and quick actions | <img src="img/08-menu-bar-popover.png" width="300" alt="Menu Bar Popover"> |
+| **09. Onboarding Experience**<br>Minimalist welcome ceremony and capability guidance | <img src="img/09-onboarding-welcome.png" width="620" alt="Onboarding Welcome"> |
+
+</details>
 
 ---
 
@@ -54,9 +101,10 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 
 ### Menu bar popover
 - **Overview** tab: system memory, pressure, disk usage of every volume (incl. external drives), top apps
-- **Projects** tab: running projects with ports and memory, plus your browser instances (start / quit / open debug list, “Manage…” jumps to the Browsers page)
+- **Projects** tab: running projects with ports, memory, and portable cross-machine start commands, plus your browser instances (start / quit / open debug list, “Manage…” jumps to the Browsers page)
+- **Unified single-scroll architecture & ultra-slim scroller**: Features a unified outer scroll container that eliminates nested scrollers inside individual cards, permanently preventing multiple vertical scrollbars and wheel gesture conflicts; equipped with a custom 3.5 pt semi-transparent floating capsule scroller (`SlimPopoverScroller`), eliminating macOS native 16 pt thick scroller overlap over action buttons and text.
 - Quick buttons to open the main window or jump straight to Disk Cleanup
-- **Customizable like widgets** (Main window → Customize): a live snapshot of the popover next to its two tabs and a component library — drag blocks to reorder them, move them between tabs, drag them out to hide or in to add (memory, disk, fans & temperature, dev projects, top apps, running projects, browser instances, favorite projects). Empty tabs disappear; Reset to Default restores the original layout
+- **Customizable like widgets** (Main window → Customize): a live snapshot of the popover next to its two tabs and a component library — drag blocks to reorder them, move them between tabs, drag them out to hide or in to add (memory, disk, fans & temperature, dev projects, top apps, running projects, browser instances, favorite projects). Adaptive side-by-side or stacked layout (`ViewThatFits`) prevents window squeezing; Empty tabs disappear; Reset to Default restores the original layout
 - Below the library, **Running projects shown** sets how many projects the popover lists before scrolling: quick picks (3 / 5 / 8 / 10 / 15 / all running) or type a number — minimum 3, maximum the number of projects running right now (default 5). Extra projects scroll inside the list
 
 ### Projects
@@ -70,6 +118,7 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 ### System memory
 - Used / Available (cached files counted as reclaimable), swap, memory pressure — same formulas as Activity Monitor
 - Composition bar: App / Wired / Compressed | Cached / Free
+- **Memory Bloat Doctor & Daemon Governance (`Not Launch`)**: detects 8 categories of notorious macOS background memory-bloating daemons (`mediaanalysisd` / `photoanalysisd`, `mds_stores`, `diagnosticd`, `bird`, `WallpaperVideoExtension`, `suggestd` / `intelligenceplatformd`, `commerce`, `SimLaunchHostService`); supports one-click safe `SIGTERM` reclamation as well as permanent user-domain `launchctl disable` (`Not Launch`) and one-click restore (`launchctl enable`)
 - Memory trend over the last hour
 - Top apps by memory (helper processes rolled up into their app, e.g. all Chrome helpers → “Google Chrome”)
 
@@ -93,31 +142,56 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 - Port map chart (log scale, ◆ = exposed), memory-by-project bars, stacked dev-memory trend
 
 ### Favorite projects (workspaces)
+- **Portable Cross-Machine Start Contract Engine**: Automatically resolves standard start commands with team reproducibility across different developer machines. Skips boilerplate execution wrappers (e.g. `cross-env`, `dotenv`, `concurrently`, `nodemon`, `PORT=3000`) to match declared scripts (`pnpm run dev`, `bun run dev`, `npm start`), and intelligently detects `go.mod` (`go run .`), `Cargo.toml` (`cargo run`), `uv`/`poetry`/Django (`python3 manage.py runserver`), and Gradle/Maven (`./gradlew bootRun`). Running projects in both the popover and main window display their normalized start command alongside one-click Terminal launch and clipboard copy.
 - **Add Workspace…**: pick project folders; the start command is detected from the folder's own files — `package.json` scripts (npm / pnpm / yarn / bun from the lockfile or `packageManager`), `deno.json`, `manage.py`, `bin/dev`, `Makefile` targets, docker compose, `Cargo.toml`, `go.mod`, `Package.swift`, `pyproject.toml` `[project.scripts]`, and entry files for script-only projects (`run.py`, `serve.py`, `gateway.py`, `server.mjs`…)
 - The best match is filled in automatically; `start.sh` / `run.sh` are listed but never auto-filled, and scripts containing `git reset --hard`, `rm -rf` or `sudo` are flagged and can't be applied with one click
 - **☆ on any running project** saves it with the command it is *actually running with* (e.g. a running `next dev` maps back to `pnpm run dev`). Inline code (`node -e`, `python -c`), multi-line or huge command lines are never saved — they often contain tokens
 - Favorites show running (ports, memory, stop) or stopped (last seen ports); edit the command, pick another detected one, copy `cd … && command`
 - **Open in Terminal** runs the command in a new window of your terminal (Terminal by default; iTerm2, Ghostty or Warp in Settings) with your login shell (PATH, nvm, pyenv as usual); the process belongs to that window — Ctrl-C there stops it. Pharos never runs commands in the background
 
-### Browser instances (Chrome, Edge, Brave…)
-- Supports Google Chrome, Chrome Beta, Chrome Canary, Chromium, Microsoft Edge and Brave — they share Chromium's flags; pick the browser per preset
-- Several browsers side by side (e.g. Chrome for work, Edge for testing, Brave for personal): a filter bar switches between them, and “All” groups instances per browser with running count and memory
-- **Settings → Browsers**: every supported browser with installed / running / saved counts and its default profile folder; hide browsers you don't use and choose which one “New Instance” uses
-- Every running browser, identified by its profile folder (`--user-data-dir`): debug port, proxy, start URL, signed-in profiles, memory incl. all helper processes, folder size on demand. Debug-profile browsers no longer clutter the project list
-- ☆ saves a running instance as a preset with its exact flags; **New Instance** picks the next free port and a `~/chromeNNNN` folder; every field is editable
-- Saved instances stay listed after you quit Chrome (“saved · not running”) with their port and the exact **launch command** — a ready-to-paste `open -na 'Google Chrome' --args …` with a copy button; ★ again removes it
-- If a saved instance is relaunched elsewhere with different flags, the card says so and **Update Preset** adopts the running flags
-- **Start** runs `open -na "Google Chrome" --args …` after checking the folder isn't already open and the port is free
-- **Quit** sends `SIGTERM` (normal Chrome shutdown, tabs restore next time); force quit is offered only if it's still open after 3 s
-- 🐞 opens `http://127.0.0.1:<port>` (DevTools target list) in your default browser. Pharos itself never connects to debug ports
+### Browsers & Network Proxy (Browsers & Proxy)
+
+1. **Clash / Mihomo Real-time Network Hub**:
+   - Automatically detects active local Mihomo/Clash engines: Mihomo Party / Clash Party (via `/tmp/mihomo-party-*.sock` Unix Domain Socket without credentials), Clash Verge Rev, Clash Nyanpasu, ClashX.Meta, Flclash, and generic Mihomo CLI.
+   - Live display of Mixed Port, SOCKS Port, TUN virtual network adapter state, active connections, and real-time upload/download speeds.
+   - Millisecond-level hot switching between **Rule**, **Direct**, and **Global** routing modes without restarting the client; one-click reset for all open connections to immediately route traffic to the new mode; one-click copy for terminal proxy configuration (`export http_proxy` / `unset`).
+2. **Browser Proxy Isolation Matrix**:
+   - **Local Dev Direct Browser**: Launch dedicated Chromium profiles with `--proxy-server="direct://"` and `--no-proxy-server`. Even when Clash system proxy or TUN mode is running, 100% of requests to `localhost`, `127.0.0.1`, and internal APIs bypass the proxy, eliminating SSL errors and proxy interference.
+   - **AI & Research Browser**: Launch profiles with `--proxy-server="http://127.0.0.1:7890"` to take advantage of node acceleration and smart split routing for foreign docs and LLM APIs.
+3. **Chromium Browser Instance Management**:
+   - Supports Google Chrome, Chrome Beta, Chrome Canary, Chromium, Microsoft Edge and Brave; every instance card features a proxy strategy capsule badge (`[Direct]` or `[Clash :7890]`) with in-drawer strategy editing.
+   - Several browsers side by side (e.g. Chrome for work, Edge for testing, Brave for personal): a filter bar switches between them, and “All” groups instances per browser with running count and memory
+   - **Settings → Browsers**: every supported browser with installed / running / saved counts and its default profile folder; hide browsers you don't use and choose which one “New Instance” uses
+   - Every running browser, identified by its profile folder (`--user-data-dir`): debug port, proxy, start URL, signed-in profiles, memory incl. all helper processes, folder size on demand. Debug-profile browsers no longer clutter the project list
+   - ☆ saves a running instance as a preset with its exact flags; **New Instance** picks the next free port and a `~/chromeNNNN` folder; every field is editable
+   - Saved instances stay listed after you quit Chrome (“saved · not running”) with their port and the exact **launch command** — a ready-to-paste `open -na 'Google Chrome' --args …` with a copy button; ★ again removes it
+   - If a saved instance is relaunched elsewhere with different flags, the card says so and **Update Preset** adopts the running flags
+   - **Start** runs `open -na "Google Chrome" --args …` after checking the folder isn't already open and the port is free
+   - **Quit** sends `SIGTERM` (normal Chrome shutdown, tabs restore next time); force quit is offered only if it's still open after 3 s
+   - 🐞 opens `http://127.0.0.1:<port>` (DevTools target list) in your default browser. Pharos itself never connects to debug ports
 
 ### Disk cleanup
-- **Pinned “Temp files” group**: `/tmp`, `/var/tmp`, and your `/var/folders/…/T` and `…/C` — where AI agents, CLIs and build tools constantly write scratch files. One **Clean Temp Files** button with an adjustable retention (keep files newer than none / 1 h / 6 h / 1 day / 3 days; default 1 day), meant for cleaning every day or two
-- Other caches in collapsible groups, each with its own **Clean Group** button: App caches (`~/Library/Caches`), Xcode & Apple toolchain (DerivedData, Archives, DeviceSupport, Simulator, SwiftPM, CocoaPods), package managers (npm, pnpm, uv, pip, Gradle, Maven, Cargo, rustup, Go, Homebrew)
-- Per-location **Clean** buttons and **Clean Everything**; every destructive button needs a second click
-- Decided file by file: only your own regular files older than the retention window are deleted; sockets, FIFOs, symlinks and other users' files are left alone; emptied subfolders are removed, the target folder itself is kept
-- The size shown uses the exact same rule as the clean, so it's what you'll actually get back; a result banner reports freed space or why nothing could be freed
-- Nested dev caches under `~/Library/Caches` get their own rows and are excluded from the parent's size — no double counting
+Four dedicated cleaning modules engineered in pure Apple Swift to deliver all major capabilities of CleanMyMac and Mole, tailored specifically for modern AI agents and developer workflows:
+- **System & Caches**:
+  - **Pinned “Temp files” group**: `/tmp`, `/var/tmp`, and `/var/folders/…/T` and `…/C` — where AI agents, CLIs and build tools constantly write scratch files. One **Clean Temp Files** button with adjustable retention (none / 1 h / 6 h / 1 day / 3 days).
+  - **System & Application Logs**: `~/Library/Logs` and crash diagnostics in `/Library/Logs/DiagnosticReports`.
+  - **Trash Bins**: Rapid size calculation and one-click emptying of user Trash (`~/.Trash`).
+  - **Browser Deep Caches**: Reclaim gigabytes from Chrome, Edge, Brave, and Safari JavaScript Code Cache, GPUCache, and WebKit temporary runtimes.
+  - **App & Toolchain Caches**: `~/Library/Caches`, Xcode DerivedData, Archives, SwiftPM, CocoaPods, and language package managers (npm, pnpm, uv, pip, Gradle, Maven, Cargo, rustup, Go).
+  - **Sub-Directory Details & Single-Item Clean**: Click "Details" on any target row to reveal top 15 subfolders and files sorted by size (see exactly which app in `Caches` is taking 5GB), with single-item clean or group clean.
+- **Orphaned App Leftovers Scanner**:
+  - Automatically identifies installed applications across `/Applications`, `/System/Applications`, and `~/Applications`.
+  - Deep-scans `~/Library/Application Support`, `~/Library/Saved Application State`, `~/Library/Containers`, `~/Library/WebKit`, and `~/Library/HTTPStorages`.
+  - Whitelists Apple system services and developer CLI tools, identifying orphaned folders left behind by uninstalled apps; supports safe removal to Trash.
+- **Project Build & Dependencies Purge (npkill style)**:
+  - Traverses developer workspaces to find heavy `node_modules`, Cargo `target`, SwiftPM `.build`, Python `.venv`, Next.js `.next`, Nuxt `.nuxt`, and `dist` build directories.
+  - Automatically checks modification times to flag dormant projects (> 14 days); provides one-click batch purging of all dormant dependencies, freeing 20–50GB+ easily.
+- **Developer & AI Specialized Cleanup**:
+  - **Homebrew Deep Cleanup**: Safely scans `/opt/homebrew/Cellar` and `Caskroom` for obsolete formula/cask versions, keeps active versions, and purges `~/Library/Caches/Homebrew/downloads` bottle archives.
+  - **Local AI Model Weights & Blob GC**: Parses Ollama JSON manifests with exact layer byte sizes, Hugging Face Hub snapshots, LM Studio GGUFs, and PyTorch checkpoints; performs automated layer blob garbage collection when an Ollama model is deleted.
+  - **Containers & Simulators**: Inspects Docker Desktop `Docker.raw` VM disk images, Colima diff disks, Xcode CoreSimulator data partitions (with device names and iOS runtimes), and `iOS DeviceSupport` physical device debug symbols.
+- **Safety & Transparency**:
+  - Scans and deletes with the identical rule; regular files only, no symlinks/sockets/FIFOs, skips active files, empties clean subdirectories, and never modifies system paths.
 
 ### AI agent chat databases
 - Scans local SQLite and state databases across 23+ AI IDEs and assistants (Cursor, Trae, Windsurf, VS Code, Antigravity, Qoder, Cherry Studio, CodeBuddy, Kiro, OpenCode, Claude Code, Zed, MiniMax Code, Doubao, etc.)
@@ -153,15 +227,16 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 
 ---
 
-## Install
+## Build from Source (Optional)
 
-Requires **macOS 14+** and the Swift toolchain (Command Line Tools are enough, no Xcode needed).
+Requires the Swift toolchain (Command Line Tools are enough, no Xcode needed):
 
 ```sh
-git clone https://github.com/Zhengyuuuui/pharos.git
-cd pharos
+git clone https://github.com/Zhengyuuuui/Pharos.git
+cd Pharos
 make test      # run the test suite (includes a real listening-socket scan)
 make install   # build release, bundle Pharos.app, copy to /Applications, launch
+# or: make dmg # build standalone signed DMG into dist/Pharos.dmg
 ```
 
 Upgrading from the old **UsageBar** build: your settings (language, favorites, Chrome presets, cleanup retention…) are copied over on first launch. Delete `/Applications/UsageBar.app` afterwards, and re-enable “Launch at login” in Settings.
@@ -205,6 +280,8 @@ Sources/
 │   ├── DiskCleaner      #   temp/cache scan + clean (one shared per-file rule)
 │   ├── Workspaces       #   favorites model, start-command detection, launch script
 │   ├── ChromeInstances  #   Chromium browsers: flags parsing, presets, launch args
+│   ├── ClashModels      #   routing modes, client variants, proxy strategies & snapshots
+│   ├── ClashController  #   Mihomo/Clash probing, UDS & HTTP dual-channel, hot switching
 │   ├── Alerts           #   when to notify (fires once, re-arms after clearing)
 │   ├── Backup           #   export / import format and merge rules
 │   ├── SMC / Thermals   #   read fans and temperatures from the SMC
@@ -223,6 +300,7 @@ Sources/
 │   ├── CleanupStore     #   disk cleanup state
 │   ├── WorkspaceStore   #   favorites: persist, pin, open in Terminal
 │   ├── ChromeStore      #   Chrome presets, start / quit
+│   ├── ClashStore       #   Clash / Mihomo real-time daemon state, hot mode switching
 │   ├── AgentChatStore   #   agent chat databases state, custom apps, backup, delete
 │   ├── PackageStore     #   package manager & Homebrew state, diagnostics
 │   ├── BatteryStore     #   battery charge limit state, hardware monitoring
@@ -256,6 +334,23 @@ make icon                           # regenerate the app icon from Scripts/make-
 
 ## Recent Updates
 
+### v3.1 (2026-10-31)
+- **Memory Bloat Doctor & Permanent System Daemon Governance (`Not Launch`)**: diagnoses 8 categories of macOS background memory-bloating daemons (`mediaanalysisd` / `photoanalysisd`, `mds_stores`, `diagnosticd`, `bird`, `WallpaperVideoExtension`, `suggestd` / `intelligenceplatformd`, `commerce`, `SimLaunchHostService`); supports both one-click safe `SIGTERM` memory reclamation and permanent user-domain `launchctl disable` (`Not Launch`) with one-click restore.
+- **Mission Control 4-Finger Swipe Fluency & Fan Speedometer GPU Optimization**: removed redundant offscreen `.drawingGroup()` and idle blur passes in `AmbientRailViews`, reducing CPU/GPU footprint on the Fans & Temperature page by over **90%** (~50.3% → ~4.3% CPU) while keeping 60 FPS mechanical needle inertia.
+- **Dual-Mechanism Adaptive Light / Dark App Icon**: fixed `AppIcon.icon/icon.json` layer specializations for `Assets.car` (macOS 26 Tahoe) and added runtime `PharosDark.icns` + `NSApp.effectiveAppearance` synchronization (`NSApp.applicationIconImage`) so Dock & App icons automatically switch between Light and Dark modes on macOS 14 / 15 / 26 with zero idle memory overhead.
+
+### v3.0 (2026-10-24)
+- **Floating Sidebar Island & Controllable Traffic Lights Frosted Glass**: redesigned the main window with a rounded floating sidebar island housing the native macOS traffic lights (`NSToolbar` unified layout) and a bottom status/settings footer island; scrolling sidebar items underneath the top-left traffic lights row triggers real-time Gaussian frosted-glass blur (`NSClipView.boundsDidChangeNotification`), with a 0%–100% transparency slider and a live miniature top-left 3-buttons preview card in **Settings → Menu Bar & Appearance**.
+- **Calibrated High-Contrast & Dynamic Typography Tokens**: `PharosColor` provides calibrated high-contrast lightness steps in both light and dark modes (increasing both `background`→`surface` and `surface`→`fill` separation), and `PharosFont` uses relative `Font.TextStyle` tokens with `.monospacedDigit()`.
+- **Comprehensive Settings Reset**: confirming **Reset Settings** in the modern Settings page restores all persisted preferences across stores (`ProjectStore`, `L10n`, `PopoverLayoutStore`, `MenuBarSettings`, `WorkspaceStore`, `Notifier`, `ChromeStore`, `PackageStore`, `AgentChatStore`, and visual toggles) while preserving saved workspaces, browser presets, and hardware fan/battery daemons.
+
+### v2.9 (2026-10-23)
+- **Persistent Lid-Closed & Background Battery Guard**: optional toggle in Battery & Charging lets `pharos-battd` persist its target mode/limit to `/Library/PrivilegedHelperTools/local.pharos.battd.state` (mode `0600`) and maintain the hardware charge limit across lid-close sleep, DarkWake, app quits, and reboots without requiring UI heartbeats.
+- **Zero-Redundancy SMC Write Deduplication & Visibility-Driven Polling**: `pharos-battd` deduplicates identical SMC hardware writes (re-asserting at most once per 60s), switches to a 3s tick loop, fast-returns in `.system` mode, and automatically rotates daemon logs (`512 KB` cap); `BatteryStore`, `FanStore`, and `ProjectStore` downclock background timers to 30s when all windows/popovers are closed.
+- **Incremental AI Chat Database Fingerprint Cache**: nanosecond-precision `AgentDatabaseFingerprint` (`DB + -wal` size & `mtime`) skips SQLite parsing on unchanged multi-GB databases (e.g. 6.5 GB `opencode.db`), reducing repeat scans to near-zero latency while supporting one-click forced full rescan.
+- **Two-Stage Progressive Project Dependency Scanning**: Stage 1 instantaneously renders project dependency manifests and CLI tools; Stage 2 progressively computes and caches `node_modules` / `.venv` / `.build` / `target` bundle sizes in the background keyed by directory & lockfile `mtime`.
+- **Modularized Core & UI Architecture**: cleanly split `PackageScanner`, `AgentChats`/`AgentScanner`, `PackageView`, and `AgentChatView` into cohesive, focused Swift modules under ~1,000 lines each with 765 unit test assertions passing.
+
 ### v2.8 (2026-10-19)
 - **Automotive Cockpit Fan Speedometer**: high-precision dual-dial cockpit gauges with 270° sweep, upright polar numerals, redline danger zone, and manual target speed marker.
 - **60 FPS Mechanical Inertia Acceleration Engine**: smooth cubic S-curve ($3t^2 - 2t^3$) spool-up, rolling continuous frame-by-frame HUD RPM digits.
@@ -269,4 +364,4 @@ make icon                           # regenerate the app icon from Scripts/make-
 
 ## License
 
-[MIT](LICENSE) © 2026 Zhengyuuuui. Portions © 2026 Jose Escorcia (original scaffolding).
+[AGPL-3.0](LICENSE) © 2026 Zhengyuuuui. Portions © 2026 Jose Escorcia (original scaffolding).

@@ -172,6 +172,7 @@ final class BatteryStore: ObservableObject {
     private var readingTelemetry = false
 
     func refreshTelemetry() {
+        if DemoMode.isEnabled { return }
         guard !readingTelemetry else { return }
         readingTelemetry = true
         Task { [weak self] in
@@ -182,6 +183,14 @@ final class BatteryStore: ObservableObject {
                 self.reading = r
             }
         }
+    }
+
+    func applyMockReading(_ r: BatteryReading, mode: BatteryMode = .limit(maxPercent: 80), helper: HelperState = .ready) {
+        self.reading = r
+        self.mode = mode
+        self.targetLimit = 80
+        self.helper = helper
+        self.isHolding = true
     }
 
     // MARK: - Control Actions

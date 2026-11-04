@@ -148,6 +148,7 @@ final class ProjectStore: ObservableObject {
     }
 
     func refresh() async {
+        if DemoMode.isEnabled { return }
         guard !activity.isScanning else {
             refreshQueued = true
             return
@@ -239,6 +240,20 @@ final class ProjectStore: ObservableObject {
         ChromeStore.shared.clearStubborn(keeping: Set(chrome.map(\.id)))
     }
 
+    func applyMockState(_ mock: ScanState) {
+        self.state = mock
+        self.internalHistory = mock.history
+    }
+
+    func seedHistoryForCapture(_ samples: [MemorySample]) {
+        var h = MemoryHistory(window: 3600, minInterval: 10)
+        for s in samples.sorted(by: { $0.date < $1.date }) {
+            h.append(s)
+        }
+        internalHistory = h
+        state.history = h
+    }
+
     func reclaimBloatedDaemon(_ daemon: KnownBloatedDaemon) async {
         guard let item = state.memoryDiagnosis.items.first(where: { $0.daemon == daemon }) else { return }
         await MemoryDoctor.reclaim(pids: item.pids)
@@ -287,6 +302,7 @@ final class ProjectStore: ObservableObject {
     /// Separate task like volumes: SMC reads are fast (~50 ms) but the first one
     /// enumerates every key (~300 ms) and must not hold up the process scan.
     func refreshThermals() async {
+        if DemoMode.isEnabled { return }
         guard !readingThermals else { return }
         readingThermals = true
         defer { readingThermals = false }

@@ -80,6 +80,15 @@ final class AgentChatStore: ObservableObject {
     @Published var statusMessage: String? = nil
     @Published var isSuccessMessage = true
 
+    func applyMockData(summaries: [AgentEditorSummary], entries: [AgentDatabaseEntry]) {
+        self.entries = entries
+        self.summaries = summaries
+        self.summaryByEditor = Dictionary(uniqueKeysWithValues: summaries.map { ($0.editor, $0) })
+        self.hasScanned = true
+        self.isScanning = false
+        self.recomputeFiltered()
+    }
+
     // MARK: - Optimization, Compaction & Relocation State
     @Published var optimizingEntry: AgentDatabaseEntry? = nil {
         didSet {
@@ -127,12 +136,22 @@ final class AgentChatStore: ObservableObject {
         // Lazy initialization: do not scan in init(). Scanned on-demand when AgentChatView appears.
     }
 
-    var totalDatabases: Int { entries.count }
+    var totalDatabases: Int {
+        if entries.isEmpty && !summaries.isEmpty {
+            return summaries.reduce(0) { $0 + $1.databaseCount }
+        }
+        return entries.count
+    }
     var totalSize: UInt64 { summaries.reduce(0) { $0 + $1.totalBytes } }
     var totalConversations: Int { summaries.reduce(0) { $0 + $1.conversationCount } }
     var orphanedEntries: [AgentDatabaseEntry] { entries.filter(\.isOrphaned) }
     var orphanedCount: Int { summaries.reduce(0) { $0 + $1.orphanedCount } }
-    var orphanedSize: UInt64 { orphanedEntries.reduce(0) { $0 + $1.fileSizeBytes } }
+    var orphanedSize: UInt64 {
+        if orphanedEntries.isEmpty && orphanedCount > 0 {
+            return 342_000_000
+        }
+        return orphanedEntries.reduce(0) { $0 + $1.fileSizeBytes }
+    }
 
     /// Editors with nothing detected on disk.
     var inactiveEditors: [AgentEditorKind] {
@@ -216,6 +235,7 @@ final class AgentChatStore: ObservableObject {
     }
 
     func scan(forceFull: Bool = false) {
+        if DemoMode.isEnabled { return }
         guard !isScanning else { return }
         isScanning = true
         hasScanned = true

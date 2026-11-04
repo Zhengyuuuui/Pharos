@@ -128,6 +128,11 @@ final class CleanupStore: ObservableObject {
     }
 
     var totalBytes: UInt64 { rows.reduce(0) { $0 + ($1.bytes ?? 0) } }
+
+    func applyMockRows(_ mockRows: [Row]) {
+        self.rows = mockRows
+        self.hasPromptedFirstLaunchDiskPermission = true
+    }
     var isCleaning: Bool { cleaning != nil }
     var isBusy: Bool { isScanning || isCleaning || isScanningLeftovers || isScanningPurges || isScanningHomebrew || isScanningAIModels || isScanningToolchain }
 
@@ -156,6 +161,7 @@ final class CleanupStore: ObservableObject {
     // MARK: - Standard Targets Clean
 
     func scan() {
+        if DemoMode.isEnabled { return }
         guard !isBusy else { return }
         isScanning = true
         Task { [weak self] in

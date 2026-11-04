@@ -14,7 +14,7 @@
   <img src="https://img.shields.io/badge/Swift-6.0-orange" alt="Swift">
   <img src="https://img.shields.io/badge/dependencies-none-brightgreen" alt="Dependencies">
   <img src="https://img.shields.io/badge/network-none-lightgrey" alt="No network">
-  <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
+  <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License">
   <img src="https://img.shields.io/badge/version-3.1-blue" alt="Version 3.1">
   <img src="https://img.shields.io/badge/updated-2026--10--31-informational" alt="Last updated 2026-10-31">
 </p>
@@ -22,6 +22,12 @@
 <p align="center"><sub>Last updated / 最后更新：2026-10-31 · v3.1 · Author / 作者：zys · Model / 模型：Gemini 4 Argon</sub></p>
 
 <p align="center"><b>English</b> · <a href="README_CN.md">简体中文</a> · <a href="CHANGELOG.md">Changelog / 更新记录</a></p>
+
+---
+
+<p align="center">
+  <img src="img/01-dashboard-ports.png" width="880" alt="Pharos Dashboard & Ports Overview">
+</p>
 
 ---
 
@@ -66,6 +72,28 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 | **AI agent chat databases** | Inspect, clean and backup local chat / session databases from 23+ AI IDEs and editors (Cursor, Trae, Windsurf, VS Code, Antigravity, OpenCode, Claude Code, MiniMax…); nanosecond-precision incremental fingerprint cache (`DB + WAL` size/mtime) skips unchanged databases; detect orphaned workspaces; manually add and scan any custom application under `/Applications` |
 | **Packages & CLI tools** | Real Homebrew Cellar formula & Caskroom package scanning, diagnostics (`brew doctor`/`services`) and cache cleanup; global CLI tools (Node, Homebrew, Rust, Python, Go) with terminal run, reveal and uninstall; two-stage progressive project dependency scanning with `mtime` + lockfile fingerprint cache across 10 developer workspace directories (`.venv`, `node_modules`, `.build`, `target`); language cache repos overview |
 | **Design system & sidebar** | Strict 3-step lightness hierarchy (`background` → `surface` → `fill` with calibrated high-contrast tokens and `Font.TextStyle` dynamic typography), floating sidebar island with native traffic lights and customizable frosted-glass scroll blur (0%–100% slider + live top-left 3-buttons preview in Settings), zero AppKit blue highlight clashing, and adaptive responsive popover customizer (`ViewThatFits`) |
+
+---
+
+## 📸 Interface Showcase
+
+<details open>
+<summary><b>Click to expand high-resolution Retina screenshots (9 core views)</b></summary>
+<br>
+
+| View & Module | High-Resolution Retina Screenshot |
+| :--- | :--- |
+| **01. Ports & Dashboard**<br>Active dev ports (`:3000`, `:5173`), LAN exposure markers, and system overview | <img src="img/01-dashboard-ports.png" width="620" alt="Ports Overview"> |
+| **02. System Memory & Doctor**<br>Physical memory composition, 1-hour swap curve, and Memory Bloat Doctor | <img src="img/02-system-memory.png" width="620" alt="System Memory"> |
+| **03. Battery & Thermals**<br>80% charge limit bypass (0 mA cell current) & cockpit fan speedometer | <img src="img/03-battery-thermals.png" width="620" alt="Battery & Thermals"> |
+| **04. Browsers & Clash Hub**<br>Chromium proxy matrix & Clash/Mihomo real-time daemon integration | <img src="img/04-clash-network.png" width="620" alt="Browsers & Clash Hub"> |
+| **05. 4-Tier Disk Cleanup**<br>System caches, app leftovers, npkill-style project purge, and AI tool blobs | <img src="img/05-disk-cleanup.png" width="620" alt="Disk Cleanup"> |
+| **06. AI Agent Conversations**<br>Inspect, optimize and vacuum session databases from 23+ AI IDEs | <img src="img/06-ai-agent-chats.png" width="620" alt="AI Agent Conversations"> |
+| **07. Packages & Global CLI**<br>Homebrew formulae & global CLI run, reveal, and cache cleanup | <img src="img/07-packages-cli.png" width="620" alt="Packages & Dependencies"> |
+| **08. Native Menu Bar Popover**<br>Frosted-glass dropdown with customizable widget cards and quick actions | <img src="img/08-menu-bar-popover.png" width="300" alt="Menu Bar Popover"> |
+| **09. Onboarding Experience**<br>Minimalist welcome ceremony and capability guidance | <img src="img/09-onboarding-welcome.png" width="620" alt="Onboarding Welcome"> |
+
+</details>
 
 ---
 
@@ -336,4 +364,4 @@ make icon                           # regenerate the app icon from Scripts/make-
 
 ## License
 
-[MIT](LICENSE) © 2026 Zhengyuuuui. Portions © 2026 Jose Escorcia (original scaffolding).
+[AGPL-3.0](LICENSE) © 2026 Zhengyuuuui. Portions © 2026 Jose Escorcia (original scaffolding).

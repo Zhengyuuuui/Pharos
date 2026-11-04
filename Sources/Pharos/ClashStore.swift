@@ -61,9 +61,14 @@ final class ClashStore: ObservableObject {
         pollTimer = nil
     }
 
+    func applyMockSnapshot(_ s: ClashStatusSnapshot) {
+        self.snapshot = s
+    }
+
     // MARK: - State Refresh
 
     func refresh() async {
+        if DemoMode.isEnabled { return }
         guard !isRefreshing else { return }
         isRefreshing = true
         defer { isRefreshing = false }

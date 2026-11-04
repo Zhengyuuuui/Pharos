@@ -31,6 +31,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         _ = BatteryStore.shared
         Notifier.shared.start(observing: store)
         startAppearanceIconSync()
+
+        if DemoMode.isEnabled {
+            NSApp.appearance = NSAppearance(named: .darkAqua)
+            UserDefaults.standard.set("en", forKey: "appLanguage")
+            UserDefaults.standard.set(true, forKey: "pharos.onboardingCompleted")
+            L10n.shared.language = .english
+            ScreenshotCapture.setupMockData(store: store)
+
+            if CommandLine.arguments.contains("--capture-screenshots") {
+                Task { @MainActor in
+                    await ScreenshotCapture.run(store: store)
+                    exit(0)
+                }
+                return
+            }
+
+            showMainWindow(selecting: .portsOverview)
+            return
+        }
+
         if OnboardingCoordinator.shouldPresentOnLaunch() {
             OnboardingWindowController.shared.show(store: store, isReplay: false)
         } else {

@@ -14,7 +14,7 @@
   <img src="https://img.shields.io/badge/Swift-6.0-orange" alt="Swift">
   <img src="https://img.shields.io/badge/dependencies-none-brightgreen" alt="Dependencies">
   <img src="https://img.shields.io/badge/network-none-lightgrey" alt="No network">
-  <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
+  <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License">
   <img src="https://img.shields.io/badge/version-3.1-blue" alt="Version 3.1">
   <img src="https://img.shields.io/badge/updated-2026--10--31-informational" alt="Last updated 2026-10-31">
 </p>
@@ -22,6 +22,12 @@
 <p align="center"><sub>最后更新 / Last updated：2026-10-31 · v3.1 · 作者 / Author：zys · 模型 / Model：Gemini 4 Argon</sub></p>
 
 <p align="center"><a href="README.md">English</a> · <b>简体中文</b> · <a href="CHANGELOG.md">更新记录 / Changelog</a></p>
+
+---
+
+<p align="center">
+  <img src="img/01-dashboard-ports.png" width="880" alt="Pharos 仪表盘与端口管理">
+</p>
 
 ---
 
@@ -67,6 +73,28 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 | **AI 助手会话管理** | 扫描、分析、备份与清理 23+ 种本地 AI 编程助手与编辑器（Cursor、Trae、Windsurf、VS Code、Antigravity、OpenCode、Claude Code、MiniMax 等）的会话数据库；内置纳秒级 `DB + WAL` 指纹增量缓存，未变动大库免重复解析；识别孤立工作区，支持手动添加扫描 `/Applications` 下的任意应用 |
 | **依赖与软件包** | 真实 Homebrew Cellar 与 Caskroom 软件包深度管理、环境自检与缓存清理；全局命令行软件统一管理（Node、Homebrew、Rust、Python、Go 等）；支持两阶段渐进式首屏秒开与 `mtime` + 锁文件指纹缓存的全生态项目依赖识别（`.venv`、`node_modules`、`.build`、`target` 等）；语言缓存仓库概览 |
 | **全局设计系统与侧边栏** | 全局统一明度层级架构（`background` → `surface` → `fill`，支持浅/深色高对比度校准与 `Font.TextStyle` 动态字号）、圆角悬浮侧边栏浮岛与原生交通灯毛玻璃滚动模糊（支持在设置中 0%–100% 连续调节通透度并配有左上角三按钮实时预览图），彻底杜绝原生蓝条高亮反差冲突；内置响应式防挤压小组件布局引擎（`ViewThatFits`） |
+
+---
+
+## 📸 界面预览
+
+<details open>
+<summary><b>点击展开查看 9 张 Retina 高清界面截图</b></summary>
+<br>
+
+| 功能模块 | Retina 2x 高清截图 |
+| :--- | :--- |
+| **01. 仪表盘与端口管理**<br>本地活跃端口（`:3000`、`:5173` 芯片）、局域网暴露标识与系统速览 | <img src="img/01-dashboard-ports.png" width="620" alt="仪表盘与端口管理"> |
+| **02. 系统内存与内存医生**<br>物理内存分布条、1 小时换页曲线与内存异常膨胀守护治理 | <img src="img/02-system-memory.png" width="620" alt="系统内存与内存医生"> |
+| **03. 电池与温控**<br>80% 充电上限硬件直通（0 mA 电池零损耗）与座舱仪表盘风扇转速 | <img src="img/03-battery-thermals.png" width="620" alt="电池与温控"> |
+| **04. 浏览器与网络中心**<br>Chromium 隔离实例矩阵与 Clash/Mihomo 实时网络看板 | <img src="img/04-clash-network.png" width="620" alt="浏览器与网络中心"> |
+| **05. 系统清理**<br>4 标签多维清理：系统缓存、应用残留、项目清理与 AI 模型缓存 | <img src="img/05-disk-cleanup.png" width="620" alt="系统清理"> |
+| **06. AI 会话管理**<br>一站式扫描、VACUUM 压缩 23+ 款主流 AI IDE 会话库与失效工作区清理 | <img src="img/06-ai-agent-chats.png" width="620" alt="AI 会话管理"> |
+| **07. 软件包与 CLI 管理**<br>Homebrew 依赖生态、全局 CLI 终端调用与 Bottle 缓存清理 | <img src="img/07-packages-cli.png" width="620" alt="软件包与 CLI 管理"> |
+| **08. 菜单栏下拉弹窗**<br>原生毛玻璃下拉弹窗，支持小组件式拖拽自定义与紧凑操作 | <img src="img/08-menu-bar-popover.png" width="300" alt="菜单栏下拉弹窗"> |
+| **09. 引导欢迎页**<br>雷达光束动效与极简初始仪式感指引 | <img src="img/09-onboarding-welcome.png" width="620" alt="引导欢迎页"> |
+
+</details>
 
 ---
 
@@ -336,4 +364,4 @@ make icon                           # 重新生成浅色/深色 App 图标
 
 ## License
 
-[MIT](LICENSE) © 2026 Zhengyuuuui. Portions © 2026 Jose Escorcia (original scaffolding).
+[AGPL-3.0](LICENSE) © 2026 Zhengyuuuui. Portions © 2026 Jose Escorcia (original scaffolding).

@@ -87,6 +87,15 @@ final class PackageStore: ObservableObject {
         // Lazy initialization: do not scan in init(). Scanned on-demand when PackageView appears.
     }
 
+    func applyMockData(tools: [LocalPackageItem], caches: [PackageCacheRepoSummary]) {
+        self.globalCliTools = tools
+        self.cacheRepos = caches
+        self.cachedGlobalCliCount = tools.count
+        self.cachedTotalCacheCount = caches.count
+        self.cachedTotalCacheSize = caches.reduce(0) { $0 + $1.fileSizeBytes }
+        self.recomputeFilteredCli()
+    }
+
     func resetSettings() {
         projectDepsDisplayMode = .bundleOnly
     }
@@ -100,6 +109,7 @@ final class PackageStore: ObservableObject {
 
     // MARK: - Scanning
     func scanAll() {
+        if DemoMode.isEnabled { return }
         guard !isScanning else { return }
         isScanning = true
         hasScanned = true

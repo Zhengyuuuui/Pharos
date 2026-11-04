@@ -34,6 +34,10 @@ final class WorkspaceStore: ObservableObject {
 
     func favorite(id: String) -> Favorite? { favorites.first { $0.id == id } }
 
+    func applyMockFavorites(_ mock: [Favorite]) {
+        self.favorites = mock
+    }
+
     func favorite(forDirectory dir: String?) -> Favorite? {
         dir.flatMap { WorkspaceMatcher.favorite(for: $0, in: favorites) }
     }

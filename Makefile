@@ -1,11 +1,13 @@
 APP = Pharos
 DIST = dist/$(APP).app
+DEMO_APP = Pharos Demo
+DEMO_DIST = dist/$(DEMO_APP).app
 VERSION ?= 3.0.0
 DMG_NAME = $(APP)-$(VERSION).dmg
 DMG_PATH = dist/$(DMG_NAME)
 DMG_STAGE = dist/dmg-stage
 
-.PHONY: build test app install clean icon assets dmg
+.PHONY: build test app install clean icon assets dmg demo-app demo-install
 
 build:
 	swift build -c release
@@ -77,6 +79,31 @@ install: app
 	rm -rf /Applications/$(APP).app
 	cp -R $(DIST) /Applications/
 	open /Applications/$(APP).app
+
+demo-app: build assets
+	rm -rf "$(DEMO_DIST)"
+	mkdir -p "$(DEMO_DIST)/Contents/MacOS" "$(DEMO_DIST)/Contents/Resources"
+	cp .build/release/$(APP) "$(DEMO_DIST)/Contents/MacOS/$(DEMO_APP)"
+	cp .build/release/pharos-fand "$(DEMO_DIST)/Contents/MacOS/pharos-fand"
+	cp .build/release/pharos-battd "$(DEMO_DIST)/Contents/MacOS/pharos-battd"
+	strip -u -r "$(DEMO_DIST)/Contents/MacOS/$(DEMO_APP)"
+	strip -u -r "$(DEMO_DIST)/Contents/MacOS/pharos-fand"
+	strip -u -r "$(DEMO_DIST)/Contents/MacOS/pharos-battd"
+	sed -e 's/<string>Pharos<\/string>/<string>Pharos Demo<\/string>/g' \
+	    -e 's/<string>local.pharos<\/string>/<string>local.pharos.demo<\/string>/g' \
+	    Resources/Info.plist > "$(DEMO_DIST)/Contents/Info.plist"
+	cp Resources/Pharos.icns "$(DEMO_DIST)/Contents/Resources/Pharos.icns"
+	cp Resources/Pharos.icns "$(DEMO_DIST)/Contents/Resources/Pharos Demo.icns"
+	if [ -f Resources/PharosDark.icns ]; then cp Resources/PharosDark.icns "$(DEMO_DIST)/Contents/Resources/PharosDark.icns"; fi
+	if [ -f .build/icon-assets/Assets.car ]; then cp .build/icon-assets/Assets.car "$(DEMO_DIST)/Contents/Resources/Assets.car"; fi
+	codesign --force --sign - "$(DEMO_DIST)"
+
+demo-install: demo-app
+	-pkill -f "Pharos Demo"
+	sleep 0.5
+	rm -rf "/Applications/$(DEMO_APP).app"
+	cp -R "$(DEMO_DIST)" /Applications/
+	@echo "Installed /Applications/$(DEMO_APP).app"
 
 clean:
 	rm -rf .build dist
