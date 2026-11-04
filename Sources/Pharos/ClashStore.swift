@@ -16,9 +16,10 @@ final class ClashStore: ObservableObject {
     private var pollTimer: Timer?
     private var lastRefreshTime: Date = Date()
     private var isRefreshing: Bool = false
+    private var activeViewers: Int = 0
 
     private init() {
-        startPolling()
+        // Do not poll in background when initialized. Polling starts on-demand via viewAppeared().
     }
 
     deinit {
@@ -26,6 +27,20 @@ final class ClashStore: ObservableObject {
     }
 
     // MARK: - Polling Lifecycle
+
+    func viewAppeared() {
+        activeViewers += 1
+        if activeViewers == 1 {
+            startPolling()
+        }
+    }
+
+    func viewDisappeared() {
+        activeViewers = max(0, activeViewers - 1)
+        if activeViewers == 0 {
+            stopPolling()
+        }
+    }
 
     func startPolling() {
         guard pollTimer == nil else { return }
@@ -41,6 +56,7 @@ final class ClashStore: ObservableObject {
     }
 
     func stopPolling() {
+        activeViewers = 0
         pollTimer?.invalidate()
         pollTimer = nil
     }

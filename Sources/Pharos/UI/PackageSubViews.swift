@@ -578,7 +578,7 @@ extension PackageView {
                         .fontWeight(.semibold)
 
                     if pkg.isDevDependency {
-                        Text("dev")
+                        Text(l10n.devDependencyTag)
                             .font(PharosFont.caption)
                             .fontWeight(.medium)
                             .foregroundStyle(PharosColor.textSecondary)

@@ -7,7 +7,6 @@ struct BatteryControlView: View {
     var showsTitle: Bool = true
     @ObservedObject private var battery = BatteryStore.shared
     @ObservedObject private var l10n = L10n.shared
-    @State private var armedUninstall = false
 
     var body: some View {
         PharosPage {
@@ -259,7 +258,7 @@ struct BatteryControlView: View {
                     HStack {
                         Text("50%").font(PharosFont.caption).foregroundStyle(PharosColor.textTertiary)
                         Spacer()
-                        Text("80% (Tahoe)").font(PharosFont.caption).foregroundStyle(PharosColor.textSecondary)
+                        Text(l10n.batteryLimit80Tahoe).font(PharosFont.caption).foregroundStyle(PharosColor.textSecondary)
                         Spacer()
                         Text("100%").font(PharosFont.caption).foregroundStyle(PharosColor.textTertiary)
                     }
@@ -375,7 +374,7 @@ struct BatteryControlView: View {
         let r = battery.reading
         return PharosSection(title: l10n.batteryHealth, systemImage: "heart.text.square") {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: PharosSpacing.m) {
-                metricCell(title: l10n.batteryHealth, value: "\(r.healthPercent)%", caption: r.health.rawValue.capitalized)
+                metricCell(title: l10n.batteryHealth, value: "\(r.healthPercent)%", caption: l10n.batteryHealthName(r.health))
                 metricCell(title: l10n.batteryCycleCount, value: "\(r.cycleCount)", caption: l10n.batteryDesignCapacityCaption(r.designCapacity))
                 metricCell(title: l10n.batteryMaxCapacity, value: "\(r.maxCapacity) mAh", caption: l10n.batteryRemainingCaption(r.remainingCapacity))
                 metricCell(title: l10n.batteryVoltage, value: String(format: "%.2f V", r.voltage), caption: l10n.batteryCurrentCaption(r.amperage))
@@ -453,37 +452,22 @@ struct BatteryControlView: View {
                         .disabled(battery.busy)
 
                     case .ready:
-                        if armedUninstall {
-                            HStack(spacing: PharosSpacing.s) {
-                                Button(l10n.confirm) {
-                                    armedUninstall = false
-                                    battery.uninstall()
-                                }
-                                .buttonStyle(.pharosDestructive)
-                                .controlSize(.small)
-
-                                Button(l10n.cancel) {
-                                    armedUninstall = false
-                                }
-                                .buttonStyle(.pharos)
-                                .controlSize(.small)
+                        HStack(spacing: PharosSpacing.s) {
+                            PharosConfirmButton(
+                                title: l10n.batteryUninstallHelper,
+                                confirmTitle: l10n.confirm,
+                                isWorking: battery.busy
+                            ) {
+                                battery.uninstall()
                             }
-                        } else {
-                            HStack(spacing: PharosSpacing.s) {
-                                Button(l10n.batteryUninstallHelper) {
-                                    armedUninstall = true
-                                }
-                                .buttonStyle(.pharos)
-                                .controlSize(.small)
-                                .disabled(battery.busy)
+                            .disabled(battery.busy)
 
-                                Button(battery.helperNeedsUpdate ? l10n.reinstallHelper : l10n.batteryHelperUpToDate) {
-                                    battery.install()
-                                }
-                                .buttonStyle(battery.helperNeedsUpdate ? .pharosPrimary : .pharos)
-                                .controlSize(.small)
-                                .disabled(battery.busy || !battery.helperNeedsUpdate)
+                            Button(battery.helperNeedsUpdate ? l10n.reinstallHelper : l10n.batteryHelperUpToDate) {
+                                battery.install()
                             }
+                            .buttonStyle(battery.helperNeedsUpdate ? .pharosPrimary : .pharos)
+                            .controlSize(.small)
+                            .disabled(battery.busy || !battery.helperNeedsUpdate)
                         }
                     }
                     Spacer()

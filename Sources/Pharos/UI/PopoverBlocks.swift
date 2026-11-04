@@ -214,6 +214,9 @@ private struct FavoritesBlock: View {
                     Spacer(minLength: 4)
                     if s.isRunning {
                         Text(ByteFormat.short(s.memoryBytes)).font(.system(size: 11).monospacedDigit()).foregroundStyle(.secondary)
+                        if let p = s.running.first {
+                            StopButton(project: p, compact: true)
+                        }
                     } else if !s.favorite.command.isEmpty {
                         IconButton(systemImage: "play.fill", help: l10n.openInTerminal, tint: .green) {
                             workspaces.openInTerminal(s.favorite)

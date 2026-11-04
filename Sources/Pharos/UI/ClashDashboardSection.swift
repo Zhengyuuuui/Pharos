@@ -181,6 +181,12 @@ struct ClashDashboardSection: View {
                 }
             }
         }
+        .onAppear {
+            clash.viewAppeared()
+        }
+        .onDisappear {
+            clash.viewDisappeared()
+        }
     }
 
     private func modeCard(

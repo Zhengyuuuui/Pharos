@@ -46,6 +46,11 @@ final class Notifier: ObservableObject {
             .map(\.lastScan)
             .removeDuplicates()
             .sink { [weak self] _ in Task { @MainActor in self?.evaluate() } }
+
+        guard Bundle.main.bundleIdentifier != nil, Bundle.main.bundleURL.pathExtension == "app" else {
+            // 处于裸二进制命令行调试或单测环境，优雅跳过系统通知初始化，不闪退
+            return
+        }
         refreshAuthorization()
     }
 
@@ -66,6 +71,9 @@ final class Notifier: ObservableObject {
     }
 
     private func deliver(_ alert: AlertState.Alert) {
+        guard Bundle.main.bundleIdentifier != nil, Bundle.main.bundleURL.pathExtension == "app" else {
+            return
+        }
         let l10n = L10n.shared
         let content = UNMutableNotificationContent()
         let id: String
@@ -91,6 +99,9 @@ final class Notifier: ObservableObject {
     }
 
     private func requestIfNeeded() {
+        guard Bundle.main.bundleIdentifier != nil, Bundle.main.bundleURL.pathExtension == "app" else {
+            return
+        }
         guard anyEnabled else { return }
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { [weak self] granted, _ in
             Task { @MainActor in self?.denied = !granted }
@@ -98,6 +109,10 @@ final class Notifier: ObservableObject {
     }
 
     func refreshAuthorization() {
+        guard Bundle.main.bundleIdentifier != nil, Bundle.main.bundleURL.pathExtension == "app" else {
+            // 处于裸二进制命令行调试或单测环境，优雅跳过系统通知初始化，不闪退
+            return
+        }
         UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
             let off = settings.authorizationStatus == .denied
             Task { @MainActor in self?.denied = off }

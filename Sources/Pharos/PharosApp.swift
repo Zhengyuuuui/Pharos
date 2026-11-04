@@ -134,6 +134,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         w.orderOut(nil)
         AgentChatStore.shared.releaseHeavyCache()
         PackageStore.shared.releaseHeavyCache()
+        CleanupStoreHolder.shared.releaseHeavyCache()
+        ClashStore.shared.stopPolling()
         // Deferred: this can be called from a button inside the window's own view tree.
         DispatchQueue.main.async {
             w.contentViewController = nil
@@ -179,6 +181,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         closing.delegate = nil
         AgentChatStore.shared.releaseHeavyCache()
         PackageStore.shared.releaseHeavyCache()
+        CleanupStoreHolder.shared.releaseHeavyCache()
+        ClashStore.shared.stopPolling()
         DispatchQueue.main.async { [weak self] in
             closing.contentViewController = nil
             self?.window = nil
@@ -216,6 +220,7 @@ final class WindowRouter: ObservableObject {
     @Published var request: MainWindowView.SidebarItem?
     @Published var cleanupTargetGroup: DiskCleaner.Group? = nil
     @Published var batteryThermalTab: BatteryAndThermalTab? = nil
+    @Published var editingPresetId: String? = nil
 }
 
 
@@ -283,11 +288,15 @@ enum DynamicMenuBarIcon {
     }
 
     @MainActor private static var cache: [CacheKey: NSImage] = [:]
+    @MainActor private static var cacheKeysOrder: [CacheKey] = []
+    private static let maxCacheCapacity = 32
 
     @MainActor
     /// `highIsBad: false` for battery, where a full ring is good and only `pressure` sets the colour.
     static func image(fraction: Double, pressure: MemoryPressure, highIsBad: Bool = true) -> NSImage {
-        let percent = min(100, max(0, Int((fraction * 100).rounded())))
+        let rawPercent = min(100, max(0, Int((fraction * 100).rounded())))
+        // Quantize to 2% step (e.g. 73% -> 72%) to sharply compress permutation space
+        let percent = (rawPercent / 2) * 2
         let key = CacheKey(percent: percent, pressure: pressure, highIsBad: highIsBad)
         if let cached = cache[key] {
             return cached
@@ -347,7 +356,12 @@ enum DynamicMenuBarIcon {
             return true
         }
         image.isTemplate = false
+        if cache.count >= maxCacheCapacity, !cacheKeysOrder.isEmpty {
+            let oldest = cacheKeysOrder.removeFirst()
+            cache.removeValue(forKey: oldest)
+        }
         cache[key] = image
+        cacheKeysOrder.append(key)
         return image
     }
 }

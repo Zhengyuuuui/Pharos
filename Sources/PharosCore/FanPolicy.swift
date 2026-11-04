@@ -4,6 +4,8 @@ import Foundation
 public enum FanRequest: Equatable, Sendable, Codable {
     /// macOS controls the fans (default; also what every failure falls back to).
     case system
+    /// Intelligent dynamic curve adapting smoothly to chip temperature (gradual ramp up & gentle glide down).
+    case curve
     /// Every fan held at this RPM (clamped to each fan's rated range).
     case fixed(rpm: Int)
     /// Every fan at its rated maximum.
@@ -13,7 +15,7 @@ public enum FanRequest: Equatable, Sendable, Codable {
 /// The safety rules for manual fan control, kept pure so they're unit-tested.
 /// The `pharos-fand` helper evaluates this every second and writes the result.
 public enum FanPolicy {
-    /// Any CPU/GPU sensor at or above this forces every fan to max.
+    /// In curve mode, any CPU/GPU sensor at or above this forces every fan to max.
     public static let overheatCelsius = 95.0
     /// …and the override is released only after dropping below this.
     public static let overheatReleaseCelsius = 88.0
@@ -29,31 +31,95 @@ public enum FanPolicy {
 
     public struct State: Equatable, Sendable {
         public var overheating = false
-        public init() {}
+        /// Command history used for inertial damping (smooth acceleration & deceleration).
+        public var lastTargets: [Int] = []
+        public init(overheating: Bool = false, lastTargets: [Int] = []) {
+            self.overheating = overheating
+            self.lastTargets = lastTargets
+        }
     }
 
     public static func decide(request: FanRequest, fans: [FanReading], chipCelsius: Double?,
                               lastHeartbeat: Date?, now: Date, state: inout State) -> Action {
         let peak = chipCelsius ?? 0
-        if state.overheating {
-            if peak < overheatReleaseCelsius { state.overheating = false }
-        } else if peak >= overheatCelsius {
-            state.overheating = true
-        }
-        // Too hot while something holds the fans: max, regardless of request or heartbeat.
-        // When macOS is already in charge it ramps the fans itself; don't take over.
-        if state.overheating, request != .system { return .hold(fans.map(\.maxRPM)) }
 
         // Pharos quit or crashed: never leave fans pinned by a dead app.
-        guard let beat = lastHeartbeat, now.timeIntervalSince(beat) <= heartbeatTimeout else { return .release }
+        guard let beat = lastHeartbeat, now.timeIntervalSince(beat) <= heartbeatTimeout else {
+            state.overheating = false
+            state.lastTargets = []
+            return .release
+        }
 
         switch request {
         case .system:
+            state.overheating = false
+            state.lastTargets = []
             return .release
-        case .max:
-            return .hold(fans.map(\.maxRPM))
+
         case .fixed(let rpm):
+            // Fixed RPM is strictly fixed without automatic curve acceleration.
+            state.overheating = false
+            state.lastTargets = []
             return .hold(fans.map { clamp(rpm, $0) })
+
+        case .max:
+            state.overheating = false
+            state.lastTargets = []
+            return .hold(fans.map(\.maxRPM))
+
+        case .curve:
+            // Dynamic Curve mode: evaluate overheat latch
+            if state.overheating {
+                if peak < overheatReleaseCelsius { state.overheating = false }
+            } else if peak >= overheatCelsius {
+                state.overheating = true
+            }
+
+            var idealTargets: [Int] = []
+            for fan in fans {
+                let minR = Double(fan.minRPM)
+                let maxR = Double(fan.maxRPM)
+                guard maxR > minR else {
+                    idealTargets.append(fan.minRPM)
+                    continue
+                }
+
+                let target: Double
+                if state.overheating {
+                    target = maxR
+                } else if peak <= 48.0 {
+                    target = minR
+                } else if peak <= 85.0 {
+                    let fraction = (peak - 48.0) / (85.0 - 48.0)
+                    target = minR + (maxR - minR) * 0.70 * fraction
+                } else {
+                    let fraction = min(1.0, (peak - 85.0) / (95.0 - 85.0))
+                    target = minR + (maxR - minR) * (0.70 + 0.30 * fraction)
+                }
+                idealTargets.append(clamp(Int(target), fan))
+            }
+
+            // Apply smooth slew-rate limiting:
+            // Slower gradual acceleration (+150 RPM/sec), gentle gliding deceleration (-80 RPM/sec)
+            var smoothed: [Int] = []
+            for (i, ideal) in idealTargets.enumerated() {
+                let current = (i < state.lastTargets.count && state.lastTargets[i] > 0)
+                    ? state.lastTargets[i]
+                    : (fans[i].targetRPM > 0 ? fans[i].targetRPM : fans[i].minRPM)
+
+                let next: Int
+                if ideal > current {
+                    next = min(ideal, current + 150)
+                } else if ideal < current {
+                    next = max(ideal, current - 80)
+                } else {
+                    next = ideal
+                }
+                smoothed.append(clamp(next, fans[i]))
+            }
+
+            state.lastTargets = smoothed
+            return .hold(smoothed)
         }
     }
 
@@ -82,6 +148,7 @@ public enum FanProtocol {
         case .status: return "status"
         case .heartbeat: return "ping"
         case .set(.system): return "system"
+        case .set(.curve): return "curve"
         case .set(.max): return "max"
         case .set(.fixed(let rpm)): return "fixed \(rpm)"
         }
@@ -94,6 +161,7 @@ public enum FanProtocol {
         case "status" where parts.count == 1: return .status
         case "ping" where parts.count == 1: return .heartbeat
         case "system" where parts.count == 1: return .set(.system)
+        case "curve" where parts.count == 1: return .set(.curve)
         case "max" where parts.count == 1: return .set(.max)
         case "fixed" where parts.count == 2:
             guard let rpm = Int(parts[1]), (0...20_000).contains(rpm) else { return nil }

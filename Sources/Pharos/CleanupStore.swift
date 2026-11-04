@@ -106,6 +106,10 @@ final class CleanupStore: ObservableObject {
         hasFullDiskAccess = DiskPermissions.hasFullDiskAccess
     }
 
+    func resetSettings() {
+        tempRetentionHours = 24
+    }
+
     /// Default targets with the user's temp retention applied.
     var targets: [DiskCleaner.Target] {
         let seconds = TimeInterval(tempRetentionHours) * 3600
@@ -131,6 +135,22 @@ final class CleanupStore: ObservableObject {
         if rows.isEmpty, !isBusy {
             scan()
         }
+    }
+
+    /// Releases cached heavy items and breakdown dictionaries when the main window closes,
+    /// dropping tens of megabytes of path strings and item structures from memory.
+    func releaseHeavyCache() {
+        guard !isBusy else { return }
+        rows = []
+        subItemsCache = [:]
+        loadingSubItemIds = []
+        expandedRowIds = []
+        leftoverItems = []
+        purgeableBundles = []
+        homebrewItems = []
+        aiModels = []
+        toolchainItems = []
+        report = nil
     }
 
     // MARK: - Standard Targets Clean
@@ -222,21 +242,50 @@ final class CleanupStore: ObservableObject {
     }
 
     func deleteLeftover(_ item: AppLeftoversScanner.LeftoverItem) {
+        guard !isBusy else { return }
+        let scope = Scope.leftovers
+        cleaning = scope
+        report = nil
         Task { [weak self] in
-            _ = try? AppLeftoversScanner.deleteLeftover(item, toTrash: true)
+            let success = await Task.detached(priority: .userInitiated) {
+                (try? AppLeftoversScanner.deleteLeftover(item, toTrash: true)) ?? false
+            }.value
             guard let self else { return }
-            self.leftoverItems.removeAll { $0.id == item.id }
+            self.cleaning = nil
+            if success {
+                self.leftoverItems.removeAll { $0.id == item.id }
+                self.report = Report(result: DiskCleaner.CleanResult(freedBytes: item.size, removedCount: 1, failedCount: 0), scope: scope)
+            } else {
+                self.report = Report(result: DiskCleaner.CleanResult(freedBytes: 0, removedCount: 0, failedCount: 1), scope: scope)
+            }
         }
     }
 
     func deleteAllLeftovers() {
+        guard !isBusy else { return }
+        let scope = Scope.leftovers
+        cleaning = scope
+        report = nil
         let current = leftoverItems
         Task { [weak self] in
-            for item in current {
-                _ = try? AppLeftoversScanner.deleteLeftover(item, toTrash: true)
-            }
+            let (successfulIds, freedBytes, failedCount) = await Task.detached(priority: .userInitiated) {
+                var successful = Set<String>()
+                var freed: UInt64 = 0
+                var failed = 0
+                for item in current {
+                    if (try? AppLeftoversScanner.deleteLeftover(item, toTrash: true)) == true {
+                        successful.insert(item.id)
+                        freed += item.size
+                    } else {
+                        failed += 1
+                    }
+                }
+                return (successful, freed, failed)
+            }.value
             guard let self else { return }
-            self.leftoverItems.removeAll()
+            self.cleaning = nil
+            self.leftoverItems.removeAll { successfulIds.contains($0.id) }
+            self.report = Report(result: DiskCleaner.CleanResult(freedBytes: freedBytes, removedCount: successfulIds.count, failedCount: failedCount), scope: scope)
         }
     }
 
@@ -256,19 +305,50 @@ final class CleanupStore: ObservableObject {
     }
 
     func purgeBundle(_ bundle: ProjectPurgeScanner.PurgeableBundle) {
+        guard !isBusy else { return }
+        let scope = Scope.projectPurge
+        cleaning = scope
+        report = nil
         Task { [weak self] in
-            _ = try? ProjectPurgeScanner.purgeBundle(bundle)
+            let success = await Task.detached(priority: .userInitiated) {
+                (try? ProjectPurgeScanner.purgeBundle(bundle)) ?? false
+            }.value
             guard let self else { return }
-            self.purgeableBundles.removeAll { $0.id == bundle.id }
+            self.cleaning = nil
+            if success {
+                self.purgeableBundles.removeAll { $0.id == bundle.id }
+                self.report = Report(result: DiskCleaner.CleanResult(freedBytes: bundle.size, removedCount: 1, failedCount: 0), scope: scope)
+            } else {
+                self.report = Report(result: DiskCleaner.CleanResult(freedBytes: 0, removedCount: 0, failedCount: 1), scope: scope)
+            }
         }
     }
 
     func purgeAllDormantBundles() {
+        guard !isBusy else { return }
+        let scope = Scope.projectPurge
+        cleaning = scope
+        report = nil
         let dormant = purgeableBundles.filter { $0.isDormant }
         Task { [weak self] in
-            _ = ProjectPurgeScanner.purgeBundles(dormant)
+            let (successfulIds, freedBytes, failedCount) = await Task.detached(priority: .userInitiated) {
+                var successful = Set<String>()
+                var freed: UInt64 = 0
+                var failed = 0
+                for bundle in dormant {
+                    if (try? ProjectPurgeScanner.purgeBundle(bundle)) == true {
+                        successful.insert(bundle.id)
+                        freed += bundle.size
+                    } else {
+                        failed += 1
+                    }
+                }
+                return (successful, freed, failed)
+            }.value
             guard let self else { return }
-            self.purgeableBundles.removeAll { $0.isDormant }
+            self.cleaning = nil
+            self.purgeableBundles.removeAll { successfulIds.contains($0.id) }
+            self.report = Report(result: DiskCleaner.CleanResult(freedBytes: freedBytes, removedCount: successfulIds.count, failedCount: failedCount), scope: scope)
         }
     }
 
@@ -288,19 +368,50 @@ final class CleanupStore: ObservableObject {
     }
 
     func cleanHomebrewItem(_ item: HomebrewCleaner.HomebrewCleanItem) {
+        guard !isBusy else { return }
+        let scope = Scope.homebrew
+        cleaning = scope
+        report = nil
         Task { [weak self] in
-            _ = try? HomebrewCleaner.cleanItem(item)
+            let success = await Task.detached(priority: .userInitiated) {
+                (try? HomebrewCleaner.cleanItem(item)) ?? false
+            }.value
             guard let self else { return }
-            self.homebrewItems.removeAll { $0.id == item.id }
+            self.cleaning = nil
+            if success {
+                self.homebrewItems.removeAll { $0.id == item.id }
+                self.report = Report(result: DiskCleaner.CleanResult(freedBytes: item.size, removedCount: 1, failedCount: 0), scope: scope)
+            } else {
+                self.report = Report(result: DiskCleaner.CleanResult(freedBytes: 0, removedCount: 0, failedCount: 1), scope: scope)
+            }
         }
     }
 
     func cleanAllHomebrew() {
+        guard !isBusy else { return }
+        let scope = Scope.homebrew
+        cleaning = scope
+        report = nil
         let current = homebrewItems
         Task { [weak self] in
-            _ = HomebrewCleaner.cleanAll(current)
+            let (successfulIds, freedBytes, failedCount) = await Task.detached(priority: .userInitiated) {
+                var successful = Set<String>()
+                var freed: UInt64 = 0
+                var failed = 0
+                for item in current {
+                    if (try? HomebrewCleaner.cleanItem(item)) == true {
+                        successful.insert(item.id)
+                        freed += item.size
+                    } else {
+                        failed += 1
+                    }
+                }
+                return (successful, freed, failed)
+            }.value
             guard let self else { return }
-            self.homebrewItems.removeAll()
+            self.cleaning = nil
+            self.homebrewItems.removeAll { successfulIds.contains($0.id) }
+            self.report = Report(result: DiskCleaner.CleanResult(freedBytes: freedBytes, removedCount: successfulIds.count, failedCount: failedCount), scope: scope)
         }
     }
 
@@ -320,10 +431,22 @@ final class CleanupStore: ObservableObject {
     }
 
     func deleteAIModel(_ item: AIModelCleaner.AIModelItem) {
+        guard !isBusy else { return }
+        let scope = Scope.aiModel(item.id)
+        cleaning = scope
+        report = nil
         Task { [weak self] in
-            _ = try? AIModelCleaner.deleteModel(item)
+            let success = await Task.detached(priority: .userInitiated) {
+                (try? AIModelCleaner.deleteModel(item)) ?? false
+            }.value
             guard let self else { return }
-            self.aiModels.removeAll { $0.id == item.id }
+            self.cleaning = nil
+            if success {
+                self.aiModels.removeAll { $0.id == item.id }
+                self.report = Report(result: DiskCleaner.CleanResult(freedBytes: item.size, removedCount: 1, failedCount: 0), scope: scope)
+            } else {
+                self.report = Report(result: DiskCleaner.CleanResult(freedBytes: 0, removedCount: 0, failedCount: 1), scope: scope)
+            }
         }
     }
 
@@ -343,10 +466,22 @@ final class CleanupStore: ObservableObject {
     }
 
     func cleanToolchainItem(_ item: ContainerAndToolchainCleaner.ToolchainItem) {
+        guard !isBusy else { return }
+        let scope = Scope.toolchain(item.id)
+        cleaning = scope
+        report = nil
         Task { [weak self] in
-            _ = try? ContainerAndToolchainCleaner.cleanToolchainItem(item)
+            let success = await Task.detached(priority: .userInitiated) {
+                (try? ContainerAndToolchainCleaner.cleanToolchainItem(item)) ?? false
+            }.value
             guard let self else { return }
-            self.toolchainItems.removeAll { $0.id == item.id }
+            self.cleaning = nil
+            if success {
+                self.toolchainItems.removeAll { $0.id == item.id }
+                self.report = Report(result: DiskCleaner.CleanResult(freedBytes: item.size, removedCount: 1, failedCount: 0), scope: scope)
+            } else {
+                self.report = Report(result: DiskCleaner.CleanResult(freedBytes: 0, removedCount: 0, failedCount: 1), scope: scope)
+            }
         }
     }
 

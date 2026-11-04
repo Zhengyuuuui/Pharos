@@ -627,7 +627,6 @@ private struct CleanupRowView: View {
                               disabled: cleanup.isBusy || bytes == 0) {
                     cleanup.cleanOne(id: row.id)
                 }
-                .frame(width: 96, alignment: .trailing)
             }
 
             if isExpanded {

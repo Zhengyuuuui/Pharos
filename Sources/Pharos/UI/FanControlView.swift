@@ -6,9 +6,8 @@ struct FanControlCard: View {
     @EnvironmentObject var store: ProjectStore
     @ObservedObject private var fan = FanStore.shared
     @ObservedObject private var l10n = L10n.shared
-    @State private var armedUninstall = false
 
-    private enum Mode: Hashable { case system, fixed, max }
+    private enum Mode: Hashable { case system, curve, fixed, max }
 
     var body: some View {
         let fans = store.thermals?.fans ?? []
@@ -45,6 +44,7 @@ struct FanControlCard: View {
                 case .ready:
                     Picker("", selection: Binding(get: { mode }, set: { set($0) })) {
                         Text(l10n.fanModeSystem).tag(Mode.system)
+                        Text(l10n.fanModeCurve).tag(Mode.curve)
                         Text(l10n.fanModeFixed).tag(Mode.fixed)
                         Text(l10n.fanModeMax).tag(Mode.max)
                     }
@@ -52,20 +52,47 @@ struct FanControlCard: View {
                     .labelsHidden()
                     .disabled(fan.busy)
 
+                    if mode == .curve {
+                        HStack(alignment: .top, spacing: PharosSpacing.s) {
+                            Image(systemName: "wave.3.forward")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(PharosColor.accent)
+                                .frame(width: 20)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(l10n.fanModeCurve)
+                                    .font(.system(size: 12.5, weight: .medium))
+                                Text(l10n.fanCurveIntro)
+                                    .font(PharosFont.caption)
+                                    .foregroundStyle(PharosColor.textSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        .padding(PharosSpacing.s)
+                        .background(
+                            RoundedRectangle(cornerRadius: PharosRadius.small, style: .continuous)
+                                .fill(PharosColor.fill.opacity(0.4))
+                        )
+                    }
+
                     if mode == .fixed {
-                        HStack(spacing: PharosSpacing.s) {
-                            Slider(value: Binding(get: { Double(fan.fixedRPM) }, set: { fan.fixedRPM = Int($0 / 100) * 100 }),
-                                   in: Double(minRPM)...Double(maxRPM))
-                            Text("\(fan.fixedRPM) rpm").font(PharosFont.captionDigits)
-                                .frame(width: 80, alignment: .trailing)
-                            Button(l10n.fanApply) { fan.apply(.fixed(rpm: fan.fixedRPM)) }
-                                .buttonStyle(.pharosPrimary)
-                                .controlSize(.small)
-                                .disabled(fan.busy || fan.request == .fixed(rpm: fan.fixedRPM))
+                        VStack(alignment: .leading, spacing: PharosSpacing.xs) {
+                            HStack(spacing: PharosSpacing.s) {
+                                Slider(value: Binding(get: { Double(fan.fixedRPM) }, set: { fan.fixedRPM = Int($0 / 100) * 100 }),
+                                       in: Double(minRPM)...Double(maxRPM))
+                                Text("\(fan.fixedRPM) rpm").font(PharosFont.captionDigits)
+                                    .frame(width: 80, alignment: .trailing)
+                                Button(l10n.fanApply) { fan.apply(.fixed(rpm: fan.fixedRPM)) }
+                                    .buttonStyle(.pharosPrimary)
+                                    .controlSize(.small)
+                                    .disabled(fan.busy || fan.request == .fixed(rpm: fan.fixedRPM))
+                            }
+                            Text(l10n.fanFixedIntro)
+                                .font(PharosFont.caption)
+                                .foregroundStyle(PharosColor.textTertiary)
                         }
                         .onAppear { fan.fixedRPM = min(max(fan.fixedRPM, minRPM), maxRPM) }
                     }
-                    if fan.overheating {
+                    if fan.request == .curve && fan.overheating {
                         Label(l10n.fanOverheat, systemImage: "flame.fill").font(PharosFont.caption).foregroundStyle(PharosColor.error)
                     }
                     if fan.unsupported {
@@ -83,6 +110,7 @@ struct FanControlCard: View {
     private var mode: Mode {
         switch fan.request {
         case .system: return .system
+        case .curve: return .curve
         case .fixed: return .fixed
         case .max: return .max
         }
@@ -91,6 +119,7 @@ struct FanControlCard: View {
     private func set(_ m: Mode) {
         switch m {
         case .system: fan.apply(.system)
+        case .curve: fan.apply(.curve)
         case .max: fan.apply(.max)
         case .fixed: fan.apply(.fixed(rpm: fan.fixedRPM))
         }
@@ -100,16 +129,12 @@ struct FanControlCard: View {
         }
     }
 
-    @ViewBuilder
     private var uninstallButton: some View {
-        if armedUninstall {
-            Button(l10n.fanUninstall) { armedUninstall = false; fan.uninstall() }
-                .buttonStyle(.pharosDestructive).controlSize(.small)
-            IconButton(systemImage: "xmark", help: l10n.cancel) { armedUninstall = false }
-        } else {
-            Button(l10n.fanUninstall) { armedUninstall = true }
-                .buttonStyle(.pharos)
-                .controlSize(.small)
+        PharosConfirmButton(
+            title: l10n.fanUninstall,
+            confirmTitle: l10n.confirm
+        ) {
+            fan.uninstall()
         }
     }
 }
@@ -120,15 +145,16 @@ struct FanControlStatusLine: View {
     @ObservedObject private var l10n = L10n.shared
 
     var body: some View {
-        if fan.helper == .ready, fan.request != .system || fan.overheating {
+        let isCurveOverheat = (fan.request == .curve && fan.overheating)
+        if fan.helper == .ready, fan.request != .system {
             HStack(spacing: 6) {
-                Image(systemName: fan.overheating ? "flame.fill" : "fanblades.fill")
-                    .foregroundStyle(fan.overheating ? .red : .orange)
-                Text(fan.overheating ? l10n.fanOverheat : label)
+                Image(systemName: isCurveOverheat ? "flame.fill" : "fanblades.fill")
+                    .foregroundStyle(isCurveOverheat ? .red : .orange)
+                Text(isCurveOverheat ? l10n.fanOverheat : label)
                     .font(.system(size: 10))
                     .lineLimit(2)
                 Spacer()
-                if !fan.overheating {
+                if !isCurveOverheat {
                     Button(l10n.fanModeSystem) { fan.apply(.system) }
                         .buttonStyle(.borderless)
                         .font(.system(size: 10))
@@ -140,6 +166,7 @@ struct FanControlStatusLine: View {
     private var label: String {
         switch fan.request {
         case .system: return ""
+        case .curve: return "\(l10n.fanHeld) · \(l10n.fanModeCurve)"
         case .max: return "\(l10n.fanHeld) · \(l10n.fanModeMax)"
         case .fixed(let rpm): return "\(l10n.fanHeld) · \(rpm) rpm"
         }

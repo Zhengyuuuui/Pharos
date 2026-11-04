@@ -122,6 +122,7 @@ public enum AgentVacuumEngine {
                 try? fm.removeItem(atPath: backupPath)
             }
             try fm.copyItem(atPath: dbPath, toPath: backupPath)
+            try? fm.setAttributes([.modificationDate: Date()], ofItemAtPath: backupPath)
             let walPath = dbPath + "-wal"
             let backupWal = "\(backupPath)-wal"
             if fm.fileExists(atPath: backupWal) {
@@ -129,13 +130,14 @@ public enum AgentVacuumEngine {
             }
             if fm.fileExists(atPath: walPath) {
                 try? fm.copyItem(atPath: walPath, toPath: backupWal)
+                try? fm.setAttributes([.modificationDate: Date()], ofItemAtPath: backupWal)
             }
         } catch {
             throw VacuumError.backupFailed(reason: error.localizedDescription)
         }
 
-        // Clean older backups, keeping at most 3
-        pruneOldBackups(for: dbPath, keepCount: 3)
+        // Clean older backups, keeping only the latest 1 snapshot to minimize disk footprint
+        pruneOldBackups(for: dbPath, keepCount: 1)
 
         return backupPath
     }
@@ -168,11 +170,16 @@ public enum AgentVacuumEngine {
             ))
         }
 
-        return result.sorted { $0.createdAt > $1.createdAt }
+        return result.sorted {
+            if $0.createdAt != $1.createdAt {
+                return $0.createdAt > $1.createdAt
+            }
+            return $0.backupPath > $1.backupPath
+        }
     }
 
-    /// Prunes older backup snapshots beyond the specified keep limit.
-    public static func pruneOldBackups(for dbPath: String, keepCount: Int = 3) {
+    /// Prunes older backup snapshots beyond the specified keep limit (defaults to 1 latest backup).
+    public static func pruneOldBackups(for dbPath: String, keepCount: Int = 1) {
         let backups = listBackups(for: dbPath)
         guard backups.count > keepCount else { return }
 

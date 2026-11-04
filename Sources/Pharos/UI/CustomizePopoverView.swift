@@ -11,25 +11,18 @@ struct CustomizePopoverView: View {
     @StateObject private var dragPosition = FloatingDragPosition()
     @State private var editorFrames = EditorFrames()
     @State private var previewTab: PopoverTab = .overview
-    @State private var armedReset = false
 
     var body: some View {
         let layout = layoutStore.layout
         PharosPage {
             PharosPageHeader(title: l10n.customizeTitle, subtitle: l10n.customizeIntro) {
-                if armedReset {
-                    HStack(spacing: PharosSpacing.xs) {
-                        Button(l10n.resetLayout) { armedReset = false; layoutStore.reset() }
-                            .buttonStyle(.pharosDestructive)
-                            .controlSize(.small)
-                        IconButton(systemImage: "xmark", help: l10n.cancel) { armedReset = false }
-                    }
-                } else {
-                    Button(l10n.resetLayout) { armedReset = true }
-                        .buttonStyle(.pharos)
-                        .controlSize(.small)
-                        .disabled(layout == .standard)
+                PharosConfirmButton(
+                    title: l10n.resetLayout,
+                    confirmTitle: l10n.confirm
+                ) {
+                    layoutStore.reset()
                 }
+                .disabled(layout == .standard)
             }
         } content: {
             HStack(alignment: .top, spacing: PharosSpacing.l) {
@@ -338,7 +331,7 @@ private struct PopoverSnapshot: View {
             footer
         }
         .padding(14)
-        .frame(width: 310)
+        .frame(width: 340)
         .background(RoundedRectangle(cornerRadius: 12).fill(.regularMaterial))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.12)))
         .shadow(color: .black.opacity(0.15), radius: 12, y: 4)

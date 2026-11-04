@@ -7,6 +7,7 @@ struct BrowserNetworkView: View {
     @EnvironmentObject var store: ProjectStore
     @ObservedObject private var chrome = ChromeStore.shared
     @ObservedObject private var l10n = L10n.shared
+    @ObservedObject private var router = WindowRouter.shared
     @State private var editing: String?
     /// nil = all browsers.
     @State private var filter: ChromiumBrowser?
@@ -32,6 +33,8 @@ struct BrowserNetworkView: View {
             }
         } content: {
             BrowserProxyMatrixSection()
+
+            ClashDashboardSection()
 
             if browsers.count > 1 {
                 Picker("", selection: $filter) {
@@ -98,7 +101,19 @@ struct BrowserNetworkView: View {
 
             PharosBanner(kind: .info, text: l10n.chromeNotice)
         }
-        .onAppear { chrome.loadProfileNames(entries.map(\.config.profileKey)) }
+        .onAppear {
+            chrome.loadProfileNames(entries.map(\.config.profileKey))
+            if let id = router.editingPresetId {
+                editing = id
+                router.editingPresetId = nil
+            }
+        }
+        .onChange(of: router.editingPresetId) { _, id in
+            if let id {
+                editing = id
+                router.editingPresetId = nil
+            }
+        }
         .onChange(of: store.lastScan) { _, _ in chrome.loadProfileNames(entries.map(\.config.profileKey)) }
     }
 
@@ -378,13 +393,12 @@ private struct ChromeCard: View {
                 }
             }
             if armedRemove, let preset = entry.preset {
-                Button { chrome.remove(id: preset.id); armedRemove = false } label: {
-                    Label(l10n.removeConfirm, systemImage: "trash")
-                }
-                .buttonStyle(.pharosDestructive)
-                .controlSize(.small)
-                .task {
-                    try? await Task.sleep(for: .seconds(3))
+                PharosConfirmButton(
+                    title: entry.isRunning ? l10n.unsaveChromePreset : l10n.removeFavorite,
+                    systemImage: "trash",
+                    confirmTitle: l10n.removeConfirm
+                ) {
+                    chrome.remove(id: preset.id)
                     armedRemove = false
                 }
             } else if let r = entry.running {

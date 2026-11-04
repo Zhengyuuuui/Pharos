@@ -169,6 +169,11 @@ final class L10n: ObservableObject {
         en ? "Ports bound to all interfaces are reachable from your local network."
            : "绑定到所有网卡的端口可被局域网访问。"
     }
+    var copyURL: String { en ? "Copy Address" : "复制访问地址" }
+    var copyPortNumber: String { en ? "Copy Port" : "复制端口号" }
+    func closePortAction(_ port: UInt16) -> String {
+        en ? "Release Port :\(port) (Terminate Process)" : "释放端口 :\(port) (结束进程)"
+    }
     var shareOfSystem: String { en ? "of used memory" : "占已用内存" }
     var collectingHistory: String {
         en ? "Collecting samples… the chart fills in over the next minutes."
@@ -361,6 +366,11 @@ final class L10n: ObservableObject {
     var launchProxyB: String { en ? "Launch Proxy B" : "启动实例 B" }
     var relaunchWithProxy: String { en ? "Relaunch with Proxy" : "以该代理重启" }
     var startWithProxy: String { en ? "Start with Proxy" : "以该代理启动" }
+    var mainBadgeRunningDirect: String { en ? "Running · Direct" : "运行中 · 已直连" }
+    var mainBadgeRunningSystem: String { en ? "Running · System" : "运行中 · 跟随系统" }
+    var badgeNotRunning: String { en ? "Not Running" : "未运行" }
+    func isolatedProxyAName(_ browser: String) -> String { en ? "\(browser) · Proxy A" : "\(browser) · 代理 A" }
+    func isolatedProxyBName(_ browser: String) -> String { en ? "\(browser) · Proxy B" : "\(browser) · 代理 B" }
     var currentRunningProxy: String { en ? "Running with this proxy" : "当前已生效" }
     var proxyDirectPill: String { en ? "Direct" : "直连" }
     var proxyAPill: String { en ? "Proxy A · 7890" : "代理 A · 7890" }
@@ -511,6 +521,27 @@ final class L10n: ObservableObject {
         en ? "Hardware power management, Tahoe-style charge limits (80%), fan speeds and sensor temperatures"
            : "硬件电源管理、Tahoe 原生风格充电上限 (80%)、风扇转速与芯片温度"
     }
+
+    // Thermal Diagnostics & Heat Culprits
+    var thermalDiagnosticsTitle: String { en ? "Thermal Diagnostics & Heat Culprits" : "电脑发热诊断与发热元凶剖析" }
+    var thermalDiagnosticsSubtitle: String {
+        en ? "Pinpoints what is causing elevated temperatures, charging heat, and top background resource hogs."
+           : "深度分析当前机身发热根因，精准定位大功率快充、代码编译与后台发热大户。"
+    }
+    var thermalCoolTitle: String { en ? "Optimal & Cool (< 60°C)" : "散热状况优良 · 清凉高效 (< 60°C)" }
+    var thermalWarmTitle: String { en ? "Moderate Warmth (60°C–74°C)" : "微热运行温区 (60°C–74°C)" }
+    var thermalHotTitle: String { en ? "High Heat Warning (75°C–87°C)" : "高热运转状态 (75°C–87°C)" }
+    var thermalCriticalTitle: String { en ? "Critical Overheating & Throttling (≥ 88°C)" : "极热与温控降频警戒 (≥ 88°C)" }
+    var thermalCoolDesc: String {
+        en ? "All chip temperatures are well within optimal efficiency zones with no heavy heat-generating workloads."
+           : "当前各芯片温度处于最佳能效温区，无异常发热进程，机身清凉静音运行。"
+    }
+    var thermalCulpritsTitle: String { en ? "Top Heat-Generating Culprits" : "发热元凶与高能耗进程" }
+    var thermalReasonsTitle: String { en ? "Root Causes of Heat" : "发热诱因与机理分析" }
+    var thermalSuggestionsTitle: String { en ? "Recommended Cooling Actions" : "对症散热治理建议" }
+    var terminateCulpritProcess: String { en ? "Terminate" : "结束进程" }
+    var rampUpFansAction: String { en ? "Ramp Up Fans" : "一键提速风扇" }
+    var openEnergyModeAction: String { en ? "Energy Settings…" : "能耗模式设置…" }
     var thermalTitle: String { en ? "Fans & Temperature" : "风扇与温度" }
     var fansTitle: String { en ? "Fans" : "风扇" }
     var temperaturesTitle: String { en ? "Temperatures" : "温度" }
@@ -581,6 +612,7 @@ final class L10n: ObservableObject {
         }
     }
     var thermalStateTitle: String { en ? "Thermal state" : "散热状态" }
+    var peakCoreTemp: String { en ? "PEAK CORE" : "峰值核心" }
     func thermalStateName(_ s: ProcessInfo.ThermalState) -> String {
         switch s {
         case .nominal: return en ? "Normal" : "正常"
@@ -618,8 +650,17 @@ final class L10n: ObservableObject {
     }
     var fanCommandFailed: String { en ? "The fan helper didn't respond." : "风扇助手没有响应。" }
     var fanModeSystem: String { en ? "macOS" : "系统控制" }
+    var fanModeCurve: String { en ? "Smart Curve" : "智能曲线" }
     var fanModeFixed: String { en ? "Fixed speed" : "固定转速" }
     var fanModeMax: String { en ? "Max" : "满速" }
+    var fanCurveIntro: String {
+        en ? "Smoothly adapts fan speed to chip temperatures with inertial damping (slowly accelerates, gently glides down) to prevent abrupt noise surges."
+           : "随芯片温度平滑自适应升降速，内置物理惯性阻尼（平缓加速、柔和降速），消除突兀噪音并兼顾散热。"
+    }
+    var fanFixedIntro: String {
+        en ? "Strictly locks fan speed to the selected RPM without automatic curve acceleration."
+           : "严格保持选定转速，不因温度波动自动加速。"
+    }
     var fanApply: String { en ? "Apply" : "应用" }
     var fanOverheat: String {
         en ? "Above 95 °C — all fans forced to max until it cools below 88 °C."
@@ -631,8 +672,8 @@ final class L10n: ObservableObject {
     }
     var fanHeld: String { en ? "Fans held by Pharos" : "风扇由 Pharos 控制中" }
     var fanSafety: String {
-        en ? "Safety: fans go back to macOS when Pharos quits, crashes or stops responding for 15 s, after sleep the setting is re-applied, and any CPU/GPU sensor at 95 °C forces max. Speeds are limited to each fan's rated range."
-           : "安全措施：Pharos 退出、崩溃或 15 秒无响应时，风扇自动交还系统；睡眠唤醒后重新应用；任一 CPU/GPU 传感器达到 95°C 时强制满速。转速限制在每个风扇的额定范围内。"
+        en ? "Safety: fans go back to macOS when Pharos quits, crashes or stops responding for 15 s, and after sleep settings are re-applied. In smart curve mode, temperatures at 95 °C trigger max cooling. Fixed speed strictly holds your chosen RPM."
+           : "安全措施：Pharos 退出、崩溃或 15 秒无响应时，风扇自动交还系统；睡眠唤醒后重新应用。在智能曲线模式下达 95°C 触发满速保护；固定转速模式严格锁定所选转速。"
     }
 
     // MARK: - Customize popover
@@ -1078,6 +1119,7 @@ final class L10n: ObservableObject {
     var agentScopeShortWorkspace: String { en ? "Workspace" : "工作区" }
     var agentScopeShortCache: String { en ? "Cache" : "缓存" }
     func agentMessages(_ n: Int) -> String { en ? "\(n) msg" : "\(n) 条消息" }
+    func agentSessions(_ n: Int) -> String { en ? "\(n) session\(n == 1 ? "" : "s")" : "\(n) 个会话" }
     func agentDbCount(_ n: Int) -> String { en ? "\(n) DBs" : "\(n) 个库" }
     var agentChartCollapse: String { en ? "Collapse chart" : "收起图表" }
     var agentChartExpand: String { en ? "Expand chart" : "展开图表" }
@@ -1220,6 +1262,24 @@ final class L10n: ObservableObject {
     var agentStartCompaction: String { en ? "Start Lossless Compaction & Reclaim Space" : "一键无损精简并释放空间" }
     var agentCompacting: String { en ? "Optimizing & Reclaiming Disk Space…" : "正在执行无损瘦身与空间回收，请稍候…" }
 
+    func agentCompactionLevelTitle(_ level: CompactionLevel) -> String {
+        switch level {
+        case .level1StreamEvents: return agentCompactionLevel1
+        case .level2Checkpoints: return agentCompactionLevel2
+        case .level3OrphanedAndArchive: return agentCompactionLevel3
+        }
+    }
+    func agentCompactionMessage(level: CompactionLevel, reclaimable: String) -> String {
+        en ? "Executing \(agentCompactionLevelTitle(level)), reclaiming approx. \(reclaimable) redundant data and fragment space."
+           : "将执行 \(agentCompactionLevelTitle(level))，预计可释放 \(reclaimable) 冗余数据与碎片空间。"
+    }
+    var tableSpaceBreakdown: String { en ? "SQLite Table Space Breakdown" : "数据库表级空间透视" }
+    var retainLatestRestorePoints: String { en ? "Retains up to 3 latest restore points" : "最多保留最近 3 份还原点" }
+    var sidecarSynced: String { en ? "Sidecar synced" : "沙盒侧车同步" }
+    var cipherAlgorithm: String { en ? "Cipher" : "加密算法" }
+    var unableToProfileDb: String { en ? "Unable to Profile Database" : "无法剖析此数据库" }
+    var invalidSqliteFileDesc: String { en ? "File is not a valid SQLite database or is corrupted." : "该文件可能不是标准的 SQLite 格式或已损坏。" }
+
     func agentCompactionSuccess(orig: String, final: String, saved: String) -> String {
         en ? "Compaction complete! Size reduced from \(orig) to \(final), successfully reclaimed \(saved) disk space!"
            : "瘦身完成！数据库体积由 \(orig) 降至 \(final)，已为您成功夺回 \(saved) 硬盘空间！"
@@ -1327,6 +1387,7 @@ final class L10n: ObservableObject {
     var testInTerminal: String { en ? "Test in Terminal" : "在终端测试运行" }
     var prodDependencies: String { en ? "Production" : "生产依赖" }
     var devDependencies: String { en ? "Development" : "开发依赖" }
+    var devDependencyTag: String { en ? "dev" : "开发" }
     var missingDependenciesWarn: String {
         en ? "Missing dependencies detected, please install packages"
            : "检测到依赖缺失，请在终端执行依赖安装"
@@ -1626,6 +1687,16 @@ final class L10n: ObservableObject {
     var batteryFlowSupplementing: String { en ? "Battery assisting the adapter (high load)" : "负载较高，电池正在辅助供电" }
     var batteryFlowOnBattery: String { en ? "Running on battery" : "正在使用电池供电" }
     var batteryPresetRecommended: String { en ? "80% (Recommended)" : "80%（推荐）" }
+    var batteryLimit80Tahoe: String { en ? "80% (Tahoe)" : "80% (Tahoe 官方保护)" }
+    func batteryHealthName(_ health: BatteryHealth) -> String {
+        switch health {
+        case .normal: return en ? "Normal" : "正常"
+        case .replaceSoon: return en ? "Replace Soon" : "建议更换"
+        case .replaceNow: return en ? "Replace Now" : "立即更换"
+        case .serviceBattery: return en ? "Service Battery" : "需要维修"
+        case .unknown: return en ? "Unknown" : "未知"
+        }
+    }
     func batteryDesignCapacityCaption(_ mAh: Int) -> String { en ? "\(mAh) mAh design" : "\(mAh) mAh 原厂" }
     func batteryRemainingCaption(_ mAh: Int) -> String { en ? "\(mAh) mAh remaining" : "\(mAh) mAh 剩余" }
     func batteryCurrentCaption(_ mA: Int) -> String { en ? "\(mA) mA current" : "\(mA) mA 电流" }
@@ -2179,4 +2250,40 @@ final class L10n: ObservableObject {
            : "可随时在「主窗口 → 设置 → 快捷操作」中重新打开引导。"
     }
     var onboardingReplay: String { en ? "Replay Onboarding" : "重新查看引导" }
+
+    // MARK: - Ambient Rail Localization
+    var ambientPortsIdle: String { en ? "Idle" : "端口空闲" }
+    var ambientSafeLocal: String { en ? "Safe Local" : "无公网开放" }
+    var ambientNoActiveDevPorts: String { en ? "No active web dev ports" : "未检测到常见 Web 调试端口" }
+    var ambientTopConsuming: String { en ? "Top:" : "主要消耗:" }
+    var ambientSampling: String { en ? "Sampling…" : "采样中…" }
+    var ambientUsedTotal: String { en ? "Used / Total" : "已用 / 总量" }
+    var ambientPeakSensor: String { en ? "Peak Sensor" : "最高芯片温度" }
+    var ambientPowerDraw: String { en ? "Power Draw" : "实时整机功耗" }
+    var ambientHealthCycles: String { en ? "Health / Cycles" : "健康度 / 循环" }
+    var ambientOnBattery: String { en ? "On Battery" : "放电运行中" }
+    var ambientFanHelperNotInstalled: String { en ? "Fan helper not installed" : "风扇控制服务未安装" }
+    var ambientSetupAction: String { en ? "Setup" : "前往配置" }
+    var ambientTotalCaches: String { en ? "Total Caches" : "总依赖缓存" }
+    var ambientGlobalClis: String { en ? "Global CLIs" : "全局 CLI 工具" }
+    var ambientNoRemoteDebuggingPorts: String { en ? "No remote debugging ports" : "未绑定 --remote-debugging-port" }
+    var ambientInstancesAndHelpers: String { en ? "Instances & Helpers" : "实例与渲染进程" }
+    func ambientAgentTrackingBanner(_ dbs: Int) -> String {
+        en ? "Tracking \(dbs) agent databases · 100% read-only" : "检测到 \(dbs) 个编辑器库 · 100% 只读解析中"
+    }
+    var ambientLargeSessionWarning: String {
+        en ? "Large sessions may cause editor latency" : "超大会话可能导致编辑器补全延迟与高额费用"
+    }
+    var ambientTotalDatabases: String { en ? "Total Databases" : "总数据库数" }
+    var ambientConversations: String { en ? "Conversations" : "总会话记录" }
+    var ambientAllDatabasesIntact: String { en ? "All databases intact" : "数据库状态全部健康" }
+    var ambientCleanableItems: String { en ? "Cleanable Items" : "待清理条目" }
+    func ambientItemCount(_ n: Int) -> String { en ? "\(n) items" : "\(n) 项" }
+    var ambientNoPorts: String { en ? "No Ports" : "无端口" }
+    var ambientNativeProcessDesc: String { en ? "Native process (No manifest detected)" : "纯运行时进程 (未检测到项目清单)" }
+    var ambientHardwareOverviewDesc: String { en ? "Memory · Disk · Thermals · Battery" : "内存 · 磁盘 · 温度 · 风扇" }
+    var ambientActiveOnline: String { en ? "Active" : "在线" }
+    var ambientNotReady: String { en ? "Not Ready" : "未就绪" }
+    var ambientHotkeyHint: String { en ? "⌥ + P to Toggle" : "快捷键 ⌥ + P 唤醒" }
+    var ambientCopied: String { en ? "Copied" : "已复制" }
 }

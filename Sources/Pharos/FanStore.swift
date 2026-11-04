@@ -75,6 +75,15 @@ final class FanStore: ObservableObject {
 
     // MARK: - Control
 
+    func setSystemMode() {
+        apply(.system)
+    }
+
+    func resetSettings() {
+        setSystemMode()
+        fixedRPM = 3500
+    }
+
     func apply(_ r: FanRequest) {
         guard helper == .ready else { return }
         busy = true

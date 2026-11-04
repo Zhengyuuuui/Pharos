@@ -42,6 +42,35 @@ struct PortChip: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .help("\(l10n.openInBrowser) — \(port.loopbackOnly ? l10n.localOnlyHelp : l10n.allInterfacesHelp)")
+        .contextMenu {
+            Button {
+                store.openInBrowser(port)
+            } label: {
+                Label(l10n.openInBrowser, systemImage: "safari")
+            }
+
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString("http://localhost:\(port.port)", forType: .string)
+            } label: {
+                Label(l10n.copyURL, systemImage: "link")
+            }
+
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString("\(port.port)", forType: .string)
+            } label: {
+                Label(l10n.copyPortNumber, systemImage: "number")
+            }
+
+            Divider()
+
+            Button(role: .destructive) {
+                store.terminatePort(port)
+            } label: {
+                Label(l10n.closePortAction(port.port), systemImage: "xmark.circle")
+            }
+        }
     }
 }
 

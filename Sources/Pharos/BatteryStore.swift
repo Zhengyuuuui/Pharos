@@ -227,6 +227,13 @@ final class BatteryStore: ObservableObject {
         apply(.system)
     }
 
+    func resetSettings() {
+        setSystemMode()
+        targetLimit = 80
+        persistentGuard = true
+        syncMagSafe = true
+    }
+
     /// True only when the daemon confirms it is enforcing a limit — the UI never guesses.
     var isPharosManaging: Bool {
         guard helper == .ready, !unsupported else { return false }

@@ -49,6 +49,10 @@ app: build assets
 	cp .build/release/pharos-fand $(DIST)/Contents/MacOS/pharos-fand
 	# Optional battery-control helper; only installed if the user asks (Battery page).
 	cp .build/release/pharos-battd $(DIST)/Contents/MacOS/pharos-battd
+	# Strip Mach-O symbols to reduce binary footprint by >50% before codesigning
+	strip -u -r $(DIST)/Contents/MacOS/$(APP)
+	strip -u -r $(DIST)/Contents/MacOS/pharos-fand
+	strip -u -r $(DIST)/Contents/MacOS/pharos-battd
 	cp Resources/Info.plist $(DIST)/Contents/Info.plist
 	cp Resources/Pharos.icns $(DIST)/Contents/Resources/Pharos.icns
 	if [ -f Resources/PharosDark.icns ]; then cp Resources/PharosDark.icns $(DIST)/Contents/Resources/PharosDark.icns; fi

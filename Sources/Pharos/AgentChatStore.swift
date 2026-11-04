@@ -56,6 +56,10 @@ final class AgentChatStore: ObservableObject {
         get { UserDefaults.standard.stringArray(forKey: customAppPathsKey) ?? [] }
         set { UserDefaults.standard.set(newValue, forKey: customAppPathsKey) }
     }
+    var customAgentAppPaths: [String] {
+        get { customAppPaths }
+        set { customAppPaths = newValue }
+    }
 
     @Published var selectedScope: AgentDatabaseScope? = nil {
         didSet { recomputeFiltered() }
@@ -113,6 +117,7 @@ final class AgentChatStore: ObservableObject {
     func resetSettings() {
         editorLayout = .grid
         chartCollapsed = false
+        customAppPaths = []
     }
 
     private var hasScanned = false
@@ -295,10 +300,10 @@ final class AgentChatStore: ObservableObject {
         resetSelection()
     }
 
-    /// Releases heavy conversation arrays and text excerpts while retaining
-    /// database summaries (name, path, size, counts) to prevent UI flicker when reopened.
+    /// Releases heavy conversation arrays, text excerpts, profiling dictionaries,
+    /// and optimization snapshots while retaining database summaries (name, path, size, counts).
     func releaseHeavyCache() {
-        guard !entries.isEmpty else { return }
+        guard !entries.isEmpty || !profiles.isEmpty else { return }
         isHeavyCacheReleased = true
         entries = entries.map { e in
             guard !e.conversations.isEmpty else { return e }
@@ -321,6 +326,12 @@ final class AgentChatStore: ObservableObject {
                 fingerprint: e.fingerprint
             )
         }
+        profiles = [:]
+        isProfiling = [:]
+        isCompacting = [:]
+        compactionResult = nil
+        backupsForOptimizing = []
+        missingProjects = []
     }
 
     func revealInFinder(_ entry: AgentDatabaseEntry) {

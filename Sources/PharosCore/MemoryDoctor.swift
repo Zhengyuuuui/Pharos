@@ -358,8 +358,8 @@ public enum MemoryDoctor {
         proc.standardError = Pipe()
         do {
             try proc.run()
-            proc.waitUntilExit()
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            proc.waitUntilExit()
             let text = String(decoding: data, as: UTF8.self)
             var disabled = Set<String>()
             for line in text.components(separatedBy: .newlines) {

@@ -18,6 +18,7 @@ final class ProjectStore: ObservableObject {
         var volumes: [DiskVolume] = []
         var thermals: ThermalSnapshot?
         var thermalState: ProcessInfo.ThermalState = .nominal
+        var thermalDiagnosis: ThermalDiagnosisReport?
         var history = MemoryHistory(window: 3600, minInterval: 10)
         var lastScan: Date?
         var memoryDiagnosis: MemoryDiagnosisReport = MemoryDiagnosisReport(items: [], reclaimableBytes: 0)
@@ -34,12 +35,14 @@ final class ProjectStore: ObservableObject {
     var volumes: [DiskVolume] { state.volumes }
     var thermals: ThermalSnapshot? { state.thermals }
     var thermalState: ProcessInfo.ThermalState { state.thermalState }
+    var thermalDiagnosis: ThermalDiagnosisReport? { state.thermalDiagnosis }
     var memoryDiagnosis: MemoryDiagnosisReport { state.memoryDiagnosis }
     private var internalHistory = MemoryHistory(window: 3600, minInterval: 10)
     var history: MemoryHistory { internalHistory }
     var lastScan: Date? { state.lastScan }
     var isScanning: Bool { activity.isScanning }
     var hasViewers: Bool { viewers > 0 }
+    private var lastProcesses: [ProcessSnapshot] = []
     /// Projects that survived SIGTERM; UI offers a force kill for these.
     @Published private(set) var stubborn: Set<String> = []
     /// Projects with a signal in flight; rows show "Stopping…" until the processes are gone.
@@ -47,6 +50,15 @@ final class ProjectStore: ObservableObject {
     /// A refresh requested while a scan was running; replayed as soon as that scan ends
     /// so a stop / quit is never left waiting for the next timer tick.
     private var refreshQueued = false
+
+    // MARK: - Disabled Services Cache
+    private var cachedDisabledServices: Set<String> = []
+    private var lastDisabledServicesQuery: Date = .distantPast
+    private let disabledServicesCacheTTL: TimeInterval = 60
+
+    func invalidateDisabledServicesCache() {
+        lastDisabledServicesQuery = .distantPast
+    }
 
     @Published var refreshSeconds: Int {
         didSet {
@@ -152,14 +164,18 @@ final class ProjectStore: ObservableObject {
         Task { await refreshVolumes() }
         Task { await refreshThermals() }
         let include = showSystem
-        let (projects, chrome, ports, apps, system, diagnosis) = await Task.detached(priority: .utility) {
+        let shouldQueryDisabled = Date().timeIntervalSince(lastDisabledServicesQuery) >= disabledServicesCacheTTL
+        let currentCachedDisabled = cachedDisabledServices
+        let (projects, chrome, ports, apps, system, diagnosis, all, newDisabledServices) = await Task.detached(priority: .utility) {
             autoreleasepool {
                 let all = ProcessScanner.scan()
                 let chrome = ChromeInstances.find(in: all)
                 // Chrome instances get their own page; keep debug-port browsers out
                 // of the project list even when "show background apps" is on.
                 let chromePIDs = Set(chrome.flatMap(\.allPIDs))
-                let disabledServices = MemoryDoctor.queryDisabledServices()
+                let disabledServices = shouldQueryDisabled
+                    ? MemoryDoctor.queryDisabledServices()
+                    : currentCachedDisabled
                 var disabledDaemons: Set<KnownBloatedDaemon> = []
                 for d in KnownBloatedDaemon.allCases where d.supportsLaunchdToggle {
                     if d.launchdServiceNames.allSatisfy({ disabledServices.contains($0) }) {
@@ -172,9 +188,22 @@ final class ProjectStore: ObservableObject {
                         Set(all.flatMap { $0.ports.map(\.port) }),
                         AppGrouper.group(all),
                         SystemMemory.read(),
-                        diagnosis)
+                        diagnosis,
+                        all,
+                        shouldQueryDisabled ? disabledServices : nil)
             }
         }.value
+        if let newDisabled = newDisabledServices {
+            cachedDisabledServices = newDisabled
+            lastDisabledServicesQuery = Date()
+        }
+        lastProcesses = all
+        let thermalDiag = ThermalDoctor.diagnose(
+            thermals: state.thermals,
+            thermalState: state.thermalState,
+            processes: all,
+            battery: BatteryStore.shared.reading
+        )
         let now = Date()
         internalHistory.append(MemorySample(
             date: now,
@@ -190,7 +219,7 @@ final class ProjectStore: ObservableObject {
         let projectsUnchanged = (projects == state.projects)
         let portsUnchanged = (ports == state.listeningPorts)
 
-        if viewers == 0 && projectsUnchanged && portsUnchanged && memoryUnchanged && state.memoryDiagnosis == diagnosis {
+        if viewers == 0 && projectsUnchanged && portsUnchanged && memoryUnchanged && state.memoryDiagnosis == diagnosis && state.thermalDiagnosis == thermalDiag {
             return
         }
 
@@ -203,6 +232,7 @@ final class ProjectStore: ObservableObject {
         next.history = internalHistory
         next.lastScan = now
         next.memoryDiagnosis = diagnosis
+        next.thermalDiagnosis = thermalDiag
         state = next
         let alive = stubborn.intersection(projects.map(\.id))
         if alive != stubborn { stubborn = alive }
@@ -231,11 +261,13 @@ final class ProjectStore: ObservableObject {
         } else {
             await MemoryDoctor.disableAndStop(daemon: daemon, pids: item?.pids ?? [])
         }
+        invalidateDisabledServicesCache()
         await refresh()
     }
 
     func disableAllRecommendedDaemons() async {
         await MemoryDoctor.disableAllRecommended(in: state.memoryDiagnosis)
+        invalidateDisabledServicesCache()
         await refresh()
     }
 
@@ -260,10 +292,16 @@ final class ProjectStore: ObservableObject {
         defer { readingThermals = false }
         guard let snap = (await Task.detached(priority: .utility) { Thermals.read() }.value) else { return }
         let level = ProcessInfo.processInfo.thermalState
-        if snap != state.thermals || level != state.thermalState {
+        if snap != state.thermals || level != state.thermalState || state.thermalDiagnosis == nil {
             var next = state
             next.thermals = snap
             next.thermalState = level
+            next.thermalDiagnosis = ThermalDoctor.diagnose(
+                thermals: snap,
+                thermalState: level,
+                processes: lastProcesses,
+                battery: BatteryStore.shared.reading
+            )
             state = next
         }
     }
@@ -273,6 +311,63 @@ final class ProjectStore: ObservableObject {
     }
 
     // MARK: - Actions
+
+    /// Terminate process(es) listening on a specific port.
+    func terminatePort(_ port: ListeningPort, graceSeconds: Double = 3) {
+        let me = getpid()
+        var targetPIDs: [Int32] = []
+        var affectedProjects: [Project] = []
+        for project in state.projects {
+            if project.ports.contains(where: { $0.port == port.port }) {
+                affectedProjects.append(project)
+                for l in project.listeners where l.ports.contains(where: { $0.port == port.port }) {
+                    targetPIDs.append(l.pid)
+                }
+            }
+        }
+        for p in affectedProjects {
+            recentlyStopped[p.directory ?? p.id] = Date()
+            stopping.insert(p.id)
+        }
+        Task { [weak self] in
+            var pids = targetPIDs.filter { $0 > 1 && $0 != me }
+            if pids.isEmpty {
+                let all = await Task.detached(priority: .userInitiated) { ProcessScanner.scan() }.value
+                pids = all.filter { $0.ports.contains(where: { $0.port == port.port }) }.map(\.pid).filter { $0 > 1 && $0 != me }
+            }
+            guard !pids.isEmpty else {
+                await self?.refresh()
+                return
+            }
+            ProcessControl.send(.terminate, to: pids)
+            let exited = await ProcessControl.waitForExit(pids, timeout: graceSeconds)
+            guard let self else { return }
+            if !exited {
+                ProcessControl.send(.kill, to: pids)
+                _ = await ProcessControl.waitForExit(pids, timeout: 1.0)
+            }
+            for p in affectedProjects {
+                self.removeLocally(p.id)
+                self.stopping.remove(p.id)
+            }
+            await self.refresh()
+        }
+    }
+
+    /// Terminate a culprit process diagnosed as causing high heat or CPU load.
+    func terminateCulprit(pid: Int32) {
+        let me = getpid()
+        guard pid > 1 && pid != me else { return }
+        ProcessControl.send(.terminate, to: [pid])
+        Task { [weak self] in
+            let exited = await ProcessControl.waitForExit([pid], timeout: 2.0)
+            if !exited {
+                ProcessControl.send(.kill, to: [pid])
+                _ = await ProcessControl.waitForExit([pid], timeout: 1.0)
+            }
+            await self?.refresh()
+        }
+    }
 
     /// SIGTERM, then poll every 100 ms: the row disappears as soon as the processes exit
     /// instead of after a fixed delay. Still alive after `graceSeconds` → offer force kill.

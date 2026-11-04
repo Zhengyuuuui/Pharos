@@ -51,7 +51,6 @@ struct AgentChatView: View {
 private struct AgentOverviewPage: View {
     @ObservedObject private var store = AgentChatStore.shared
     @ObservedObject private var l10n = L10n.shared
-    @State private var armedOrphanClean = false
     @State private var showInactive = false
 
     var body: some View {
@@ -99,26 +98,14 @@ private struct AgentOverviewPage: View {
                 }
 
                 if store.orphanedCount > 0 {
-                    if armedOrphanClean {
-                        HStack(spacing: PharosSpacing.xs) {
-                            Button {
-                                armedOrphanClean = false
-                                store.cleanAllOrphaned()
-                            } label: {
-                                Text(l10n.cleanOrphanedConfirm).font(PharosFont.caption)
-                            }
-                            .buttonStyle(.pharosDestructive)
-                            .controlSize(.small)
-                            IconButton(systemImage: "xmark", help: l10n.cancel) { armedOrphanClean = false }
-                        }
-                    } else {
-                        Button { armedOrphanClean = true } label: {
-                            Label(l10n.cleanOrphaned, systemImage: "trash")
-                        }
-                        .buttonStyle(.pharosDestructive)
-                        .controlSize(.small)
-                        .help(l10n.cleanOrphanedHelp)
+                    PharosConfirmButton(
+                        title: l10n.cleanOrphaned,
+                        systemImage: "trash",
+                        confirmTitle: l10n.cleanOrphanedConfirm
+                    ) {
+                        store.cleanAllOrphaned()
                     }
+                    .help(l10n.cleanOrphanedHelp)
                 }
             }
         }

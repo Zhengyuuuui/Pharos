@@ -85,6 +85,27 @@ public struct PopoverLayout: Equatable, Sendable {
     private mutating func set(_ list: [PopoverBlock], for tab: PopoverTab) {
         if tab == .overview { overview = list } else { projects = list }
     }
+
+    /// Incrementally merges an imported layout:
+    /// Blocks currently placed in this layout keep their exact tab and order.
+    /// Blocks from `imported` not present in this layout are appended to their imported tab.
+    public func merging(imported: PopoverLayout) -> PopoverLayout {
+        var result = self
+        var activeBlocks = Set(result.overview + result.projects)
+        for block in imported.overview {
+            if !activeBlocks.contains(block) {
+                result.insert(block, into: .overview)
+                activeBlocks.insert(block)
+            }
+        }
+        for block in imported.projects {
+            if !activeBlocks.contains(block) {
+                result.insert(block, into: .projects)
+                activeBlocks.insert(block)
+            }
+        }
+        return result
+    }
 }
 
 extension PopoverLayout: Codable {

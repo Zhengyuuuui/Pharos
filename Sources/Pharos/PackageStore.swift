@@ -59,11 +59,16 @@ final class PackageStore: ObservableObject {
     @Published private(set) var filteredProjectPackages: [LocalPackageItem] = []
 
     // MARK: - Metric Summaries
-    var globalCliCount: Int { globalCliTools.count }
+    private var cachedGlobalCliCount: Int? = nil
+    private var cachedFeaturedCliCount: Int? = nil
+    private var cachedTotalCacheSize: UInt64? = nil
+    private var cachedTotalCacheCount: Int? = nil
+
+    var globalCliCount: Int { cachedGlobalCliCount ?? globalCliTools.count }
     var featuredCliTools: [LocalPackageItem] { globalCliTools.filter(\.isFeatured) }
-    var featuredCliCount: Int { featuredCliTools.count }
-    var totalCacheSize: UInt64 { cacheRepos.reduce(0) { $0 + $1.fileSizeBytes } }
-    var totalCacheCount: Int { cacheRepos.count }
+    var featuredCliCount: Int { cachedFeaturedCliCount ?? featuredCliTools.count }
+    var totalCacheSize: UInt64 { cachedTotalCacheSize ?? cacheRepos.reduce(0) { $0 + $1.fileSizeBytes } }
+    var totalCacheCount: Int { cachedTotalCacheCount ?? cacheRepos.count }
 
     func cliCount(for eco: PackageEcosystem) -> Int {
         globalCliTools.filter { $0.ecosystem == eco }.count
@@ -141,6 +146,10 @@ final class PackageStore: ObservableObject {
 
             await MainActor.run { [weak self] in
                 guard let self else { return }
+                self.cachedGlobalCliCount = nil
+                self.cachedFeaturedCliCount = nil
+                self.cachedTotalCacheSize = nil
+                self.cachedTotalCacheCount = nil
                 self.globalCliTools = clis
                 self.cacheRepos = caches
                 self.detectedProjects = initialSummaries
@@ -186,11 +195,19 @@ final class PackageStore: ObservableObject {
         }
     }
 
-    /// Releases heavy dependency package lists while keeping project summary metadata
-    /// (name, rootPath, counts, sizes) to prevent UI flicker when reopened.
+    /// Releases heavy dependency package lists and global CLI tool models while keeping
+    /// project summary metadata and numeric counts to drop memory footprint.
     func releaseHeavyCache() {
-        guard !detectedProjects.isEmpty else { return }
+        guard !detectedProjects.isEmpty || !globalCliTools.isEmpty || !cacheRepos.isEmpty else { return }
         isHeavyCacheReleased = true
+
+        // Cache summary numbers before clearing arrays so status rows remain responsive
+        cachedGlobalCliCount = globalCliTools.count
+        cachedFeaturedCliCount = featuredCliTools.count
+        cachedTotalCacheSize = cacheRepos.reduce(0) { $0 + $1.fileSizeBytes }
+        cachedTotalCacheCount = cacheRepos.count
+
+        // Release detailed package items from detected projects
         detectedProjects = detectedProjects.map { p in
             guard !p.packages.isEmpty else { return p }
             return ProjectDependencySummary(
@@ -205,6 +222,13 @@ final class PackageStore: ObservableObject {
                 cacheDirectoryName: p.cacheDirectoryName
             )
         }
+
+        // Release global CLI lists and cache repos
+        globalCliTools = []
+        filteredCliTools = []
+        featuredShelfTools = []
+        cacheRepos = []
+
         recomputeFilteredProject()
     }
 
@@ -374,6 +398,22 @@ final class PackageStore: ObservableObject {
         }
     }
 
+    private func executeScriptInTerminal(script: String, prefix: String) {
+        let tempScriptUrl = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("pharos-\(prefix)-\(UUID().uuidString).command")
+        do {
+            try LaunchScript.write(script, to: tempScriptUrl)
+            NSWorkspace.shared.open(tempScriptUrl)
+            // Schedule cleanup of the temporary command script 5 seconds after invocation
+            // so Terminal has already ingested it into its shell session without leaving /tmp clutter.
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 5.0) {
+                try? FileManager.default.removeItem(at: tempScriptUrl)
+            }
+        } catch {
+            print("Failed to run \(prefix) script in terminal: \(error)")
+            try? FileManager.default.removeItem(at: tempScriptUrl)
+        }
+    }
+
     func testInTerminal(command: String, in directory: String? = nil) {
         let workDir = directory ?? NSHomeDirectory()
         let title = "Pharos: \(command)"
@@ -384,14 +424,7 @@ final class PackageStore: ObservableObject {
             shell: nil,
             interactiveLogin: true
         )
-
-        let tempScriptUrl = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("pharos-test-\(UUID().uuidString).command")
-        do {
-            try LaunchScript.write(script, to: tempScriptUrl)
-            NSWorkspace.shared.open(tempScriptUrl)
-        } catch {
-            print("Failed to run test script in terminal: \(error)")
-        }
+        executeScriptInTerminal(script: script, prefix: "test")
     }
 
     func uninstallInTerminal(item: LocalPackageItem) {
@@ -404,14 +437,7 @@ final class PackageStore: ObservableObject {
             shell: nil,
             interactiveLogin: true
         )
-
-        let tempScriptUrl = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("pharos-uninstall-\(UUID().uuidString).command")
-        do {
-            try LaunchScript.write(script, to: tempScriptUrl)
-            NSWorkspace.shared.open(tempScriptUrl)
-        } catch {
-            print("Failed to run uninstall script in terminal: \(error)")
-        }
+        executeScriptInTerminal(script: script, prefix: "uninstall")
     }
 
     // MARK: - Homebrew Control & Management
@@ -423,13 +449,7 @@ final class PackageStore: ObservableObject {
             shell: nil,
             interactiveLogin: true
         )
-        let tempScriptUrl = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("pharos-brew-\(UUID().uuidString).command")
-        do {
-            try LaunchScript.write(script, to: tempScriptUrl)
-            NSWorkspace.shared.open(tempScriptUrl)
-        } catch {
-            print("Failed to run command in terminal: \(error)")
-        }
+        executeScriptInTerminal(script: script, prefix: "brew")
     }
 
     func runHomebrewCleanup() {

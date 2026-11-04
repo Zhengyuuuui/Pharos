@@ -200,7 +200,6 @@ struct PharosConfirmButton: View {
     let action: () -> Void
 
     @State private var armed = false
-    @State private var hovering = false
 
     var body: some View {
         Group {
@@ -251,12 +250,6 @@ struct PharosConfirmButton: View {
             }
         }
         .controlSize(.small)
-        .onHover { inside in
-            if hovering && !inside && armed {
-                withAnimation(.easeOut(duration: 0.15)) { armed = false }
-            }
-            hovering = inside
-        }
         .accessibilityHint(armed ? confirmTitle : "")
     }
 }

@@ -716,9 +716,15 @@ struct MainSettingsView: View {
                 chrome.resetSettings()
                 packageStore.resetSettings()
                 agentStore.resetSettings()
+                CleanupStoreHolder.shared.resetSettings()
+                BatteryStore.shared.setSystemMode()
+                BatteryStore.shared.resetSettings()
+                FanStore.shared.setSystemMode()
+                FanStore.shared.resetSettings()
                 gauge3DAcceleration = true
                 popoverGaussianBlur = true
                 trafficLightGlassTransparency = 0.75
+                UserDefaults.standard.removeObject(forKey: "pharos.showInspector")
                 UserDefaults.standard.removeObject(forKey: "pharos.fanViewMode")
                 UserDefaults.standard.removeObject(forKey: "popoverTab")
                 // OnboardingPolicy.completedVersionKey is deliberately kept: resetting preferences must not re-trigger onboarding.

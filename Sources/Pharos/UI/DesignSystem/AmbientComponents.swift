@@ -68,7 +68,7 @@ struct PharosActionPill: View {
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(isCopiedFeedback ? PharosColor.success : (isPrimary ? PharosColor.accent : PharosColor.textSecondary))
 
-                Text(isCopiedFeedback ? (L10n.shared.isZh ? "已复制" : "Copied") : title)
+                Text(isCopiedFeedback ? L10n.shared.ambientCopied : title)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(isCopiedFeedback ? PharosColor.success : PharosColor.textPrimary)
                     .lineLimit(1)

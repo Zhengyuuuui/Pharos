@@ -38,7 +38,7 @@ struct BatteryAndThermalView: View {
                         .tag(BatteryAndThermalTab.thermals)
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 250)
+                .frame(minWidth: 280, idealWidth: 320)
             }
             .padding(.horizontal, PharosSpacing.page)
             .padding(.top, PharosSpacing.l)

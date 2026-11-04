@@ -88,9 +88,7 @@ struct AgentOptimizationView: View {
             }
         } message: {
             if let prof = profile {
-                Text("\(entry.workspaceName)\n\n" + (l10n.isZh
-                    ? "将执行 \(selectedLevel.title)，预计可释放 \(ByteFormat.disk(prof.reclaimableBytes)) 冗余数据与碎片空间。"
-                    : "Executing \(selectedLevel.title), reclaiming approx. \(ByteFormat.disk(prof.reclaimableBytes))."))
+                Text("\(entry.workspaceName)\n\n" + l10n.agentCompactionMessage(level: selectedLevel, reclaimable: ByteFormat.disk(prof.reclaimableBytes)))
             } else {
                 Text(entry.workspaceName)
             }
@@ -333,7 +331,7 @@ struct AgentOptimizationView: View {
         PharosCard {
             VStack(alignment: .leading, spacing: PharosSpacing.s) {
                 HStack {
-                    Label(l10n.isZh ? "数据库表级空间透视" : "SQLite Table Space Breakdown", systemImage: "tablecells")
+                    Label(l10n.tableSpaceBreakdown, systemImage: "tablecells")
                         .font(PharosFont.rowLabel)
                     Spacer()
                     Text(l10n.agentDeepDiagnosticsDesc)
@@ -492,7 +490,7 @@ struct AgentOptimizationView: View {
                     Label(l10n.agentBackupsListTitle, systemImage: "clock.arrow.circlepath")
                         .font(PharosFont.rowLabel)
                     Spacer()
-                    Text(l10n.isZh ? "最多保留最近 3 份还原点" : "Retains up to 3 latest restore points")
+                    Text(l10n.retainLatestRestorePoints)
                         .font(PharosFont.caption)
                         .foregroundStyle(PharosColor.textTertiary)
                 }
@@ -554,7 +552,7 @@ struct AgentOptimizationView: View {
                             .font(PharosFont.caption)
                             .lineLimit(1)
                         Spacer()
-                        Text("\(s.messageCount) \(l10n.agentMessages(s.messageCount))")
+                        Text(l10n.agentMessages(s.messageCount))
                             .font(PharosFont.captionDigits)
                             .foregroundStyle(PharosColor.textTertiary)
                         Text(ByteFormat.disk(s.sizeBytes))
@@ -648,11 +646,11 @@ struct AgentOptimizationView: View {
                         metricItem(
                             title: l10n.conversationsInDb,
                             value: "\(entry.conversationCount)",
-                            sub: l10n.isZh ? "沙盒侧车同步" : "Sidecar synced",
+                            sub: l10n.sidecarSynced,
                             icon: "bubble.left.and.bubble.right.fill"
                         )
                         metricItem(
-                            title: l10n.isZh ? "加密算法" : "Cipher",
+                            title: l10n.cipherAlgorithm,
                             value: "SQLCipher",
                             sub: "AES-256-CBC",
                             icon: "key.fill"
@@ -688,7 +686,7 @@ struct AgentOptimizationView: View {
                                     .lineLimit(1)
                                 Spacer()
                                 if let n = conv.messageCount {
-                                    Text("\(n) \(l10n.agentMessages(n))")
+                                    Text(l10n.agentMessages(n))
                                         .font(PharosFont.captionDigits)
                                         .foregroundStyle(PharosColor.textTertiary)
                                 }
@@ -716,9 +714,9 @@ struct AgentOptimizationView: View {
 
     private var profileFailedView: some View {
         ContentUnavailableView(
-            l10n.isZh ? "无法剖析此数据库" : "Unable to Profile Database",
+            l10n.unableToProfileDb,
             systemImage: "exclamationmark.triangle",
-            description: Text(l10n.isZh ? "该文件可能不是标准的 SQLite 格式或已损坏。" : "File is not a valid SQLite database or is corrupted.")
+            description: Text(l10n.invalidSqliteFileDesc)
         )
         .frame(maxWidth: .infinity, minHeight: 200)
     }
@@ -808,7 +806,7 @@ struct AgentRelocationView: View {
                             .lineLimit(1)
                             .truncationMode(.middle)
                         HStack(spacing: 8) {
-                            Text("\(proj.sessionCount) \(l10n.agentMessages(proj.sessionCount))")
+                            Text(l10n.agentSessions(proj.sessionCount))
                                 .font(PharosFont.caption)
                                 .foregroundStyle(PharosColor.textTertiary)
                             if let act = proj.lastActiveDate {

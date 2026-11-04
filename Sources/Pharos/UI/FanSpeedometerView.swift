@@ -894,7 +894,7 @@ public struct FanSpeedometerClusterView: View {
             // Live Peak Temperature Core
             if let temp = peakTemp {
                 VStack(spacing: 3) {
-                    Text("PEAK CORE")
+                    Text(l10n.peakCoreTemp)
                         .font(.system(size: 9.5, weight: .semibold))
                         .foregroundStyle(.secondary)
                     Text(String(format: "%.0f°C", temp))

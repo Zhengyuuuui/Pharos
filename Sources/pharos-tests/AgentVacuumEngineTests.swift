@@ -59,6 +59,15 @@ func testAgentVacuumEngineAndExclusivity() {
         expectEq(backups.count, 1, "found 1 backup")
         expectEq(backups.first?.backupPath, bak, "backup path matched")
 
+        // Test backup rotation: second backup rotates and keeps only 1 latest snapshot on disk
+        // Sleep slightly to guarantee distinct timestamp/filename
+        usleep(100_000)
+        let bak2 = try AgentVacuumEngine.createPreflightBackup(for: dbPath)
+        let backupsAfterSecond = AgentVacuumEngine.listBackups(for: dbPath)
+        expectEq(backupsAfterSecond.count, 1, "backup rotation keeps only 1 latest snapshot")
+        expectEq(backupsAfterSecond.first?.backupPath, bak2, "latest backup is retained")
+        expect(!FileManager.default.fileExists(atPath: bak), "older backup was automatically removed")
+
         // Mutate db then restore
         var mDb: OpaquePointer?
         if sqlite3_open(dbPath, &mDb) == SQLITE_OK {
@@ -66,7 +75,7 @@ func testAgentVacuumEngineAndExclusivity() {
             sqlite3_close(mDb)
         }
 
-        try AgentVacuumEngine.restoreBackup(from: bak, to: dbPath)
+        try AgentVacuumEngine.restoreBackup(from: bak2, to: dbPath)
 
         // Verify restoration
         var rDb: OpaquePointer?

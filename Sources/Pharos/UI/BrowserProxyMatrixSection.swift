@@ -43,7 +43,7 @@ struct BrowserProxyMatrixSection: View {
 
                 HStack(spacing: PharosSpacing.m) {
                     // Card 1: Main Profile with Direct
-                    let mainBadge = mainRunning != nil ? (isMainDirect ? "运行中 · 已直连" : "运行中 · 跟随系统") : "未运行"
+                    let mainBadge = mainRunning != nil ? (isMainDirect ? l10n.mainBadgeRunningDirect : l10n.mainBadgeRunningSystem) : l10n.badgeNotRunning
                     let mainBadgeColor = isMainDirect ? PharosColor.success : (mainRunning != nil ? PharosColor.warning : PharosColor.textTertiary)
                     let mainBtnTitle = mainRunning != nil ? l10n.relaunchMainDirect : l10n.launchMainDirect
 
@@ -78,7 +78,7 @@ struct BrowserProxyMatrixSection: View {
                         buttonIcon: "network"
                     ) {
                         chrome.launchIsolated(
-                            name: "\(b.appName) · 代理 A",
+                            name: l10n.isolatedProxyAName(b.appName),
                             folderName: "\(b.rawValue)-proxyA",
                             strategy: .clashMixedPort(7890),
                             browser: b,
@@ -100,7 +100,7 @@ struct BrowserProxyMatrixSection: View {
                         buttonIcon: "arrow.triangle.branch"
                     ) {
                         chrome.launchIsolated(
-                            name: "\(b.appName) · 代理 B",
+                            name: l10n.isolatedProxyBName(b.appName),
                             folderName: "\(b.rawValue)-proxyB",
                             strategy: .clashMixedPort(7897),
                             browser: b,

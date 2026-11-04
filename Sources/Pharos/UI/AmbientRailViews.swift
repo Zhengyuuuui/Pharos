@@ -21,7 +21,7 @@ struct PortsOverviewInspectorView: View {
                 PharosBentoTile(
                     title: l10n.activePorts,
                     value: "\(allPorts.count)",
-                    subtitle: allPorts.isEmpty ? (l10n.isZh ? "端口空闲" : "Idle") : l10n.normalListening,
+                    subtitle: allPorts.isEmpty ? l10n.ambientPortsIdle : l10n.normalListening,
                     systemImage: "antenna.radiowaves.left.and.right",
                     dotLevel: allPorts.isEmpty ? .offline : .normal
                 )
@@ -29,7 +29,7 @@ struct PortsOverviewInspectorView: View {
                 PharosBentoTile(
                     title: l10n.publicExposure,
                     value: "\(exposedCount)",
-                    subtitle: exposedCount > 0 ? l10n.openBroadcasting : (l10n.isZh ? "无公网开放" : "Safe Local"),
+                    subtitle: exposedCount > 0 ? l10n.openBroadcasting : l10n.ambientSafeLocal,
                     systemImage: "network",
                     dotLevel: exposedCount > 0 ? .warning : .normal
                 )
@@ -39,7 +39,7 @@ struct PortsOverviewInspectorView: View {
             PharosBentoCard(title: l10n.lanDebugStation, systemImage: "wifi", trailingBadge: lanIP ?? "-") {
                 VStack(alignment: .leading, spacing: 8) {
                     if webUrls.isEmpty {
-                        Text(l10n.isZh ? "未检测到常见 Web 调试端口" : "No active web dev ports")
+                        Text(l10n.ambientNoActiveDevPorts)
                             .font(.system(size: 11))
                             .foregroundStyle(PharosColor.textTertiary)
                     } else {
@@ -213,7 +213,7 @@ struct SystemMemoryInspectorView: View {
 
                     if let topApp = store.apps.first {
                         HStack(spacing: 4) {
-                            Text(l10n.isZh ? "主要消耗:" : "Top:")
+                            Text(l10n.ambientTopConsuming)
                                 .font(.system(size: 10))
                                 .foregroundStyle(PharosColor.textTertiary)
                             Text(topApp.name)
@@ -240,7 +240,7 @@ struct SystemMemoryInspectorView: View {
                                 .foregroundStyle(PharosColor.textPrimary)
                         }
                     } else {
-                        Text(l10n.isZh ? "采样中…" : "Sampling…")
+                        Text(l10n.ambientSampling)
                             .font(.system(size: 11))
                             .foregroundStyle(PharosColor.textTertiary)
                     }
@@ -315,7 +315,7 @@ struct DiskUsageInspectorView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     if let vol = startup {
                         HStack {
-                            Text(l10n.isZh ? "已用 / 总量" : "Used / Total")
+                            Text(l10n.ambientUsedTotal)
                                 .font(.system(size: 10.5))
                                 .foregroundStyle(PharosColor.textSecondary)
                             Spacer()
@@ -362,8 +362,15 @@ struct BatteryThermalInspectorView: View {
     var body: some View {
         let r = battery.reading
         let thermals = store.thermals
-        let peakTemp = thermals?.peakChipTemperature ?? 48.0
-        let (headroom, isThrottling) = ThermalHeadroom.calculate(peakTemp: peakTemp)
+        let peakTemp = thermals?.peakChipTemperature
+        let (headroom, isThrottling): (Double?, Bool) = {
+            if let peak = peakTemp {
+                let calc = ThermalHeadroom.calculate(peakTemp: peak)
+                return (calc.headroom, calc.isThrottling)
+            } else {
+                return (nil, false)
+            }
+        }()
         let wattsString = String(format: "%.1f", abs(r.watts))
 
         VStack(spacing: 8) {
@@ -371,22 +378,22 @@ struct BatteryThermalInspectorView: View {
             PharosBentoCard(title: l10n.thermalHeadroomTitle, systemImage: "thermometer.medium") {
                 VStack(alignment: .leading, spacing: 5) {
                     PharosMicroMetric(
-                        label: l10n.isZh ? "最高芯片温度" : "Peak Sensor",
-                        value: "\(Int(peakTemp.rounded()))°C",
-                        unit: l10n.headroomDegrees(Int(headroom.rounded())),
-                        dotLevel: isThrottling ? .critical : (headroom < 15 ? .warning : .normal)
+                        label: l10n.ambientPeakSensor,
+                        value: peakTemp.map { "\(Int($0.rounded()))°C" } ?? " — ",
+                        unit: headroom.map { l10n.headroomDegrees(Int($0.rounded())) } ?? "",
+                        dotLevel: isThrottling ? .critical : ((headroom ?? 30) < 15 ? .warning : .normal)
                     )
-                    ProgressView(value: min(1.0, max(0.0, peakTemp / 100.0)))
-                        .tint(headroom > 25 ? PharosColor.success : (headroom > 10 ? PharosColor.warning : PharosColor.error))
+                    ProgressView(value: min(1.0, max(0.0, (peakTemp ?? 0) / 100.0)))
+                        .tint((headroom ?? 30) > 25 ? PharosColor.success : ((headroom ?? 30) > 10 ? PharosColor.warning : PharosColor.error))
                         .scaleEffect(x: 1, y: 0.6, anchor: .center)
 
                     HStack(spacing: 4) {
                         Text(l10n.throttlingStatus + ":")
                             .font(.system(size: 10))
                             .foregroundStyle(PharosColor.textTertiary)
-                        Text(isThrottling ? l10n.throttlingActive : l10n.throttlingNone)
+                        Text(peakTemp == nil ? " — " : (isThrottling ? l10n.throttlingActive : l10n.throttlingNone))
                             .font(.system(size: 10.5, weight: .medium))
-                            .foregroundStyle(isThrottling ? PharosColor.error : PharosColor.success)
+                            .foregroundStyle(peakTemp == nil ? PharosColor.textTertiary : (isThrottling ? PharosColor.error : PharosColor.success))
                     }
                 }
             }
@@ -394,14 +401,14 @@ struct BatteryThermalInspectorView: View {
             // [Block 2] 实时功率与续航测算 (Medium 卡, 约 120pt)
             PharosBentoCard(title: l10n.powerDraw, systemImage: "bolt.fill") {
                 VStack(spacing: 5) {
-                    PharosMicroMetric(label: l10n.isZh ? "实时整机功耗" : "Power Draw", value: "\(wattsString) W", dotLevel: .normal)
+                    PharosMicroMetric(label: l10n.ambientPowerDraw, value: "\(wattsString) W", dotLevel: .normal)
                     if r.hasBattery {
                         PharosMicroMetric(
-                            label: l10n.isZh ? "健康度 / 循环" : "Health / Cycles",
+                            label: l10n.ambientHealthCycles,
                             value: "\(r.healthPercent)% / \(r.cycleCount)"
                         )
                         HStack {
-                            Text(r.isCharging ? l10n.batteryPulseCharging : (l10n.isZh ? "放电运行中" : "On Battery"))
+                            Text(r.isCharging ? l10n.batteryPulseCharging : l10n.ambientOnBattery)
                                 .font(.system(size: 10))
                                 .foregroundStyle(PharosColor.textTertiary)
                             Spacer()
@@ -432,11 +439,11 @@ struct BatteryThermalInspectorView: View {
                     }
                 } else {
                     HStack {
-                        Text(l10n.isZh ? "风扇控制服务未安装" : "Fan helper not installed")
+                        Text(l10n.ambientFanHelperNotInstalled)
                             .font(.system(size: 10.5))
                             .foregroundStyle(PharosColor.textTertiary)
                         Spacer()
-                        Button(l10n.isZh ? "前往配置" : "Setup") {
+                        Button(l10n.ambientSetupAction) {
                             WindowRouter.shared.batteryThermalTab = .thermals
                             WindowRouter.shared.request = .batteryAndThermals
                         }
@@ -476,8 +483,8 @@ struct PackagesInspectorView: View {
                         .tint(PharosColor.accent)
                         .scaleEffect(x: 1, y: 0.6, anchor: .center)
 
-                    PharosMicroMetric(label: l10n.isZh ? "总依赖缓存" : "Total Caches", value: ByteFormat.disk(totalBytes))
-                    PharosMicroMetric(label: l10n.isZh ? "全局 CLI 工具" : "Global CLIs", value: "\(packageStore.globalCliCount)")
+                    PharosMicroMetric(label: l10n.ambientTotalCaches, value: ByteFormat.disk(totalBytes))
+                    PharosMicroMetric(label: l10n.ambientGlobalClis, value: "\(packageStore.globalCliCount)")
                 }
             }
 
@@ -559,7 +566,7 @@ struct ChromeInspectorView: View {
             // [Block 2] DevTools 远程调试直达站 (Hero 主力大卡, 约 150pt)
             PharosBentoCard(title: l10n.activeDevToolsPorts, systemImage: "point.3.connected.trianglepath.dotted") {
                 if ports.isEmpty {
-                    Text(l10n.isZh ? "未绑定 --remote-debugging-port" : "No remote debugging ports")
+                    Text(l10n.ambientNoRemoteDebuggingPorts)
                         .font(.system(size: 10.5))
                         .foregroundStyle(PharosColor.textTertiary)
                 } else {
@@ -587,12 +594,14 @@ struct ChromeInspectorView: View {
             PharosBentoCard(title: l10n.browserFootprint, systemImage: "memorychip") {
                 VStack(alignment: .leading, spacing: 6) {
                     PharosMicroMetric(
-                        label: l10n.isZh ? "实例与渲染进程" : "Instances & Helpers",
+                        label: l10n.ambientInstancesAndHelpers,
                         value: ByteFormat.short(totalMem),
                         dotLevel: .normal
                     )
 
                     PharosActionPill(title: l10n.newCleanProfile, systemImage: "plus.circle", isPrimary: true) {
+                        let presetId = ChromeStore.shared.addPreset()
+                        WindowRouter.shared.editingPresetId = presetId
                         WindowRouter.shared.request = .chrome
                     }
                 }
@@ -614,7 +623,7 @@ struct AgentChatsInspectorView: View {
         VStack(spacing: 8) {
             // [Block 1] 数据库安全脉搏微条 (Mini 胶囊卡, 高 48pt)
             PharosBentoPulse(
-                text: l10n.isZh ? "检测到 \(agentStore.totalDatabases) 个编辑器库 · 100% 只读解析中" : "Tracking \(agentStore.totalDatabases) agent databases · 100% read-only",
+                text: l10n.ambientAgentTrackingBanner(agentStore.totalDatabases),
                 dotLevel: agentStore.orphanedCount > 0 ? .warning : .normal
             )
 
@@ -628,7 +637,7 @@ struct AgentChatsInspectorView: View {
                                 .font(.system(size: 11))
                                 .foregroundStyle(PharosColor.warning)
                         }
-                        Text(l10n.isZh ? "超大会话可能导致编辑器补全延迟与高额费用" : "Large sessions may cause editor latency")
+                        Text(l10n.ambientLargeSessionWarning)
                             .font(.system(size: 10))
                             .foregroundStyle(PharosColor.textTertiary)
                     } else {
@@ -640,8 +649,8 @@ struct AgentChatsInspectorView: View {
                         }
                     }
 
-                    PharosMicroMetric(label: l10n.isZh ? "总数据库数" : "Total Databases", value: "\(agentStore.totalDatabases)")
-                    PharosMicroMetric(label: l10n.isZh ? "总会话记录" : "Conversations", value: "\(agentStore.totalConversations)")
+                    PharosMicroMetric(label: l10n.ambientTotalDatabases, value: "\(agentStore.totalDatabases)")
+                    PharosMicroMetric(label: l10n.ambientConversations, value: "\(agentStore.totalConversations)")
                 }
             }
 
@@ -656,7 +665,7 @@ struct AgentChatsInspectorView: View {
                                 .foregroundStyle(PharosColor.warning)
                         }
                     } else {
-                        Text(l10n.isZh ? "数据库状态全部健康" : "All databases intact")
+                        Text(l10n.ambientAllDatabasesIntact)
                             .font(.system(size: 10.5))
                             .foregroundStyle(PharosColor.textTertiary)
                     }
@@ -715,8 +724,8 @@ struct DiskCleanupInspectorView: View {
                     }
 
                     PharosMicroMetric(
-                        label: l10n.isZh ? "待清理条目" : "Cleanable Items",
-                        value: "\(cleanup.rows.count) \(l10n.isZh ? "项" : "items")",
+                        label: l10n.ambientCleanableItems,
+                        value: l10n.ambientItemCount(cleanup.rows.count),
                         unit: ByteFormat.short(cleanBytes)
                     )
                 }
@@ -730,7 +739,12 @@ struct DiskCleanupInspectorView: View {
                         .foregroundStyle(PharosColor.textTertiary)
                         .lineSpacing(2)
 
-                    PharosActionPill(title: l10n.cleanTempCachesOnly, systemImage: "sparkles", isPrimary: true) {
+                    PharosConfirmButton(
+                        title: l10n.cleanTempCachesOnly,
+                        systemImage: "sparkles",
+                        confirmTitle: l10n.confirm,
+                        isWorking: cleanup.isBusy
+                    ) {
                         cleanup.clean(group: .temp)
                     }
                 }
@@ -755,7 +769,7 @@ struct ProjectDetailInspectorView: View {
                 PharosBentoTile(
                     title: l10n.activePorts,
                     value: "\(project.ports.count)",
-                    subtitle: project.ports.isEmpty ? (l10n.isZh ? "无端口" : "No Ports") : l10n.normalListening,
+                    subtitle: project.ports.isEmpty ? l10n.ambientNoPorts : l10n.normalListening,
                     systemImage: "antenna.radiowaves.left.and.right",
                     dotLevel: project.ports.isEmpty ? .offline : .normal
                 )
@@ -773,7 +787,7 @@ struct ProjectDetailInspectorView: View {
             PharosBentoCard(title: l10n.techStackFingerprint, systemImage: "cpu") {
                 VStack(alignment: .leading, spacing: 6) {
                     if badges.isEmpty {
-                        Text(l10n.isZh ? "纯运行时进程 (未检测到项目清单)" : "Native process (No manifest detected)")
+                        Text(l10n.ambientNativeProcessDesc)
                             .font(.system(size: 10.5))
                             .foregroundStyle(PharosColor.textTertiary)
                     } else {
@@ -854,7 +868,7 @@ struct CustomizePopoverInspectorView: View {
                         Text(l10n.presetMinimal)
                             .font(.system(size: 10.5, weight: .medium))
                             .foregroundStyle(PharosColor.textPrimary)
-                        Text(l10n.isZh ? "内存 · 磁盘 · 温度 · 风扇" : "Memory · Disk · Thermals · Battery")
+                        Text(l10n.ambientHardwareOverviewDesc)
                             .font(.system(size: 10))
                             .foregroundStyle(PharosColor.textTertiary)
                     }
@@ -902,7 +916,7 @@ struct SettingsInspectorView: View {
                         PharosStatusDot(level: fandActive ? .normal : .offline)
                         Text(l10n.daemonFand).font(.system(size: 10.5))
                         Spacer()
-                        Text(fandActive ? (l10n.isZh ? "在线" : "Active") : (l10n.isZh ? "未就绪" : "Not Ready"))
+                        Text(fandActive ? l10n.ambientActiveOnline : l10n.ambientNotReady)
                             .font(.system(size: 10))
                             .foregroundStyle(PharosColor.textTertiary)
                     }
@@ -910,7 +924,7 @@ struct SettingsInspectorView: View {
                         PharosStatusDot(level: battdActive ? .normal : .offline)
                         Text(l10n.daemonBattd).font(.system(size: 10.5))
                         Spacer()
-                        Text(battdActive ? (l10n.isZh ? "在线" : "Active") : (l10n.isZh ? "未就绪" : "Not Ready"))
+                        Text(battdActive ? l10n.ambientActiveOnline : l10n.ambientNotReady)
                             .font(.system(size: 10))
                             .foregroundStyle(PharosColor.textTertiary)
                     }
@@ -932,7 +946,7 @@ struct SettingsInspectorView: View {
                         .lineSpacing(2)
 
                     HStack {
-                        Text(l10n.isZh ? "快捷键 ⌥ + P 唤醒" : "⌥ + P to Toggle")
+                        Text(l10n.ambientHotkeyHint)
                             .font(.system(size: 10, design: .monospaced))
                             .foregroundStyle(PharosColor.textSecondary)
                         Spacer()

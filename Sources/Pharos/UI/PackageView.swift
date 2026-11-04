@@ -95,14 +95,17 @@ struct PackageView: View {
     private var globalCliSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Metrics Cards (Click to filter)
-            HStack(spacing: 10) {
-                totalCliFilterCard()
-                featuredCliFilterCard()
-                ecosystemFilterCard(title: "Node.js", ecosystem: .node, icon: "hexagon.fill", color: .green)
-                ecosystemFilterCard(title: "Homebrew", ecosystem: .homebrew, icon: "mug.fill", color: .orange)
-                ecosystemFilterCard(title: "Python", ecosystem: .python, icon: "snake.fill", color: .blue)
-                ecosystemFilterCard(title: "Rust", ecosystem: .rust, icon: "gearshape.fill", color: .purple)
-                ecosystemFilterCard(title: "Go", ecosystem: .go, icon: "arrow.right.circle.fill", color: .cyan)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    totalCliFilterCard()
+                    featuredCliFilterCard()
+                    ecosystemFilterCard(title: "Node.js", ecosystem: .node, icon: "hexagon.fill", color: .green)
+                    ecosystemFilterCard(title: "Homebrew", ecosystem: .homebrew, icon: "mug.fill", color: .orange)
+                    ecosystemFilterCard(title: "Python", ecosystem: .python, icon: "snake.fill", color: .blue)
+                    ecosystemFilterCard(title: "Rust", ecosystem: .rust, icon: "gearshape.fill", color: .purple)
+                    ecosystemFilterCard(title: "Go", ecosystem: .go, icon: "arrow.right.circle.fill", color: .cyan)
+                }
+                .padding(.vertical, 2)
             }
 
             // Homebrew dedicated management and control bar

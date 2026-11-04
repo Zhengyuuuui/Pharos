@@ -18,20 +18,20 @@ public enum CompactionLevel: Int, CaseIterable, Sendable, Codable {
 
     public var title: String {
         switch self {
-        case .level1StreamEvents: return "Level 1: 无损流式事件剥离 (推荐)"
-        case .level2Checkpoints: return "Level 2: 影子快照与检查点清理"
-        case .level3OrphanedAndArchive: return "Level 3: 幽灵项目清理与深度归档"
+        case .level1StreamEvents: return "Level 1: Lossless Stream Event Stripping"
+        case .level2Checkpoints: return "Level 2: Checkpoint & Shadow Diff Pruning"
+        case .level3OrphanedAndArchive: return "Level 3: Orphaned & Expired Context Archiving"
         }
     }
 
     public var subtitle: String {
         switch self {
         case .level1StreamEvents:
-            return "仅剔除打字机渲染增量与过程状态，完整保留所有问答文本与生成代码，界面打开完全如初。"
+            return "Strips typewriter rendering increments while preserving all Q&A text and code."
         case .level2Checkpoints:
-            return "在 Level 1 基础上，进一步清理过期的代码影子 Diff 与 KV 缓存检查点。"
+            return "Prunes expired shadow code diffs and KV cache checkpoints."
         case .level3OrphanedAndArchive:
-            return "在 Level 2 基础上，清理已被物理删除项目的残留历史会话数据。"
+            return "Cleans historical session records for deleted projects."
         }
     }
 }

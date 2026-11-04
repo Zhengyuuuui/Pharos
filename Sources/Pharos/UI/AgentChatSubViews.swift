@@ -14,8 +14,6 @@ struct AgentEditorDetailPage: View {
     @ObservedObject private var l10n = L10n.shared
     @State private var tab: Tab = .databases
     @State private var showMissingPaths = false
-    @State private var armedOrphanClean = false
-    @State private var armedRemoveApp = false
 
     enum Tab: Hashable { case databases, conversations }
 
@@ -66,28 +64,14 @@ struct AgentEditorDetailPage: View {
 
             HStack(spacing: 8) {
                 if editor == .custom {
-                    if armedRemoveApp {
-                        HStack(spacing: 4) {
-                            Button(role: .destructive) {
-                                armedRemoveApp = false
-                                store.removeCustomApplication(named: customName, appPath: customAppPath)
-                            } label: {
-                                Text(l10n.delete).font(.system(size: 11, weight: .semibold))
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .tint(.red)
-                            .controlSize(.small)
-                            IconButton(systemImage: "xmark", help: l10n.cancel) { armedRemoveApp = false }
-                        }
-                    } else {
-                        Button { armedRemoveApp = true } label: {
-                            Label(l10n.agentRemoveCustomApp, systemImage: "trash")
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(.red)
-                        .controlSize(.small)
-                        .help(l10n.agentRemoveCustomAppHelp)
+                    PharosConfirmButton(
+                        title: l10n.agentRemoveCustomApp,
+                        systemImage: "trash",
+                        confirmTitle: l10n.delete
+                    ) {
+                        store.removeCustomApplication(named: customName, appPath: customAppPath)
                     }
+                    .help(l10n.agentRemoveCustomAppHelp)
                 }
 
                 Button { store.scan() } label: {
@@ -104,28 +88,14 @@ struct AgentEditorDetailPage: View {
                 }
 
                 if let s = store.summary(for: editor, customName: customName), s.orphanedCount > 0 {
-                    if armedOrphanClean {
-                        HStack(spacing: 4) {
-                            Button {
-                                armedOrphanClean = false
-                                store.cleanOrphaned(for: editor)
-                            } label: {
-                                Text(l10n.cleanEditorOrphanedConfirm).font(.system(size: 11, weight: .semibold))
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .tint(.red)
-                            .controlSize(.small)
-                            IconButton(systemImage: "xmark", help: l10n.cancel) { armedOrphanClean = false }
-                        }
-                    } else {
-                        Button { armedOrphanClean = true } label: {
-                            Label(l10n.cleanEditorOrphaned, systemImage: "trash")
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(.red)
-                        .controlSize(.small)
-                        .help(l10n.cleanEditorOrphanedHelp)
+                    PharosConfirmButton(
+                        title: l10n.cleanEditorOrphaned,
+                        systemImage: "trash",
+                        confirmTitle: l10n.cleanEditorOrphanedConfirm
+                    ) {
+                        store.cleanOrphaned(for: editor)
                     }
+                    .help(l10n.cleanEditorOrphanedHelp)
                 }
             }
         }

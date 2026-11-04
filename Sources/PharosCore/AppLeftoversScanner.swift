@@ -66,6 +66,7 @@ public enum AppLeftoversScanner {
         "systemsettings", "textinput", "knowledge", "biome", "accounts", "reminders",
         "notes", "mail", "calendar", "fontbook", "keychain", "security", "bluetooth",
         "accessibility", "speech", "spindump", "audiocomponent", "coredata",
+        "clouddocs", "mobilesync",
 
         // Developer tools, CLIs, package managers & runtimes
         "pharos", "local.pharos",
@@ -74,10 +75,11 @@ public enum AppLeftoversScanner {
         "cargo", "rustup", "go", "pip", "uv", "poetry", "conda", "miniforge3",
         "virtualenv", "virtualenvs",
         "bash", "zsh", "fish", "tmux", "gnupg", "gpg", "ssh",
-        "claude", "aider", "opencode", "trae", "cursor", "vscode", "visual studio code",
+        "claude", "aider", "opencode", "trae", "cursor", "vscode", "visual studio code", "code",
         "windsurf", "sublime text", "neovim", "vim", "emacs",
         "xcode", "simulator", "developer", "instruments",
-        "android", "androidstudio", "flutter", "java", "openjdk", "gradle", "maven"
+        "android", "androidstudio", "flutter", "java", "openjdk", "gradle", "maven",
+        "google", "chrome", "google/chrome", "bravesoftware", "brave", "microsoft edge", "microsoft", "edge", "jetbrains"
     ]
 
     // MARK: - Installed Apps Discovery
@@ -295,7 +297,12 @@ public enum AppLeftoversScanner {
 
         // Match against known system and CLI identifiers
         for known in knownSystemAndCliIdentifiers {
-            if lower == known || lower.hasPrefix(known + ".") || lower.hasPrefix(known + "-") || lower.hasSuffix("." + known) {
+            if lower == known ||
+               lower.hasPrefix(known + ".") ||
+               lower.hasPrefix(known + "-") ||
+               lower.hasSuffix("." + known) ||
+               lower.hasPrefix(known + "/") ||
+               lower.hasSuffix("/" + known) {
                 return true
             }
         }
@@ -333,13 +340,8 @@ public enum AppLeftoversScanner {
 
         let url = URL(fileURLWithPath: path)
         if toTrash {
-            do {
-                try FileManager.default.trashItem(at: url, resultingItemURL: nil)
-                return true
-            } catch {
-                try FileManager.default.removeItem(atPath: path)
-                return true
-            }
+            try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+            return true
         } else {
             try FileManager.default.removeItem(atPath: path)
             return true

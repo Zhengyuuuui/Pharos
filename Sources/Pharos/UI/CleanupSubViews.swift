@@ -92,7 +92,6 @@ private struct SubItemRowView: View {
             ) {
                 cleanup.cleanSubItem(item, under: target)
             }
-            .frame(width: 72, alignment: .trailing)
         }
     }
 }
@@ -252,7 +251,6 @@ private struct LeftoverItemRow: View {
             ) {
                 cleanup.deleteLeftover(item)
             }
-            .frame(width: 84, alignment: .trailing)
         }
     }
 }
@@ -452,7 +450,6 @@ private struct ProjectBundleRow: View {
             ) {
                 cleanup.purgeBundle(bundle)
             }
-            .frame(width: 84, alignment: .trailing)
         }
     }
 }
@@ -596,7 +593,6 @@ struct DevAndAIView: View {
                                     ) {
                                         cleanup.cleanHomebrewItem(item)
                                     }
-                                    .frame(width: 72, alignment: .trailing)
                                 }
                                 .padding(.vertical, 4)
 
@@ -687,7 +683,6 @@ struct DevAndAIView: View {
                                     ) {
                                         cleanup.deleteAIModel(model)
                                     }
-                                    .frame(width: 80, alignment: .trailing)
                                 }
                                 .padding(.vertical, 4)
 
@@ -780,7 +775,6 @@ struct DevAndAIView: View {
                                     ) {
                                         cleanup.cleanToolchainItem(item)
                                     }
-                                    .frame(width: 80, alignment: .trailing)
                                 }
                                 .padding(.vertical, 4)
 
