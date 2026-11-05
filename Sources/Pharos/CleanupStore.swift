@@ -161,7 +161,18 @@ final class CleanupStore: ObservableObject {
     // MARK: - Standard Targets Clean
 
     func scan() {
-        if DemoMode.isEnabled { return }
+        if DemoMode.isEnabled {
+            let targetMap = Dictionary(uniqueKeysWithValues: DiskCleaner.defaultTargets.map { ($0.id, $0) })
+            self.rows = [
+                CleanupStore.Row(target: targetMap["tmp"] ?? DiskCleaner.defaultTargets[0], bytes: 3_435_973_836),
+                CleanupStore.Row(target: targetMap["user-logs"] ?? DiskCleaner.defaultTargets[1], bytes: 1_503_238_553),
+                CleanupStore.Row(target: targetMap["user-trash"] ?? DiskCleaner.defaultTargets[2], bytes: 5_153_960_755),
+                CleanupStore.Row(target: targetMap["chrome-cache"] ?? DiskCleaner.defaultTargets[3], bytes: 2_791_728_742),
+                CleanupStore.Row(target: targetMap["app-caches"] ?? DiskCleaner.defaultTargets[4], bytes: 7_086_696_038)
+            ]
+            self.report = nil
+            return
+        }
         guard !isBusy else { return }
         isScanning = true
         Task { [weak self] in
@@ -497,6 +508,17 @@ final class CleanupStore: ObservableObject {
         guard !isBusy else { return }
         cleaning = scope
         report = nil
+        if DemoMode.isEnabled {
+            Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                guard let self else { return }
+                let totalCleaned = self.totalBytes
+                self.rows = self.rows.map { Row(target: $0.target, bytes: 0) }
+                self.report = Report(result: DiskCleaner.CleanResult(freedBytes: totalCleaned > 0 ? totalCleaned : 18_600_000_000, removedCount: 24, failedCount: 0), scope: scope)
+                self.cleaning = nil
+            }
+            return
+        }
         Task { [weak self] in
             let result = await Task.detached(priority: .userInitiated, operation: work).value
             guard let self else { return }

@@ -9,14 +9,24 @@ import PharosCore
 /// Uses a dedicated developer mock dataset to ensure zero private project leakage.
 @MainActor
 enum ScreenshotCapture {
-    static let outputDirectory = URL(fileURLWithPath: "/Users/zhengyusheng/Documents/WidgetAIUsage/img")
+    static var outputDirectory = URL(fileURLWithPath: "/Users/zhengyusheng/Documents/WidgetAIUsage/img")
     private static var retainedWindows: [NSWindow] = []
+    private(set) static var isLightMode: Bool = false
 
-    static func run(store: ProjectStore) async {
-        print("📸 Starting Pharos Official Clean Demo Screenshot Capture...")
+    static func run(store: ProjectStore, isLight: Bool? = nil) async {
+        let light = isLight ?? (
+            CommandLine.arguments.contains("--light") ||
+            CommandLine.arguments.contains("--capture-light") ||
+            NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .aqua
+        )
+        isLightMode = light
+        outputDirectory = URL(fileURLWithPath: light ? "/Users/zhengyusheng/Documents/WidgetAIUsage/img/light" : "/Users/zhengyusheng/Documents/WidgetAIUsage/img")
 
-        // 1. Force macOS Dark Mode and English localization
-        NSApp.appearance = NSAppearance(named: .darkAqua)
+        print("📸 Starting Pharos Official Clean Demo Screenshot Capture (\(light ? "Light Mode" : "Dark Mode"))...")
+
+        // 1. Force appearance and English localization
+        let targetAppearance = NSAppearance(named: light ? .aqua : .darkAqua)
+        NSApp.appearance = targetAppearance
         UserDefaults.standard.set("en", forKey: "appLanguage")
         L10n.shared.language = .english
 
@@ -41,7 +51,7 @@ enum ScreenshotCapture {
             defer: false
         )
         retainedWindows.append(mainWindow)
-        mainWindow.appearance = NSAppearance(named: .darkAqua)
+        mainWindow.appearance = targetAppearance
         mainWindow.contentViewController = hosting
         mainWindow.titlebarAppearsTransparent = true
         mainWindow.titleVisibility = .hidden
@@ -180,7 +190,7 @@ enum ScreenshotCapture {
             defer: false
         )
         retainedWindows.append(window)
-        window.appearance = NSAppearance(named: .darkAqua)
+        window.appearance = isLightMode ? NSAppearance(named: .aqua) : NSAppearance(named: .darkAqua)
         window.contentViewController = hosting
         window.backgroundColor = .clear
         window.isOpaque = false
@@ -229,7 +239,7 @@ enum ScreenshotCapture {
             defer: false
         )
         retainedWindows.append(window)
-        window.appearance = NSAppearance(named: .darkAqua)
+        window.appearance = isLightMode ? NSAppearance(named: .aqua) : NSAppearance(named: .darkAqua)
         window.contentViewController = hosting
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
@@ -312,7 +322,7 @@ enum ScreenshotCapture {
         ctx.setShadow(
             offset: CGSize(width: 0, height: -14 * scale),
             blur: 36 * scale,
-            color: NSColor.black.withAlphaComponent(0.38).cgColor
+            color: NSColor.black.withAlphaComponent(isLightMode ? 0.20 : 0.38).cgColor
         )
         ctx.setFillColor(NSColor.black.cgColor)
         ctx.addPath(windowPath)
@@ -324,7 +334,7 @@ enum ScreenshotCapture {
         ctx.setShadow(
             offset: CGSize(width: 0, height: -4 * scale),
             blur: 12 * scale,
-            color: NSColor.black.withAlphaComponent(0.24).cgColor
+            color: NSColor.black.withAlphaComponent(isLightMode ? 0.14 : 0.24).cgColor
         )
         ctx.setFillColor(NSColor.black.cgColor)
         ctx.addPath(windowPath)
@@ -338,10 +348,13 @@ enum ScreenshotCapture {
         ctx.draw(contentImage, in: windowRect)
         ctx.restoreGState()
 
-        // 4. Layer 4: Subtle Window Border (0.5 pt macOS dark outline)
+        // 4. Layer 4: Subtle Window Border
         ctx.saveGState()
         ctx.addPath(windowPath)
-        ctx.setStrokeColor(NSColor.white.withAlphaComponent(0.14).cgColor)
+        let strokeColor = isLightMode
+            ? NSColor.black.withAlphaComponent(0.12)
+            : NSColor.white.withAlphaComponent(0.14)
+        ctx.setStrokeColor(strokeColor.cgColor)
         ctx.setLineWidth(0.5 * scale)
         ctx.strokePath()
         ctx.restoreGState()
@@ -490,6 +503,7 @@ enum ScreenshotCapture {
                 memoryBytes: 108_000_000
             )
         ]
+        DemoMode.registerCanonicalProjects(mockProjects)
 
         // 2. Favorites (Workspaces)
         WorkspaceStore.shared.applyMockFavorites([

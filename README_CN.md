@@ -15,15 +15,19 @@
   <img src="https://img.shields.io/badge/dependencies-none-brightgreen" alt="Dependencies">
   <img src="https://img.shields.io/badge/network-none-lightgrey" alt="No network">
   <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License">
-  <img src="https://img.shields.io/badge/version-3.1-blue" alt="Version 3.1">
-  <img src="https://img.shields.io/badge/updated-2026--10--31-informational" alt="Last updated 2026-10-31">
+  <img src="https://img.shields.io/badge/version-3.1.0-blue" alt="Version 3.1.0">
+  <img src="https://img.shields.io/badge/updated-2026--11--05-informational" alt="Last updated 2026-11-05">
 </p>
 
-<p align="center"><sub>最后更新 / Last updated：2026-10-31 · v3.1 · 作者 / Author：zys · 模型 / Model：Gemini 4 Argon</sub></p>
+<p align="center"><sub>最后更新 / Last updated：2026-11-05 · v3.1.0 (官方正式版) · 作者 / Author：zys · 模型 / Model：Gemini 4 Argon</sub></p>
 
 <p align="center"><a href="README.md">English</a> · <b>简体中文</b> · <a href="CHANGELOG.md">更新记录 / Changelog</a></p>
 
 ---
+
+> [!TIP]
+> **🚀 Pharos v3.1.0 官方正式版全面上线！**
+> 专为 macOS 开发者打造的高颜值轻量菜单栏工具正式发布：支持系统级内存膨胀诊断与后台守护进程治理（`Not Launch` 永久禁用）、60 FPS 机车座舱双表盘风扇控制、硬件级电池充电阈值守护（支持合盖与后台接管）、Clash/Mihomo 代理网络隔离与 23+ 种 AI 编程助手数据库管理。纯原生 Swift 编写，零第三方依赖。即刻下载 DMG 尝鲜体验！
 
 <p align="center">
   <img src="img/01-dashboard-ports.png" width="880" alt="Pharos 仪表盘与端口管理">
@@ -36,7 +40,7 @@
 运行环境要求：**macOS 14+**（Sonoma / Sequoia · 支持 Apple Silicon 与 Intel）。
 
 ### 方式一：直接下载 DMG 安装包（推荐）
-前往 GitHub Releases 下载最新的 [**Pharos-3.0.0.dmg**](https://github.com/Zhengyuuuui/Pharos/releases/latest)，双击打开后将 `Pharos.app` 拖入 `/Applications` 文件夹即可。
+前往 GitHub Releases 下载最新的 [**Pharos-3.1.0.dmg**](https://github.com/Zhengyuuuui/Pharos/releases/download/v3.1.0/Pharos-3.1.0.dmg)（或查看 [GitHub Releases 页面](https://github.com/Zhengyuuuui/Pharos/releases/latest)），双击打开后将 `Pharos.app` 拖入 `/Applications` 文件夹即可。
 
 ### 方式二：Homebrew 一键安装
 通过 Homebrew Cask 单行命令安装：

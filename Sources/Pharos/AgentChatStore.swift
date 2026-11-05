@@ -454,6 +454,10 @@ final class AgentChatStore: ObservableObject {
     }
 
     func deleteEntry(_ entry: AgentDatabaseEntry) {
+        if DemoMode.isEnabled {
+            entries.removeAll { $0.id == entry.id }
+            return
+        }
         let l10n = L10n.shared
         do {
             let known = entry.editor == .custom ? [

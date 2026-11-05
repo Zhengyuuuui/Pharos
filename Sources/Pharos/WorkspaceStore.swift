@@ -146,6 +146,12 @@ final class WorkspaceStore: ObservableObject {
     /// app (Settings → Terminal; Terminal.app by default). The process then
     /// belongs to that terminal window: output is visible and Ctrl-C stops it.
     func openInTerminal(_ fav: Favorite) {
+        if DemoMode.isEnabled {
+            if let store = AppDelegate.shared?.store {
+                DemoMode.simulateStart(favorite: fav, in: store)
+            }
+            return
+        }
         let l10n = L10n.shared
         guard !fav.command.isEmpty else { errorMessage = l10n.noCommandSet; return }
         guard FileManager.default.fileExists(atPath: fav.directory) else {

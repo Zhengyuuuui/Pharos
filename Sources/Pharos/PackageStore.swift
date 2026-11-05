@@ -425,6 +425,7 @@ final class PackageStore: ObservableObject {
     }
 
     func testInTerminal(command: String, in directory: String? = nil) {
+        if DemoMode.isEnabled { return }
         let workDir = directory ?? NSHomeDirectory()
         let title = "Pharos: \(command)"
         let script = LaunchScript.contents(
@@ -438,6 +439,10 @@ final class PackageStore: ObservableObject {
     }
 
     func uninstallInTerminal(item: LocalPackageItem) {
+        if DemoMode.isEnabled {
+            self.globalCliTools.removeAll { $0.id == item.id }
+            return
+        }
         let cmd = item.uninstallCommand
         let title = "Pharos: Uninstall \(item.name)"
         let script = LaunchScript.contents(
@@ -452,6 +457,7 @@ final class PackageStore: ObservableObject {
 
     // MARK: - Homebrew Control & Management
     func runTerminalCommand(_ command: String, title: String) {
+        if DemoMode.isEnabled { return }
         let script = LaunchScript.contents(
             directory: NSHomeDirectory(),
             command: command,

@@ -15,15 +15,19 @@
   <img src="https://img.shields.io/badge/dependencies-none-brightgreen" alt="Dependencies">
   <img src="https://img.shields.io/badge/network-none-lightgrey" alt="No network">
   <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License">
-  <img src="https://img.shields.io/badge/version-3.1-blue" alt="Version 3.1">
-  <img src="https://img.shields.io/badge/updated-2026--10--31-informational" alt="Last updated 2026-10-31">
+  <img src="https://img.shields.io/badge/version-3.1.0-blue" alt="Version 3.1.0">
+  <img src="https://img.shields.io/badge/updated-2026--11--05-informational" alt="Last updated 2026-11-05">
 </p>
 
-<p align="center"><sub>Last updated / 最后更新：2026-10-31 · v3.1 · Author / 作者：zys · Model / 模型：Gemini 4 Argon</sub></p>
+<p align="center"><sub>Last updated / 最后更新：2026-11-05 · v3.1.0 (Official Release / 正式版) · Author / 作者：zys · Model / 模型：Gemini 4 Argon</sub></p>
 
 <p align="center"><b>English</b> · <a href="README_CN.md">简体中文</a> · <a href="CHANGELOG.md">Changelog / 更新记录</a></p>
 
 ---
+
+> [!TIP]
+> **🚀 Pharos v3.1.0 Official Release is now live!**
+> Pharos is officially released! Featuring memory bloat diagnostics & permanent daemon governance (`Not Launch`), 60 FPS tachometer cockpit fan control, hardware battery charge limit with lid-closed persistence, full Clash/Mihomo proxy isolation matrix, 23+ AI IDE chat database analyzer, and CleanMyMac-parity disk cleanup in 100% native Swift.
 
 <p align="center">
   <img src="img/01-dashboard-ports.png" width="880" alt="Pharos Dashboard & Ports Overview">
@@ -36,7 +40,7 @@
 Requires **macOS 14+** (Sonoma / Sequoia · Apple Silicon & Intel).
 
 ### Option 1: Direct Download (DMG)
-Download the latest [**Pharos-3.0.0.dmg**](https://github.com/Zhengyuuuui/Pharos/releases/latest) from GitHub Releases, open it, and drag `Pharos.app` to your `/Applications` folder.
+Download the latest [**Pharos-3.1.0.dmg**](https://github.com/Zhengyuuuui/Pharos/releases/download/v3.1.0/Pharos-3.1.0.dmg) (or view on [GitHub Releases](https://github.com/Zhengyuuuui/Pharos/releases/latest)), open it, and drag `Pharos.app` to your `/Applications` folder.
 
 ### Option 2: Homebrew
 ```sh

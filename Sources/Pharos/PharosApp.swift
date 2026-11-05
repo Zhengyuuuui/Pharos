@@ -33,15 +33,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         startAppearanceIconSync()
 
         if DemoMode.isEnabled {
-            NSApp.appearance = NSAppearance(named: .darkAqua)
+            let isLight = CommandLine.arguments.contains("--light") ||
+                          CommandLine.arguments.contains("--capture-light") ||
+                          NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .aqua
+            NSApp.appearance = NSAppearance(named: isLight ? .aqua : .darkAqua)
             UserDefaults.standard.set("en", forKey: "appLanguage")
             UserDefaults.standard.set(true, forKey: "pharos.onboardingCompleted")
             L10n.shared.language = .english
             ScreenshotCapture.setupMockData(store: store)
 
-            if CommandLine.arguments.contains("--capture-screenshots") {
+            if CommandLine.arguments.contains("--capture-screenshots") || CommandLine.arguments.contains("--capture-light") {
                 Task { @MainActor in
-                    await ScreenshotCapture.run(store: store)
+                    await ScreenshotCapture.run(store: store, isLight: isLight)
                     exit(0)
                 }
                 return

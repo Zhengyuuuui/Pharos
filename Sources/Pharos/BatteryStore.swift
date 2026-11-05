@@ -193,9 +193,34 @@ final class BatteryStore: ObservableObject {
         self.isHolding = true
     }
 
+    func toggleDemoModeBypass() {
+        if mode == .system {
+            var r = reading
+            r.isCharging = false
+            r.isCharged = false
+            r.amperage = 0
+            r.powerSource = .acPower
+            applyMockReading(r, mode: .limit(maxPercent: 80), helper: .ready)
+        } else {
+            var r = reading
+            r.isCharging = true
+            r.isCharged = false
+            r.amperage = 2140
+            r.powerSource = .acPower
+            self.reading = r
+            self.mode = .system
+            self.helper = .ready
+            self.isHolding = false
+        }
+    }
+
     // MARK: - Control Actions
 
     func apply(_ newMode: BatteryMode) {
+        if DemoMode.isEnabled {
+            DemoMode.simulateToggleBatteryLimit()
+            return
+        }
         guard helper == .ready else {
             mode = newMode
             scheduleTimers()
@@ -259,6 +284,7 @@ final class BatteryStore: ObservableObject {
     // MARK: - Heartbeat & State Sync
 
     private func beat() {
+        if DemoMode.isEnabled { return }
         let cmd: BatteryProtocol.Command = (mode == .system ? .status : .heartbeat)
         guard isInstalled else {
             if helper != .notInstalled { helper = .notInstalled }

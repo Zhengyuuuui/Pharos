@@ -8,7 +8,7 @@ Times are UTC+8. 时间为北京时间（UTC+8）。
 ---
 
 ## 目录 / Quick Links
-- [v3.1 (2026-10-31)](#v31--2026-10-31-1935) — Memory Bloat Doctor & Permanent Daemon Governance (`Not Launch`), Fan Cockpit GPU Optimization & Adaptive Light/Dark App Icon / 内存膨胀体检与系统守护进程永久禁用治理、风扇座舱 GPU 降载优化与深浅色图标自动切换
+- [v3.1.0 (2026-11-05)](#v310--2026-11-05-official-release--官方正式版) — Official Release: Memory Bloat Doctor & Daemon Governance (`Not Launch`), Fan Cockpit GPU Optimization & Adaptive Light/Dark App Icon / 官方正式版发布：内存膨胀体检与系统守护进程永久禁用治理、风扇座舱 GPU 降载优化与深浅色图标自动切换
 - [v3.0 (2026-10-24)](#v30--2026-10-24-0840) — Global Design System Overhaul, Domain-Categorized Pure Sidebar & Adaptive Anti-Squeezing Popover Customizer / 全局设计系统规范落地、领域分类纯净侧边栏与自适应防挤压小组件布局
 - [v2.9 (2026-10-23)](#v29--2026-10-23-1546) — Persistent Lid-Closed Battery Guard, SMC Write Deduplication, Incremental Scanners & Modular Architecture / 电池合盖持续守护、SMC 写入去重、增量扫描缓存与模块化重构
 - [v2.8 (2026-10-19)](#v28--2026-10-19-1320) — Automotive Cockpit Speedometer & 60FPS Mechanical Inertia Engine / 拟真机车仪表盘风扇座舱与 60FPS 物理惯性引擎
@@ -24,7 +24,7 @@ Times are UTC+8. 时间为北京时间（UTC+8）。
 
 ---
 
-### v3.1 — 2026-10-31 19:35
+### v3.1.0 — 2026-11-05 (Official Release / 官方正式版)
 
 > Author / 作者：zys · Model / 模型：Gemini 4 Argon
 

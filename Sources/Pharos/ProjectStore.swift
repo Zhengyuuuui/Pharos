@@ -330,6 +330,12 @@ final class ProjectStore: ObservableObject {
 
     /// Terminate process(es) listening on a specific port.
     func terminatePort(_ port: ListeningPort, graceSeconds: Double = 3) {
+        if DemoMode.isEnabled {
+            for project in state.projects where project.ports.contains(where: { $0.port == port.port }) {
+                DemoMode.simulateStop(project: project, in: self)
+            }
+            return
+        }
         let me = getpid()
         var targetPIDs: [Int32] = []
         var affectedProjects: [Project] = []
@@ -388,6 +394,10 @@ final class ProjectStore: ObservableObject {
     /// SIGTERM, then poll every 100 ms: the row disappears as soon as the processes exit
     /// instead of after a fixed delay. Still alive after `graceSeconds` → offer force kill.
     func terminate(_ project: Project, graceSeconds: Double = 3) {
+        if DemoMode.isEnabled {
+            DemoMode.simulateStop(project: project, in: self)
+            return
+        }
         recentlyStopped[project.directory ?? project.id] = Date()
         let pids = killablePIDs(project)
         stopping.insert(project.id)
@@ -406,6 +416,10 @@ final class ProjectStore: ObservableObject {
     }
 
     func forceKill(_ project: Project) {
+        if DemoMode.isEnabled {
+            DemoMode.simulateStop(project: project, in: self)
+            return
+        }
         recentlyStopped[project.directory ?? project.id] = Date()
         let pids = killablePIDs(project)
         stopping.insert(project.id)
