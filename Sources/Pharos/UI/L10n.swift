@@ -430,6 +430,50 @@ final class L10n: ObservableObject {
     }
     var clashModeSwitchFailed: String { en ? "Failed to switch routing mode." : "切换路由模式失败。" }
     var clashConnectionsClosed: String { en ? "All active connections closed." : "已切断并重置所有活跃连接。" }
+    var clashConfigCore: String { en ? "Configure Core" : "配置核心" }
+    var clashConfigTitle: String { en ? "Proxy Core Settings" : "代理核心配置" }
+    var clashConfigSubtitle: String {
+        en ? "Configure external controller endpoint, authentication token, and mixed proxy port."
+           : "设置外部控制器接口地址、密钥 Token 及混合代理端口。"
+    }
+    var clashModeAuto: String { en ? "Auto Detect" : "自动探测" }
+    var clashModeManual: String { en ? "Manual Config" : "手动指定" }
+    var clashAutoDetectHint: String {
+        en ? "Automatically scans Mihomo Party, Clash Verge Rev, Clash Nyanpasu, ClashX.Meta, Sing-Box, Flclash, and Homebrew Mihomo."
+           : "自动探测 Mihomo Party、Clash Verge Rev、Clash Nyanpasu、ClashX.Meta、Sing-Box、Flclash 及 Homebrew Mihomo。"
+    }
+    var clashEndpointLabel: String { en ? "Controller Endpoint" : "控制器接口 (Endpoint)" }
+    var clashEndpointPlaceholder: String { en ? "http://127.0.0.1:9097 or unix:///tmp/..." : "http://127.0.0.1:9097 或 unix:///tmp/..." }
+    var clashSecretLabel: String { en ? "Secret Token" : "密钥 Token" }
+    var clashSecretPlaceholder: String { en ? "Leave empty if not set" : "未设置时留空" }
+    var clashMixedPortLabel: String { en ? "Mixed Proxy Port" : "混合代理端口" }
+    var clashClientNameLabel: String { en ? "Client Display Name" : "客户端显示名称" }
+    var clashTestConnection: String { en ? "Test Connection" : "测试连接" }
+    var clashTesting: String { en ? "Testing…" : "测试中…" }
+    var clashSaveAndApply: String { en ? "Save & Apply" : "保存并生效" }
+    var clashTestSuccess: String { en ? "Connection Successful" : "连接成功" }
+    var clashTestFailed: String { en ? "Connection Failed" : "连接失败" }
+    var clashTestFailedInvalidURL: String { en ? "Invalid endpoint address" : "无效的控制器接口地址" }
+    var clashManualModeBadge: String { en ? "Manual" : "手动指定" }
+    func clashNodesCount(_ count: Int) -> String {
+        en ? "\(count) proxies loaded" : "已加载 \(count) 个节点"
+    }
+    var clashRefreshNodes: String { en ? "Refresh Proxies" : "刷新节点" }
+    var noProxyNodesFound: String { en ? "No proxies detected" : "未发现可用节点" }
+    var proxyExitNode: String { en ? "Exit Node" : "出口节点" }
+    func proxyNodeSwitchedToast(_ node: String, _ port: Int) -> String {
+        if port > 0 {
+            return en ? "Switched to \(node) (Port :\(port))" : "已实时切换至 \(node) (端口 :\(port))"
+        }
+        return en ? "Switched to \(node)" : "已实时切换至 \(node)"
+    }
+    var customProxy: String { en ? "Custom Proxy…" : "自定义外部代理…" }
+    var customProxyPrompt: String { en ? "Enter Proxy Server Address" : "输入自定义代理地址" }
+    var customProxyHint: String {
+        en ? "e.g. socks5://127.0.0.1:1080 or http://1.2.3.4:8080" : "例如 socks5://127.0.0.1:1080 或 http://1.2.3.4:8080"
+    }
+    var clashConfigPathLabel: String { en ? "Active Config File (config.yaml)" : "运行态配置文件 (config.yaml)" }
+    var clashConfigPathPlaceholder: String { en ? "Path to config.yaml" : "配置文件绝对路径，留空则自动检测" }
     var terminalProxyCopied: String {
         en ? "Copied terminal proxy command to clipboard." : "已复制终端 export 代理命令到剪贴板。"
     }

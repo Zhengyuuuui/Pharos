@@ -24,7 +24,9 @@ public enum ClashClientKind: String, Sendable, CaseIterable, Codable {
     case clashNyanpasu = "Clash Nyanpasu"
     case clashX = "ClashX.Meta"
     case flclash = "Flclash"
+    case singBox = "Sing-Box"
     case genericMihomo = "Mihomo Core"
+    case custom = "Custom"
 
     public var iconName: String {
         switch self {
@@ -33,15 +35,18 @@ public enum ClashClientKind: String, Sendable, CaseIterable, Codable {
         case .clashNyanpasu: return "cat.fill"
         case .clashX: return "paperplane.fill"
         case .flclash: return "bolt.shield.fill"
+        case .singBox: return "cube.box.fill"
         case .genericMihomo: return "network"
+        case .custom: return "slider.horizontal.3"
         }
     }
 }
 
 /// Proxy isolation strategy configured for a browser instance.
-public enum BrowserProxyStrategy: Hashable, Sendable, Codable {
+public enum BrowserProxyStrategy: Hashable, Sendable {
     case followSystem
     case direct
+    case node(name: String, port: Int)
     case clashMixedPort(Int)
     case custom(String)
 
@@ -51,17 +56,113 @@ public enum BrowserProxyStrategy: Hashable, Sendable, Codable {
     }
 
     public var isClash: Bool {
-        if case .clashMixedPort = self { return true }
-        return false
+        switch self {
+        case .node, .clashMixedPort: return true
+        default: return false
+        }
+    }
+
+    public var nodeName: String? {
+        if case .node(let name, _) = self { return name }
+        return nil
     }
 
     public var badgeText: String {
         switch self {
         case .followSystem: return "System"
         case .direct: return "Direct"
+        case .node(let name, let port): return "\(name) (:\(port))"
         case .clashMixedPort(let port): return "Clash :\(port)"
         case .custom(let s): return s
         }
+    }
+}
+
+extension BrowserProxyStrategy: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case kind, name, port, value
+    }
+
+    public init(from decoder: Decoder) throws {
+        if let container = try? decoder.container(keyedBy: CodingKeys.self) {
+            let kind = (try? container.decode(String.self, forKey: .kind)) ?? ""
+            switch kind {
+            case "followSystem":
+                self = .followSystem
+                return
+            case "direct":
+                self = .direct
+                return
+            case "node":
+                let name = (try? container.decode(String.self, forKey: .name)) ?? ""
+                let port = (try? container.decode(Int.self, forKey: .port)) ?? 7890
+                self = .node(name: name, port: port)
+                return
+            case "clashMixedPort":
+                let port = (try? container.decode(Int.self, forKey: .port)) ?? 7890
+                self = .clashMixedPort(port)
+                return
+            case "custom":
+                let val = (try? container.decode(String.self, forKey: .value)) ?? ""
+                self = .custom(val)
+                return
+            default:
+                break
+            }
+        }
+
+        let raw = try? decoder.singleValueContainer()
+        if let str = try? raw?.decode(String.self) {
+            switch str {
+            case "followSystem": self = .followSystem
+            case "direct": self = .direct
+            default: self = .custom(str)
+            }
+            return
+        }
+        self = .followSystem
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .followSystem:
+            try container.encode("followSystem", forKey: .kind)
+        case .direct:
+            try container.encode("direct", forKey: .kind)
+        case .node(let name, let port):
+            try container.encode("node", forKey: .kind)
+            try container.encode(name, forKey: .name)
+            try container.encode(port, forKey: .port)
+        case .clashMixedPort(let port):
+            try container.encode("clashMixedPort", forKey: .kind)
+            try container.encode(port, forKey: .port)
+        case .custom(let s):
+            try container.encode("custom", forKey: .kind)
+            try container.encode(s, forKey: .value)
+        }
+    }
+}
+
+/// An outbound proxy leaf node retrieved from Mihomo / Clash.
+public struct MihomoProxyNode: Identifiable, Hashable, Sendable, Codable {
+    public var id: String { name }
+    public let name: String
+    public let type: String
+    public let delay: Int?
+    public let alive: Bool
+
+    public init(name: String, type: String, delay: Int? = nil, alive: Bool = true) {
+        self.name = name
+        self.type = type
+        self.delay = delay
+        self.alive = alive
+    }
+
+    public var isLeaf: Bool {
+        let t = type.lowercased()
+        let nonLeaf = ["selector", "urltest", "fallback", "loadbalance", "relay", "compatible", "reject", "rejectdrop", "pass"]
+        return !nonLeaf.contains(t)
     }
 }
 

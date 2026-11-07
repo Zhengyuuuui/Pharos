@@ -9,17 +9,56 @@ final class ClashStore: ObservableObject {
 
     @Published private(set) var snapshot: ClashStatusSnapshot = ClashStatusSnapshot()
     @Published private(set) var endpoint: ClashController.ControllerEndpoint?
+    @Published private(set) var nodes: [MihomoProxyNode] = []
     @Published private(set) var isOperating: Bool = false
     @Published var errorMessage: String?
     @Published var notificationBanner: String?
 
+    // MARK: - Manual Configuration State
+
+    @Published var isManualMode: Bool {
+        didSet { UserDefaults.standard.set(isManualMode, forKey: Keys.manualMode) }
+    }
+    @Published var manualEndpoint: String {
+        didSet { UserDefaults.standard.set(manualEndpoint, forKey: Keys.manualEndpoint) }
+    }
+    @Published var manualSecret: String {
+        didSet { UserDefaults.standard.set(manualSecret, forKey: Keys.manualSecret) }
+    }
+    @Published var manualMixedPort: Int {
+        didSet { UserDefaults.standard.set(manualMixedPort, forKey: Keys.manualMixedPort) }
+    }
+    @Published var manualClientName: String {
+        didSet { UserDefaults.standard.set(manualClientName, forKey: Keys.manualClientName) }
+    }
+    @Published var manualConfigPath: String {
+        didSet { UserDefaults.standard.set(manualConfigPath, forKey: Keys.manualConfigPath) }
+    }
+
+    private enum Keys {
+        static let manualMode = "clashManualMode"
+        static let manualEndpoint = "clashManualEndpoint"
+        static let manualSecret = "clashManualSecret"
+        static let manualMixedPort = "clashManualMixedPort"
+        static let manualClientName = "clashManualClientName"
+        static let manualConfigPath = "clashManualConfigPath"
+    }
+
     private var pollTimer: Timer?
     private var lastRefreshTime: Date = Date()
+    private var lastNodesFetchTime: Date = Date.distantPast
     private var isRefreshing: Bool = false
     private var activeViewers: Int = 0
 
     private init() {
-        // Do not poll in background when initialized. Polling starts on-demand via viewAppeared().
+        let d = UserDefaults.standard
+        isManualMode = d.bool(forKey: Keys.manualMode)
+        manualEndpoint = d.string(forKey: Keys.manualEndpoint) ?? "http://127.0.0.1:9097"
+        manualSecret = d.string(forKey: Keys.manualSecret) ?? ""
+        let port = d.integer(forKey: Keys.manualMixedPort)
+        manualMixedPort = port > 0 ? port : 7890
+        manualClientName = d.string(forKey: Keys.manualClientName) ?? "Mihomo Core"
+        manualConfigPath = d.string(forKey: Keys.manualConfigPath) ?? ""
     }
 
     deinit {
@@ -65,7 +104,48 @@ final class ClashStore: ObservableObject {
         self.snapshot = s
     }
 
-    // MARK: - State Refresh
+    // MARK: - State Refresh & Testing
+
+    /// Tests connectivity to a given endpoint and secret token.
+    func testConnection(endpoint: String, secret: String?) async -> (success: Bool, message: String) {
+        let ep = ClashController.parseEndpoint(from: endpoint, secret: secret, clientKind: .custom)
+        guard let validEp = ep else {
+            return (false, "Invalid endpoint address")
+        }
+
+        return await Task.detached(priority: .utility) { () -> (Bool, String) in
+            // 1. Connection-level check
+            switch validEp.channel {
+            case .unixSocket(let path):
+                guard ClashController.canConnectUnixSocket(path: path) else {
+                    return (false, "Cannot connect to unix socket")
+                }
+            case .http(let host, let port):
+                guard ClashController.canConnectTCP(port: port, host: host) else {
+                    return (false, "Cannot connect to \(host):\(port)")
+                }
+            }
+
+            // 2. Protocol / Authentication check
+            do {
+                let (status, _) = try await ClashController.sendRequest(endpoint: validEp, method: "GET", uri: "/version")
+                if status == 200 {
+                    return (true, "OK (HTTP 200)")
+                } else if status == 401 || status == 403 {
+                    return (false, "Unauthorized: Invalid Secret")
+                } else {
+                    let (cfgStatus, _) = try await ClashController.sendRequest(endpoint: validEp, method: "GET", uri: "/configs")
+                    if cfgStatus == 200 {
+                        return (true, "OK (HTTP 200)")
+                    } else {
+                        return (false, "HTTP \(cfgStatus)")
+                    }
+                }
+            } catch {
+                return (false, error.localizedDescription)
+            }
+        }.value
+    }
 
     func refresh() async {
         if DemoMode.isEnabled { return }
@@ -79,32 +159,61 @@ final class ClashStore: ObservableObject {
 
         let existingEndpoint = endpoint
         let prevSnapshot = snapshot
+        let manual = isManualMode
+        let manEndpointStr = manualEndpoint
+        let manSecretStr = manualSecret
+        let manMixedPort = manualMixedPort
+        let manCfgPath = manualConfigPath
 
         let (resolvedEndpoint, newSnapshot) = await Task.detached(priority: .utility) { () -> (ClashController.ControllerEndpoint?, ClashStatusSnapshot?) in
-            var ep = existingEndpoint
-            if let current = ep {
-                let alive: Bool
-                switch current.channel {
-                case .unixSocket(let path):
-                    alive = ClashController.canConnectUnixSocket(path: path)
-                case .http(_, let port):
-                    alive = ClashController.canConnectTCP(port: port)
-                }
-                if !alive {
+            var ep: ClashController.ControllerEndpoint?
+            if manual {
+                ep = ClashController.parseEndpoint(from: manEndpointStr, secret: manSecretStr, clientKind: .custom, configPath: manCfgPath)
+            } else {
+                ep = existingEndpoint
+                if let current = ep {
+                    let alive: Bool
+                    switch current.channel {
+                    case .unixSocket(let path):
+                        alive = ClashController.canConnectUnixSocket(path: path)
+                    case .http(let host, let port):
+                        alive = ClashController.canConnectTCP(port: port, host: host)
+                    }
+                    if !alive {
+                        ep = ClashController.detectActiveEndpoint()
+                    }
+                } else {
                     ep = ClashController.detectActiveEndpoint()
                 }
-            } else {
-                ep = ClashController.detectActiveEndpoint()
             }
 
             guard let validEp = ep else {
                 return (nil, nil)
             }
-            let snap = await ClashController.fetchFullSnapshot(
+
+            var snap = await ClashController.fetchFullSnapshot(
                 endpoint: validEp,
                 previousSnapshot: prevSnapshot,
                 elapsedSeconds: max(elapsed, 0.5)
             )
+
+            if manual && snap.isRunning && manMixedPort > 0 && snap.mixedPort == 7890 && manMixedPort != 7890 {
+                snap = ClashStatusSnapshot(
+                    isRunning: snap.isRunning,
+                    clientKind: snap.clientKind,
+                    mode: snap.mode,
+                    mixedPort: manMixedPort,
+                    socksPort: snap.socksPort,
+                    httpPort: snap.httpPort,
+                    isTunEnabled: snap.isTunEnabled,
+                    uploadBytesPerSec: snap.uploadBytesPerSec,
+                    downloadBytesPerSec: snap.downloadBytesPerSec,
+                    totalUploadBytes: snap.totalUploadBytes,
+                    totalDownloadBytes: snap.totalDownloadBytes,
+                    activeConnectionCount: snap.activeConnectionCount,
+                    controllerEndpoint: snap.controllerEndpoint
+                )
+            }
             return (validEp, snap)
         }.value
 
@@ -122,6 +231,64 @@ final class ClashStore: ObservableObject {
         if self.snapshot != newSnapshot {
             self.snapshot = newSnapshot
         }
+
+        if newSnapshot.isRunning {
+            if nodes.isEmpty || lastNodesFetchTime.timeIntervalSinceNow < -15 {
+                await refreshNodes()
+            }
+        } else if !nodes.isEmpty {
+            nodes = []
+        }
+    }
+
+    // MARK: - Proxy Node Management
+
+    /// Refreshes available proxy nodes from the Mihomo/Clash core.
+    func refreshNodes() async {
+        guard let ep = endpoint else { return }
+        lastNodesFetchTime = Date()
+        do {
+            let fetched = try await ClashController.fetchProxies(endpoint: ep)
+            self.nodes = fetched
+        } catch {
+            // Keep existing nodes if momentary error
+        }
+    }
+
+    /// Hot switches a proxy group to the selected node in milliseconds without restarting the browser.
+    @discardableResult
+    func switchProxy(groupName: String, nodeName: String) async -> Bool {
+        guard let ep = endpoint else { return false }
+        isOperating = true
+        defer { isOperating = false }
+
+        do {
+            let ok = try await ClashController.switchGroupProxy(
+                groupName: groupName,
+                nodeName: nodeName,
+                endpoint: ep
+            )
+            if ok {
+                notificationBanner = L10n.shared.proxyNodeSwitchedToast(nodeName, 0)
+            }
+            return ok
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    /// Mounts the dedicated listener port and selector group for this instance in Mihomo config.
+    func ensureInstanceListener(config: ChromeConfig) async throws {
+        guard let ep = endpoint else { return }
+        let cfgPath = ep.configPath ?? (manualConfigPath.isEmpty ? nil : manualConfigPath)
+        try await ClashController.ensureListenerAndGroup(
+            port: config.dedicatedProxyPort,
+            groupName: config.dedicatedGroupName,
+            availableNodeNames: nodes.map(\.name),
+            configPath: cfgPath,
+            endpoint: ep
+        )
     }
 
     // MARK: - Controller Actions
@@ -181,7 +348,12 @@ final class ClashStore: ObservableObject {
 
     /// Copies terminal export command to clipboard.
     func copyTerminalProxySnippet() {
-        let port = snapshot.mixedPort > 0 ? snapshot.mixedPort : 7890
+        let port: Int
+        if isManualMode && manualMixedPort > 0 {
+            port = manualMixedPort
+        } else {
+            port = snapshot.mixedPort > 0 ? snapshot.mixedPort : 7890
+        }
         let (exportCmd, _) = ChromeInstances.terminalProxyCommands(mixedPort: port)
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(exportCmd, forType: .string)

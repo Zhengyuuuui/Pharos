@@ -94,6 +94,41 @@ func testClashYamlParsing() {
     expectEq(ClashController.parseYamlString(named: "secret", in: clashYaml), "clash-meta-secret", "parse single quoted secret")
 }
 
+func testSingBoxConfigParsing() {
+    let singBoxJson = """
+    {
+      "experimental": {
+        "clash_api": {
+          "external_controller": "127.0.0.1:9095",
+          "external_ui": "ui",
+          "secret": "my-sing-box-token"
+        }
+      }
+    }
+    """
+    let parsed = ClashController.parseSingBoxConfig(content: singBoxJson)
+    expectEq(parsed?.port, 9095, "parse sing-box port")
+    expectEq(parsed?.secret, "my-sing-box-token", "parse sing-box secret")
+
+    let invalidJson = "invalid json string"
+    expectEq(ClashController.parseSingBoxConfig(content: invalidJson)?.port, nil, "invalid json returns nil")
+}
+
+func testEndpointParsing() {
+    let httpEp = ClashController.parseEndpoint(from: "http://127.0.0.1:9097", secret: "secret123")
+    expectEq(httpEp?.displayString, "http://127.0.0.1:9097", "http endpoint parsed")
+    expectEq(httpEp?.secret, "secret123", "secret preserved")
+
+    let rawHostPort = ClashController.parseEndpoint(from: "127.0.0.1:7890")
+    expectEq(rawHostPort?.displayString, "http://127.0.0.1:7890", "raw host:port parsed")
+
+    let unixEp = ClashController.parseEndpoint(from: "unix:///tmp/mihomo.sock")
+    expectEq(unixEp?.displayString, "unix:///tmp/mihomo.sock", "unix socket parsed")
+
+    let rawUnix = ClashController.parseEndpoint(from: "/private/tmp/mihomo-party.sock")
+    expectEq(rawUnix?.displayString, "unix:///private/tmp/mihomo-party.sock", "raw path parsed as unix socket")
+}
+
 func testHttpResponseParsing() {
     let rawHttp = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 15\r\n\r\n{\"status\":\"ok\"}"
     let parsed = try? ClashController.parseHttpResponse(data: Data(rawHttp.utf8))
@@ -108,6 +143,66 @@ func testHttpResponseParsing() {
     let parsed204 = try? ClashController.parseHttpResponse(data: Data(noContentHttp.utf8))
     expectEq(parsed204?.statusCode, 204, "status code 204")
     expectEq(parsed204?.data.isEmpty, true, "no content has empty body")
+}
+
+func testMihomoProxyNodeAndStrategy() {
+    let ssNode = MihomoProxyNode(name: "HK-01", type: "ss", delay: 45, alive: true)
+    expect(ssNode.isLeaf, "ss is leaf")
+    expectEq(ssNode.name, "HK-01", "ss name")
+    expectEq(ssNode.delay, 45, "ss delay")
+    expect(ssNode.alive, "ss alive")
+
+    let selectorNode = MihomoProxyNode(name: "PROXY", type: "Selector")
+    expect(!selectorNode.isLeaf, "selector is not leaf")
+
+    let urlTestNode = MihomoProxyNode(name: "Auto", type: "URLTest")
+    expect(!urlTestNode.isLeaf, "urltest is not leaf")
+
+    var config = ChromeConfig(browser: .chrome, debugPort: 9222)
+    expectEq(config.dedicatedProxyPort, 19222, "dedicated proxy port is 10000 + 9222")
+    expectEq(config.dedicatedGroupName, "Pharos-9222", "dedicated group name")
+
+    config.proxyStrategy = .node(name: "HK-01", port: 19222)
+    expectEq(config.proxyNodeName, "HK-01", "node name stored")
+    expectEq(config.proxyServer, "http://127.0.0.1:19222", "node sets proxyServer")
+    expect(config.proxyStrategy.isClash, "node isClash")
+    expectEq(config.proxyStrategy.nodeName, "HK-01", "strategy nodeName")
+    expect(config.extraFlags.contains("--proxy-bypass-list=<local>;localhost;127.0.0.1;*.local"), "node sets bypass")
+
+    let encoder = JSONEncoder()
+    let decoder = JSONDecoder()
+    if let data = try? encoder.encode(config.proxyStrategy),
+       let decoded = try? decoder.decode(BrowserProxyStrategy.self, from: data) {
+        expectEq(decoded, config.proxyStrategy, "node strategy codable roundtrip")
+    } else {
+        expect(false, "node strategy failed codable")
+    }
+}
+
+func testChunkedHttpDecoding() {
+    let singleChunk = "d\r\nHello, world!\r\n0\r\n\r\n"
+    let decodedSingle = ClashController.decodeChunkedBody(data: Data(singleChunk.utf8))
+    expectEq(String(data: decodedSingle, encoding: .utf8), "Hello, world!", "single chunk decoded")
+
+    let multiChunk = "4\r\nWiki\r\n6\r\npedia \r\n0\r\n\r\n"
+    let decodedMulti = ClashController.decodeChunkedBody(data: Data(multiChunk.utf8))
+    expectEq(String(data: decodedMulti, encoding: .utf8), "Wikipedia ", "multi chunk decoded")
+
+    let nonChunked = "Raw plain text content"
+    let decodedPlain = ClashController.decodeChunkedBody(data: Data(nonChunked.utf8))
+    expectEq(String(data: decodedPlain, encoding: .utf8), "Raw plain text content", "non-chunked returns as is")
+}
+
+func testProcessArgvParsing() {
+    let args1 = ["/usr/local/bin/mihomo", "-d", "/Users/test/.config/mihomo", "-ext-ctl-unix", "/tmp/mihomo-test.sock"]
+    let parsed1 = ClashController.parseProcessArguments(args1)
+    expectEq(parsed1.sockPath, "/tmp/mihomo-test.sock", "parse unix socket")
+    expectEq(parsed1.workDir, "/Users/test/.config/mihomo", "parse workdir")
+
+    let args2 = ["mihomo", "-ext-ctl=127.0.0.1:9099", "-f=/etc/mihomo/config.yaml"]
+    let parsed2 = ClashController.parseProcessArguments(args2)
+    expectEq(parsed2.extCtl, "127.0.0.1:9099", "parse extCtl with equal sign")
+    expectEq(parsed2.configPath, "/etc/mihomo/config.yaml", "parse configPath with equal sign")
 }
 
 func testLiveClashControllerIfPresent() {

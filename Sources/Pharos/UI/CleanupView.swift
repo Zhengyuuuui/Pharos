@@ -89,7 +89,7 @@ struct CleanupView: View {
     private var tabPicker: some View {
         Picker("", selection: $activeTab) {
             Label(l10n.tabSystemCaches, systemImage: "archivebox").tag(CleanupTab.caches)
-            Label(l10n.tabAppLeftovers, systemImage: "app.badge.xmark").tag(CleanupTab.leftovers)
+            Label(l10n.tabAppLeftovers, systemImage: "xmark.app").tag(CleanupTab.leftovers)
             Label(l10n.tabProjectPurge, systemImage: "wrench.and.screwdriver").tag(CleanupTab.purges)
             Label(l10n.tabDevAndAI, systemImage: "cpu").tag(CleanupTab.devAI)
         }

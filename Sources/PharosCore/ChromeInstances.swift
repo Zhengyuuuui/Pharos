@@ -54,21 +54,23 @@ public struct ChromeConfig: Codable, Hashable, Sendable {
     public var userDataDir: String?
     public var debugPort: UInt16?
     public var proxyServer: String?
+    public var proxyNodeName: String?
     public var startURL: String?
     /// Any other flags, verbatim (e.g. --no-first-run).
     public var extraFlags: [String]
 
     public init(browser: ChromiumBrowser = .chrome, userDataDir: String? = nil, debugPort: UInt16? = nil,
-                proxyServer: String? = nil, startURL: String? = nil, extraFlags: [String] = []) {
+                proxyServer: String? = nil, proxyNodeName: String? = nil, startURL: String? = nil, extraFlags: [String] = []) {
         self.browser = browser
         self.userDataDir = userDataDir.map(WorkspaceMatcher.normalize)
         self.debugPort = debugPort
         self.proxyServer = proxyServer
+        self.proxyNodeName = proxyNodeName
         self.startURL = startURL
         self.extraFlags = extraFlags
     }
 
-    private enum CodingKeys: String, CodingKey { case browser, userDataDir, debugPort, proxyServer, startURL, extraFlags }
+    private enum CodingKeys: String, CodingKey { case browser, userDataDir, debugPort, proxyServer, proxyNodeName, startURL, extraFlags }
 
     /// Presets saved before multi-browser support have no `browser`: they were Chrome.
     public init(from decoder: Decoder) throws {
@@ -77,6 +79,7 @@ public struct ChromeConfig: Codable, Hashable, Sendable {
         userDataDir = try c.decodeIfPresent(String.self, forKey: .userDataDir)
         debugPort = try c.decodeIfPresent(UInt16.self, forKey: .debugPort)
         proxyServer = try c.decodeIfPresent(String.self, forKey: .proxyServer)
+        proxyNodeName = try c.decodeIfPresent(String.self, forKey: .proxyNodeName)
         startURL = try c.decodeIfPresent(String.self, forKey: .startURL)
         extraFlags = try c.decodeIfPresent([String].self, forKey: .extraFlags) ?? []
     }
@@ -85,6 +88,23 @@ public struct ChromeConfig: Codable, Hashable, Sendable {
     /// process per user-data-dir, so the folder *is* the instance.
     public var profileKey: String { userDataDir ?? browser.defaultUserDataDir }
     public var isDefaultProfile: Bool { userDataDir == nil || userDataDir == browser.defaultUserDataDir }
+
+    /// Dedicated local proxy listener port for instance-level isolation (e.g. 19222 for debugPort 9222).
+    public var dedicatedProxyPort: Int {
+        if let dp = debugPort, dp > 0 {
+            return 10000 + Int(dp)
+        }
+        let hash = abs(profileKey.utf8.reduce(0) { ($0 &* 31) &+ Int($1) })
+        return 18000 + (hash % 1000)
+    }
+
+    /// Dedicated Mihomo proxy-group name for this instance.
+    public var dedicatedGroupName: String {
+        if let dp = debugPort, dp > 0 {
+            return "Pharos-\(dp)"
+        }
+        return "Pharos-\(dedicatedProxyPort)"
+    }
 
     /// High-level proxy strategy derived from `proxyServer` and `extraFlags`.
     public var proxyStrategy: BrowserProxyStrategy {
@@ -96,6 +116,9 @@ public struct ChromeConfig: Codable, Hashable, Sendable {
                 if proxy.contains("127.0.0.1:") || proxy.contains("localhost:") {
                     let portStr = proxy.components(separatedBy: ":").last?.trimmingCharacters(in: CharacterSet.decimalDigits.inverted)
                     if let p = portStr.flatMap(Int.init) {
+                        if let node = proxyNodeName, !node.isEmpty {
+                            return .node(name: node, port: p)
+                        }
                         return .clashMixedPort(p)
                     }
                 }
@@ -110,19 +133,28 @@ public struct ChromeConfig: Codable, Hashable, Sendable {
             switch newValue {
             case .followSystem:
                 proxyServer = nil
+                proxyNodeName = nil
                 extraFlags.removeAll { $0 == "--no-proxy-server" || $0.hasPrefix("--proxy-bypass-list=") }
             case .direct:
                 proxyServer = "direct://"
+                proxyNodeName = nil
                 if !extraFlags.contains("--no-proxy-server") {
                     extraFlags.append("--no-proxy-server")
                 }
                 extraFlags.removeAll { $0.hasPrefix("--proxy-bypass-list=") }
+            case .node(let name, let port):
+                proxyServer = "http://127.0.0.1:\(port)"
+                proxyNodeName = name
+                extraFlags.removeAll { $0 == "--no-proxy-server" || $0.hasPrefix("--proxy-bypass-list=") }
+                extraFlags.append("--proxy-bypass-list=<local>;localhost;127.0.0.1;*.local")
             case .clashMixedPort(let port):
                 proxyServer = "http://127.0.0.1:\(port)"
+                proxyNodeName = nil
                 extraFlags.removeAll { $0 == "--no-proxy-server" || $0.hasPrefix("--proxy-bypass-list=") }
                 extraFlags.append("--proxy-bypass-list=<local>;localhost;127.0.0.1;*.local")
             case .custom(let url):
                 proxyServer = url
+                proxyNodeName = nil
                 extraFlags.removeAll { $0 == "--no-proxy-server" }
             }
         }

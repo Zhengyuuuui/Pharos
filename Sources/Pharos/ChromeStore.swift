@@ -250,6 +250,22 @@ final class ChromeStore: ObservableObject {
         start(config, running: running, listening: listening)
     }
 
+    /// Starts a Chrome instance, ensuring that any instance-specific Mihomo listener
+    /// and proxy node group are mounted and active before launch.
+    func startWithNodeCheck(_ config: ChromeConfig, running: [ChromeInstance], listening: Set<UInt16>) {
+        Task { @MainActor in
+            if ClashStore.shared.snapshot.isRunning {
+                try? await ClashStore.shared.ensureInstanceListener(config: config)
+                if case .node(let name, _) = config.proxyStrategy {
+                    _ = await ClashStore.shared.switchProxy(groupName: config.dedicatedGroupName, nodeName: name)
+                } else if config.proxyStrategy.isDirect {
+                    _ = await ClashStore.shared.switchProxy(groupName: config.dedicatedGroupName, nodeName: "DIRECT")
+                }
+            }
+            self.start(config, running: running, listening: listening)
+        }
+    }
+
     func start(_ config: ChromeConfig, running: [ChromeInstance], listening: Set<UInt16>) {
         let l10n = L10n.shared
         guard isInstalled(config.browser) else { errorMessage = l10n.browserNotInstalled(config.browser.appName); return }

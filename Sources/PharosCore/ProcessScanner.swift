@@ -20,13 +20,15 @@ public enum ProcessScanner {
                 // Chrome browser processes need their flags (profile dir, debug
                 // port) even when not listening; helpers are skipped by name.
                 let isChrome = ChromeInstances.isChromeExecutable(path: path, argv0: nil)
+                let procName = name(of: info).lowercased()
+                let isProxy = procName.contains("mihomo") || procName.contains("clash") || procName.contains("sing-box")
                 result.append(ProcessSnapshot(
                     pid: pid,
                     ppid: Int32(info.pbi_ppid),
                     name: name(of: info),
                     executablePath: path,
                     cwd: listening ? currentDirectory(pid) : nil,
-                    arguments: listening || isChrome ? arguments(pid) : [],
+                    arguments: listening || isChrome || isProxy ? arguments(pid) : [],
                     memoryBytes: footprint(pid),
                     ports: ports
                 ))

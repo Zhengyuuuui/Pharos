@@ -15,11 +15,13 @@ public enum ClashController {
         public let channel: Channel
         public let secret: String?
         public let clientKind: ClashClientKind
+        public let configPath: String?
 
-        public init(channel: Channel, secret: String? = nil, clientKind: ClashClientKind = .genericMihomo) {
+        public init(channel: Channel, secret: String? = nil, clientKind: ClashClientKind = .genericMihomo, configPath: String? = nil) {
             self.channel = channel
             self.secret = secret
             self.clientKind = clientKind
+            self.configPath = configPath
         }
 
         public var displayString: String {
@@ -34,11 +36,107 @@ public enum ClashController {
 
     // MARK: - Active Endpoint Detection
 
+    /// Extracts command-line options such as -ext-ctl-unix, -ext-ctl, -d, -f from process arguments.
+    public static func parseProcessArguments(_ args: [String]) -> (sockPath: String?, extCtl: String?, workDir: String?, configPath: String?) {
+        var sockPath: String?
+        var extCtl: String?
+        var workDir: String?
+        var configPath: String?
+
+        for i in 0..<args.count {
+            let arg = args[i]
+            if arg == "-ext-ctl-unix", i + 1 < args.count {
+                sockPath = args[i + 1]
+            } else if arg.hasPrefix("-ext-ctl-unix=") {
+                sockPath = String(arg.dropFirst("-ext-ctl-unix=".count))
+            } else if arg == "-ext-ctl", i + 1 < args.count {
+                extCtl = args[i + 1]
+            } else if arg.hasPrefix("-ext-ctl=") {
+                extCtl = String(arg.dropFirst("-ext-ctl=".count))
+            } else if arg == "-d", i + 1 < args.count {
+                workDir = args[i + 1]
+            } else if arg.hasPrefix("-d=") {
+                workDir = String(arg.dropFirst("-d=".count))
+            } else if arg == "-f", i + 1 < args.count {
+                configPath = args[i + 1]
+            } else if arg.hasPrefix("-f=") {
+                configPath = String(arg.dropFirst("-f=".count))
+            }
+        }
+        return (sockPath, extCtl, workDir, configPath)
+    }
+
+    /// Probes running processes for active mihomo / clash-meta / clash / sing-box daemons
+    /// and extracts controller endpoint, secret, and config path directly from CLI arguments.
+    public static func detectFromRunningProcesses(processes: [ProcessSnapshot]? = nil) -> ControllerEndpoint? {
+        let procs = processes ?? ProcessScanner.scan()
+        for p in procs {
+            let name = p.name.lowercased()
+            let exe = (p.executablePath ?? "").lowercased()
+            let isProxyCore = name.contains("mihomo") || name.contains("clash") || name.contains("sing-box") ||
+                              exe.contains("mihomo") || exe.contains("clash") || exe.contains("sing-box")
+            guard isProxyCore else { continue }
+
+            var (sockPath, extCtl, workDir, configPath) = parseProcessArguments(p.arguments)
+
+            if configPath == nil, let w = workDir {
+                let candidate = w + "/config.yaml"
+                if FileManager.default.fileExists(atPath: candidate) {
+                    configPath = candidate
+                }
+            }
+
+            var secret: String?
+            if let cp = configPath, let content = try? String(contentsOfFile: cp, encoding: .utf8) {
+                secret = parseYamlString(named: "secret", in: content) ?? parseYamlString(named: "verge_clash_secret", in: content)
+                if extCtl == nil {
+                    extCtl = parseYamlString(named: "external-controller", in: content)
+                }
+            }
+
+            let kind: ClashClientKind = {
+                let combined = (exe + " " + p.arguments.joined(separator: " ")).lowercased()
+                if combined.contains("mihomo-party") || combined.contains("clash party") { return .mihomoParty }
+                if combined.contains("clash-verge") { return .clashVerge }
+                if combined.contains("nyanpasu") { return .clashNyanpasu }
+                if combined.contains("flclash") { return .flclash }
+                if combined.contains("sing-box") { return .singBox }
+                if combined.contains("clashx") { return .clashX }
+                return .genericMihomo
+            }()
+
+            // Priority 1: Unix Socket
+            if let sock = sockPath, canConnectUnixSocket(path: sock) {
+                return ControllerEndpoint(channel: .unixSocket(path: sock), secret: secret, clientKind: kind, configPath: configPath)
+            }
+
+            // Priority 2: TCP Host/Port
+            if let ctl = extCtl {
+                let portStr = ctl.components(separatedBy: ":").last ?? "9090"
+                if let port = Int(portStr) {
+                    let host = ctl.contains(":") ? ctl.components(separatedBy: ":").first! : "127.0.0.1"
+                    let effHost = (host.isEmpty || host == "0.0.0.0" || host == "::") ? "127.0.0.1" : host
+                    if canConnectTCP(port: port, host: effHost) {
+                        return ControllerEndpoint(channel: .http(host: effHost, port: port), secret: secret, clientKind: kind, configPath: configPath)
+                    }
+                }
+            }
+        }
+        return nil
+    }
+
     /// Automatically scans and returns the active Clash/Mihomo controller endpoint.
     public static func detectActiveEndpoint() -> ControllerEndpoint? {
+        // 0. Probing Running Processes (Priority 0: Direct CLI arguments and active daemon inspection)
+        if let procEndpoint = detectFromRunningProcesses() {
+            return procEndpoint
+        }
+
         // 1. Probing Unix Domain Sockets (Priority 1: Mihomo Party / Clash Party)
         if let partySocket = findActiveMihomoPartySocket() {
-            return ControllerEndpoint(channel: .unixSocket(path: partySocket), secret: nil, clientKind: .mihomoParty)
+            let workDir = NSHomeDirectory() + "/Library/Application Support/mihomo-party/work/config.yaml"
+            let cfg = FileManager.default.fileExists(atPath: workDir) ? workDir : nil
+            return ControllerEndpoint(channel: .unixSocket(path: partySocket), secret: nil, clientKind: .mihomoParty, configPath: cfg)
         }
 
         // 2. Probing Verge Unix Sockets
@@ -50,53 +148,120 @@ public enum ClashController {
         let home = NSHomeDirectory()
 
         // 3.1 Clash Verge Rev
-        let vergeConfigPath = home + "/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev/verge.yaml"
-        if let content = try? String(contentsOfFile: vergeConfigPath, encoding: .utf8) {
-            let port = parseYamlInt(named: "verge_external_controller_port", in: content) ?? 9097
-            let secret = parseYamlString(named: "verge_clash_secret", in: content)
-            if canConnectTCP(port: port) {
-                return ControllerEndpoint(channel: .http(host: "127.0.0.1", port: port), secret: secret, clientKind: .clashVerge)
-            }
-        }
-
-        // 3.2 Clash Nyanpasu
-        let nyanpasuConfig = home + "/Library/Application Support/mo.yanpasu.clash-nyanpasu/config.yaml"
-        if let content = try? String(contentsOfFile: nyanpasuConfig, encoding: .utf8) {
-            let port = parseYamlPort(in: content) ?? 9090
-            let secret = parseYamlString(named: "secret", in: content)
-            if canConnectTCP(port: port) {
-                return ControllerEndpoint(channel: .http(host: "127.0.0.1", port: port), secret: secret, clientKind: .clashNyanpasu)
-            }
-        }
-
-        // 3.3 ClashX.Meta / ClashX
-        for path in [home + "/.config/clash.meta/config.yaml", home + "/.config/clash/config.yaml"] {
-            if let content = try? String(contentsOfFile: path, encoding: .utf8) {
-                let port = parseYamlPort(in: content) ?? 9090
-                let secret = parseYamlString(named: "secret", in: content)
-                if canConnectTCP(port: port) {
-                    return ControllerEndpoint(channel: .http(host: "127.0.0.1", port: port), secret: secret, clientKind: .clashX)
+        let vergeDirs = [
+            home + "/.config/clash-verge-rev",
+            home + "/Library/Application Support/clash-verge-rev",
+            home + "/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev"
+        ]
+        let vergeFilenames = ["verge.yaml", "clash-meta.yaml", "config.yaml"]
+        for dir in vergeDirs {
+            for file in vergeFilenames {
+                let path = dir + "/" + file
+                if let content = try? String(contentsOfFile: path, encoding: .utf8) {
+                    let port = parseYamlInt(named: "verge_external_controller_port", in: content) ?? parseYamlPort(in: content) ?? 9097
+                    let secret = parseYamlString(named: "verge_clash_secret", in: content) ?? parseYamlString(named: "secret", in: content)
+                    if canConnectTCP(port: port) {
+                        return ControllerEndpoint(channel: .http(host: "127.0.0.1", port: port), secret: secret, clientKind: .clashVerge, configPath: path)
+                    }
                 }
             }
         }
 
-        // 3.4 Flclash
-        let flclashConfig = home + "/Library/Application Support/com.flclash.flclash/config.yaml"
-        if let content = try? String(contentsOfFile: flclashConfig, encoding: .utf8) {
-            let port = parseYamlPort(in: content) ?? 9090
-            let secret = parseYamlString(named: "secret", in: content)
-            if canConnectTCP(port: port) {
-                return ControllerEndpoint(channel: .http(host: "127.0.0.1", port: port), secret: secret, clientKind: .flclash)
+        // 3.2 Clash Nyanpasu
+        let nyanpasuDirs = [
+            home + "/.config/clash-nyanpasu",
+            home + "/Library/Application Support/mo.yanpasu.clash-nyanpasu"
+        ]
+        let nyanpasuFilenames = ["config.yaml", "nyanpasu.yaml"]
+        for dir in nyanpasuDirs {
+            for file in nyanpasuFilenames {
+                let path = dir + "/" + file
+                if let content = try? String(contentsOfFile: path, encoding: .utf8) {
+                    let port = parseYamlPort(in: content) ?? 9090
+                    let secret = parseYamlString(named: "secret", in: content)
+                    if canConnectTCP(port: port) {
+                        return ControllerEndpoint(channel: .http(host: "127.0.0.1", port: port), secret: secret, clientKind: .clashNyanpasu, configPath: path)
+                    }
+                }
             }
         }
 
-        // 3.5 Generic Mihomo Core CLI
-        let genericConfig = home + "/.config/mihomo/config.yaml"
-        if let content = try? String(contentsOfFile: genericConfig, encoding: .utf8) {
-            let port = parseYamlPort(in: content) ?? 9090
-            let secret = parseYamlString(named: "secret", in: content)
-            if canConnectTCP(port: port) {
-                return ControllerEndpoint(channel: .http(host: "127.0.0.1", port: port), secret: secret, clientKind: .genericMihomo)
+        // 3.3 ClashX.Meta / ClashX
+        let clashXPaths = [
+            home + "/.config/clash.meta/config.yaml",
+            home + "/.config/clash/config.yaml",
+            home + "/Library/Application Support/com.metacubex.ClashX.Meta/config.yaml",
+            home + "/Library/Application Support/com.west2online.ClashX/config.yaml"
+        ]
+        for path in clashXPaths {
+            if let content = try? String(contentsOfFile: path, encoding: .utf8) {
+                let port = parseYamlPort(in: content) ?? 9090
+                let secret = parseYamlString(named: "secret", in: content)
+                if canConnectTCP(port: port) {
+                    return ControllerEndpoint(channel: .http(host: "127.0.0.1", port: port), secret: secret, clientKind: .clashX, configPath: path)
+                }
+            }
+        }
+
+        // 3.4 Sing-Box
+        let singBoxPaths = [
+            home + "/.config/sing-box/config.json",
+            home + "/Library/Application Support/sing-box/config.json",
+            home + "/Library/Application Support/io.nekohasekai.sagernet/config.json"
+        ]
+        for path in singBoxPaths {
+            if let content = try? String(contentsOfFile: path, encoding: .utf8),
+               let parsed = parseSingBoxConfig(content: content) {
+                if canConnectTCP(port: parsed.port) {
+                    return ControllerEndpoint(channel: .http(host: "127.0.0.1", port: parsed.port), secret: parsed.secret, clientKind: .singBox, configPath: path)
+                }
+            }
+        }
+
+        // 3.5 Flclash
+        let flclashPaths = [
+            home + "/.config/flclash/config.yaml",
+            home + "/Library/Application Support/com.flclash.flclash/config.yaml"
+        ]
+        for path in flclashPaths {
+            if let content = try? String(contentsOfFile: path, encoding: .utf8) {
+                let port = parseYamlPort(in: content) ?? 9090
+                let secret = parseYamlString(named: "secret", in: content)
+                if canConnectTCP(port: port) {
+                    return ControllerEndpoint(channel: .http(host: "127.0.0.1", port: port), secret: secret, clientKind: .flclash, configPath: path)
+                }
+            }
+        }
+
+        // 3.6 GUI.for.Clash
+        let guiDirs = [
+            home + "/.config/GUI.for.Clash",
+            home + "/Library/Application Support/GUI.for.Clash"
+        ]
+        for dir in guiDirs {
+            let path = dir + "/config.yaml"
+            if let content = try? String(contentsOfFile: path, encoding: .utf8) {
+                let port = parseYamlPort(in: content) ?? 9090
+                let secret = parseYamlString(named: "secret", in: content)
+                if canConnectTCP(port: port) {
+                    return ControllerEndpoint(channel: .http(host: "127.0.0.1", port: port), secret: secret, clientKind: .genericMihomo, configPath: path)
+                }
+            }
+        }
+
+        // 3.7 Generic Mihomo Core CLI / Homebrew
+        let genericPaths = [
+            home + "/.config/mihomo/config.yaml",
+            "/opt/homebrew/etc/mihomo/config.yaml",
+            "/usr/local/etc/mihomo/config.yaml"
+        ]
+        for path in genericPaths {
+            if let content = try? String(contentsOfFile: path, encoding: .utf8) {
+                let port = parseYamlPort(in: content) ?? 9090
+                let secret = parseYamlString(named: "secret", in: content)
+                if canConnectTCP(port: port) {
+                    return ControllerEndpoint(channel: .http(host: "127.0.0.1", port: port), secret: secret, clientKind: .genericMihomo, configPath: path)
+                }
             }
         }
 
@@ -217,6 +382,168 @@ public enum ClashController {
         }
     }
 
+    // MARK: - Proxy Node Management & Hot Switching
+
+    /// Fetches the list of all available outbound proxy leaf nodes from the daemon.
+    public static func fetchProxies(
+        endpoint: ControllerEndpoint
+    ) async throws -> [MihomoProxyNode] {
+        let (statusCode, data) = try await sendRequest(endpoint: endpoint, method: "GET", uri: "/proxies")
+        guard statusCode == 200 else {
+            throw NSError(domain: "ClashController", code: statusCode, userInfo: [NSLocalizedDescriptionKey: "HTTP \(statusCode)"])
+        }
+
+        guard let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let proxiesDict = json["proxies"] as? [String: [String: Any]] else {
+            throw NSError(domain: "ClashController", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid /proxies JSON response"])
+        }
+
+        var nodes: [MihomoProxyNode] = []
+        let nonLeafTypes: Set<String> = [
+            "selector", "urltest", "fallback", "loadbalance", "relay",
+            "compatible", "reject", "rejectdrop", "pass"
+        ]
+        let excludedNames: Set<String> = [
+            "global", "direct", "reject", "reject-drop", "pass", "compatible"
+        ]
+
+        for (name, dict) in proxiesDict {
+            let typeStr = dict["type"] as? String ?? ""
+            let typeLower = typeStr.lowercased()
+            let nameLower = name.lowercased()
+
+            if nonLeafTypes.contains(typeLower) || excludedNames.contains(nameLower) {
+                continue
+            }
+
+            let alive = dict["alive"] as? Bool ?? true
+            var lastDelay: Int? = nil
+            if let history = dict["history"] as? [[String: Any]], let last = history.last {
+                lastDelay = last["delay"] as? Int
+            } else if let extra = dict["extra"] as? [String: Any] {
+                for (_, testVal) in extra {
+                    if let tDict = testVal as? [String: Any],
+                       let tHistory = tDict["history"] as? [[String: Any]],
+                       let last = tHistory.last,
+                       let d = last["delay"] as? Int, d > 0 {
+                        lastDelay = d
+                        break
+                    }
+                }
+            }
+
+            nodes.append(MihomoProxyNode(name: name, type: typeStr, delay: lastDelay, alive: alive))
+        }
+
+        return nodes.sorted { a, b in
+            a.name.localizedStandardCompare(b.name) == .orderedAscending
+        }
+    }
+
+    /// Dynamically mounts an instance-specific listener and selector group into the Mihomo configuration.
+    public static func ensureListenerAndGroup(
+        port: Int,
+        groupName: String,
+        availableNodeNames: [String],
+        configPath: String?,
+        endpoint: ControllerEndpoint
+    ) async throws {
+        guard let cfgPath = configPath, FileManager.default.isWritableFile(atPath: cfgPath) else {
+            return
+        }
+
+        guard var content = try? String(contentsOfFile: cfgPath, encoding: .utf8) else {
+            return
+        }
+
+        var modified = false
+
+        // 1. Check or inject listener
+        let listenerKey = "port: \(port)"
+        if !content.contains(listenerKey) {
+            let listenerBlock = """
+
+listeners:
+  - name: Pharos-\(port)
+    type: mixed
+    port: \(port)
+    listen: 127.0.0.1
+    proxy: \(groupName)
+"""
+            if content.contains("listeners:") {
+                let insertion = """
+  - name: Pharos-\(port)
+    type: mixed
+    port: \(port)
+    listen: 127.0.0.1
+    proxy: \(groupName)
+
+"""
+                content = content.replacingOccurrences(of: "listeners:\n", with: "listeners:\n" + insertion)
+            } else {
+                content += listenerBlock
+            }
+            modified = true
+        }
+
+        // 2. Check or inject proxy group
+        let groupKey = "name: \(groupName)"
+        if !content.contains(groupKey) {
+            var proxiesList = "      - DIRECT\n"
+            for node in availableNodeNames.prefix(50) {
+                let cleanNode = node.replacingOccurrences(of: "\"", with: "\\\"")
+                proxiesList += "      - \"\(cleanNode)\"\n"
+            }
+
+            let groupBlock = """
+
+proxy-groups:
+  - name: \(groupName)
+    type: select
+    proxies:
+\(proxiesList)
+"""
+            if content.contains("proxy-groups:") {
+                let insertion = """
+  - name: \(groupName)
+    type: select
+    proxies:
+\(proxiesList)
+"""
+                content = content.replacingOccurrences(of: "proxy-groups:\n", with: "proxy-groups:\n" + insertion)
+            } else {
+                content += groupBlock
+            }
+            modified = true
+        }
+
+        if modified {
+            try content.write(toFile: cfgPath, atomically: true, encoding: .utf8)
+            // Hot reload daemon configuration
+            let payload = try JSONSerialization.data(withJSONObject: ["path": cfgPath])
+            _ = try await sendRequest(endpoint: endpoint, method: "PUT", uri: "/configs?force=true", body: payload)
+        }
+    }
+
+    /// Millisecond-level hot node switching for a specific proxy group.
+    public static func switchGroupProxy(
+        groupName: String,
+        nodeName: String,
+        endpoint: ControllerEndpoint
+    ) async throws -> Bool {
+        guard let encodedGroup = groupName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
+            return false
+        }
+        let payload = try JSONSerialization.data(withJSONObject: ["name": nodeName])
+        let (code, _) = try await sendRequest(
+            endpoint: endpoint,
+            method: "PUT",
+            uri: "/proxies/\(encodedGroup)",
+            body: payload
+        )
+        return code == 200 || code == 204
+    }
+
     // MARK: - Low-level Request Dispatcher
 
     /// Sends a request to either Unix Domain Socket or standard HTTP loopback port.
@@ -308,14 +635,14 @@ public enum ClashController {
                 }
                 if n <= 0 { break }
                 responseData.append(contentsOf: chunk.prefix(n))
-                if responseData.count > 2 * 1024 * 1024 { break } // 2MB limit
+                if responseData.count > 8 * 1024 * 1024 { break } // 8MB safety limit
             }
 
             return try parseHttpResponse(data: responseData)
         }.value
     }
 
-    /// Parses a raw HTTP/1.1 response buffer.
+    /// Parses a raw HTTP/1.1 response buffer with chunked decoding support.
     public static func parseHttpResponse(data: Data) throws -> (statusCode: Int, data: Data) {
         let separatorCRLF = Data("\r\n\r\n".utf8)
         let separatorLF = Data("\n\n".utf8)
@@ -343,7 +670,40 @@ public enum ClashController {
             throw NSError(domain: "ClashController", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid HTTP code in \(statusLine)"])
         }
 
-        return (code, bodyData)
+        let isChunked = headerStr.localizedCaseInsensitiveContains("Transfer-Encoding: chunked")
+        let finalBody = isChunked ? decodeChunkedBody(data: bodyData) : bodyData
+
+        return (code, finalBody)
+    }
+
+    /// Decodes an HTTP/1.1 chunked transfer-encoded payload.
+    public static func decodeChunkedBody(data: Data) -> Data {
+        var result = Data()
+        var offset = 0
+        let crlf = Data("\r\n".utf8)
+
+        while offset < data.count {
+            guard let range = data.range(of: crlf, in: offset..<data.count) else { break }
+            let lineData = data.subdata(in: offset..<range.lowerBound)
+            offset = range.upperBound
+
+            guard let lineStr = String(data: lineData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !lineStr.isEmpty else { continue }
+
+            let sizeStr = lineStr.components(separatedBy: ";")[0].trimmingCharacters(in: .whitespaces)
+            guard let chunkSize = Int(sizeStr, radix: 16) else { break }
+            if chunkSize == 0 { break }
+
+            let chunkEnd = offset + chunkSize
+            guard chunkEnd <= data.count else { break }
+            result.append(data.subdata(in: offset..<chunkEnd))
+            offset = chunkEnd
+
+            if offset + 2 <= data.count && data.subdata(in: offset..<offset + 2) == crlf {
+                offset += 2
+            }
+        }
+        return result.isEmpty ? data : result
     }
 
     // MARK: - HTTP TCP Client (URLSession)
@@ -471,20 +831,87 @@ public enum ClashController {
     }
 
     private static func detectClientFromRunningApps() -> ClashClientKind? {
+        let home = NSHomeDirectory()
         let installed = [
             "/Applications/Clash Verge Rev.app": ClashClientKind.clashVerge,
             "/Applications/Clash Verge.app": ClashClientKind.clashVerge,
+            home + "/Applications/Clash Verge Rev.app": ClashClientKind.clashVerge,
             "/Applications/Clash Party.app": ClashClientKind.mihomoParty,
             "/Applications/Mihomo Party.app": ClashClientKind.mihomoParty,
+            home + "/Applications/Mihomo Party.app": ClashClientKind.mihomoParty,
             "/Applications/Clash Nyanpasu.app": ClashClientKind.clashNyanpasu,
+            home + "/Applications/Clash Nyanpasu.app": ClashClientKind.clashNyanpasu,
             "/Applications/ClashX.Meta.app": ClashClientKind.clashX,
             "/Applications/ClashX.app": ClashClientKind.clashX,
-            "/Applications/Flclash.app": ClashClientKind.flclash
+            home + "/Applications/ClashX.Meta.app": ClashClientKind.clashX,
+            "/Applications/Flclash.app": ClashClientKind.flclash,
+            home + "/Applications/Flclash.app": ClashClientKind.flclash,
+            "/Applications/Sing-Box.app": ClashClientKind.singBox,
+            "/Applications/sing-box.app": ClashClientKind.singBox,
+            home + "/Applications/Sing-Box.app": ClashClientKind.singBox,
+            home + "/Applications/sing-box.app": ClashClientKind.singBox
         ]
         for (path, kind) in installed {
             if FileManager.default.fileExists(atPath: path) { return kind }
         }
         return nil
+    }
+
+    // MARK: - Light JSON & YAML Parser Helpers
+
+    /// Parses Sing-Box's `experimental.clash_api` configuration block from config.json.
+    public static func parseSingBoxConfig(content: String) -> (port: Int, secret: String?)? {
+        guard let data = content.data(using: .utf8),
+              let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+            return nil
+        }
+        let experimental = json["experimental"] as? [String: Any]
+        guard let api = (experimental?["clash_api"] as? [String: Any]) ?? (json["clash_api"] as? [String: Any]) else {
+            return nil
+        }
+
+        let controllerStr = api["external_controller"] as? String ?? "127.0.0.1:9090"
+        let portStr = controllerStr.components(separatedBy: ":").last ?? "9090"
+        let port = Int(portStr) ?? 9090
+        let secret = api["secret"] as? String
+        return (port, secret)
+    }
+
+    /// Parses an endpoint string (e.g. "http://127.0.0.1:9097", "127.0.0.1:9090", "unix:///tmp/mihomo.sock") into a typed ControllerEndpoint.
+    public static func parseEndpoint(
+        from string: String,
+        secret: String? = nil,
+        clientKind: ClashClientKind = .custom,
+        configPath: String? = nil
+    ) -> ControllerEndpoint? {
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let cleanSecret = secret?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let effSecret = (cleanSecret?.isEmpty == false) ? cleanSecret : nil
+        let effConfig = (configPath?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false) ? configPath : nil
+
+        if trimmed.hasPrefix("unix://") {
+            let path = String(trimmed.dropFirst(7))
+            return ControllerEndpoint(channel: .unixSocket(path: path), secret: effSecret, clientKind: clientKind, configPath: effConfig)
+        } else if trimmed.hasPrefix("/") {
+            return ControllerEndpoint(channel: .unixSocket(path: trimmed), secret: effSecret, clientKind: clientKind, configPath: effConfig)
+        }
+
+        var hostPort = trimmed
+        if hostPort.hasPrefix("http://") {
+            hostPort = String(hostPort.dropFirst(7))
+        } else if hostPort.hasPrefix("https://") {
+            hostPort = String(hostPort.dropFirst(8))
+        }
+        if let slashIdx = hostPort.firstIndex(of: "/") {
+            hostPort = String(hostPort[..<slashIdx])
+        }
+
+        let parts = hostPort.components(separatedBy: ":")
+        let host = parts.first?.isEmpty == false ? parts[0] : "127.0.0.1"
+        let port = parts.count > 1 ? (Int(parts[1]) ?? 9090) : 9090
+        return ControllerEndpoint(channel: .http(host: host, port: port), secret: effSecret, clientKind: clientKind, configPath: effConfig)
     }
 
     // MARK: - Light YAML Parser Helpers

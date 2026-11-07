@@ -1,4 +1,6 @@
+import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 import PharosCore
 
 // MARK: - Sub-Items Breakdown List View
@@ -110,7 +112,7 @@ struct AppLeftoversView: View {
         VStack(alignment: .leading, spacing: PharosSpacing.m) {
             PharosCard {
                 HStack(alignment: .center, spacing: PharosSpacing.m) {
-                    Image(systemName: "app.badge.xmark")
+                    Image(systemName: "xmark.app")
                         .font(.system(size: 20))
                         .foregroundStyle(PharosColor.accent)
                         .frame(width: 40, height: 40)
@@ -214,10 +216,7 @@ private struct LeftoverItemRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "questionmark.app.dashed")
-                .font(.system(size: 14))
-                .foregroundStyle(PharosColor.accent.opacity(0.8))
-                .frame(width: 20)
+            AppLeftoverIconView(item: item)
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
@@ -252,6 +251,93 @@ private struct LeftoverItemRow: View {
                 cleanup.deleteLeftover(item)
             }
         }
+    }
+}
+
+/// Dynamic application icon renderer for uninstalled application leftovers.
+/// Retrieves authentic high-res app icons from LaunchServices, local Applications/Trash bundles,
+/// or gracefully falls back to the native macOS application template icon in a 28x28 container.
+struct AppLeftoverIconView: View {
+    let item: AppLeftoversScanner.LeftoverItem
+
+    var body: some View {
+        let (icon, isFallback) = AppLeftoverIconResolver.icon(for: item)
+        ZStack(alignment: .bottomTrailing) {
+            Image(nsImage: icon)
+                .resizable()
+                .interpolation(.high)
+                .scaledToFit()
+                .frame(width: 22, height: 22)
+                .shadow(color: Color.black.opacity(0.08), radius: 1, x: 0, y: 0.5)
+
+            if isFallback {
+                Circle()
+                    .fill(PharosColor.warning)
+                    .frame(width: 5, height: 5)
+                    .offset(x: 1, y: 1)
+            }
+        }
+        .frame(width: 28, height: 28)
+        .background(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(PharosColor.fill)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .stroke(PharosColor.separator.opacity(0.3), lineWidth: 0.5)
+        )
+    }
+}
+
+@MainActor
+enum AppLeftoverIconResolver {
+    private static var cache: [String: (image: NSImage, isFallback: Bool)] = [:]
+
+    static func icon(for item: AppLeftoversScanner.LeftoverItem) -> (image: NSImage, isFallback: Bool) {
+        let key = item.bundleId ?? item.appName
+        if let cached = cache[key] {
+            return cached
+        }
+        let resolved = resolve(for: item)
+        cache[key] = resolved
+        return resolved
+    }
+
+    private static func resolve(for item: AppLeftoversScanner.LeftoverItem) -> (image: NSImage, isFallback: Bool) {
+        let ws = NSWorkspace.shared
+
+        // 1. Query LaunchServices with bundleId
+        if let bundleId = item.bundleId, !bundleId.isEmpty {
+            if let appURL = ws.urlForApplication(withBundleIdentifier: bundleId) {
+                return (ws.icon(forFile: appURL.path), false)
+            }
+        }
+
+        // 2. Check candidate application bundles: /Applications, ~/Applications, ~/.Trash
+        let home = NSHomeDirectory()
+        var namesToCheck = [item.appName]
+        if let bundleId = item.bundleId, let lastPart = bundleId.split(separator: ".").last, !lastPart.isEmpty {
+            let lastStr = String(lastPart)
+            if !namesToCheck.contains(lastStr) {
+                namesToCheck.append(lastStr)
+            }
+        }
+        for name in namesToCheck {
+            let candidates = [
+                "/Applications/" + name + ".app",
+                home + "/Applications/" + name + ".app",
+                home + "/.Trash/" + name + ".app",
+                "/System/Applications/" + name + ".app"
+            ]
+            for path in candidates {
+                if FileManager.default.fileExists(atPath: path) {
+                    return (ws.icon(forFile: path), false)
+                }
+            }
+        }
+
+        // 3. Fallback to standard macOS application system icon
+        return (ws.icon(for: .application), true)
     }
 }
 
