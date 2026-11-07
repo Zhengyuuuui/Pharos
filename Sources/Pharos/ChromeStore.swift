@@ -9,16 +9,50 @@ final class ChromeStore: ObservableObject {
     static let shared = ChromeStore()
 
     /// A preset and/or a running instance, matched by profile folder.
+    @MainActor
     struct Entry: Identifiable {
         let preset: ChromePreset?
         let running: ChromeInstance?
 
-        var id: String { preset?.id ?? "running:" + (running?.id ?? "") }
-        var config: ChromeConfig { running?.config ?? preset?.config ?? ChromeConfig() }
+        nonisolated var id: String { preset?.id ?? "running:" + (running?.id ?? "") }
         var isRunning: Bool { running != nil }
+
+        var config: ChromeConfig {
+            var c = preset?.config ?? running?.config ?? ChromeConfig()
+            if let r = running {
+                c.browser = r.config.browser
+                if let u = r.config.userDataDir { c.userDataDir = u }
+                if let d = r.config.debugPort { c.debugPort = d }
+                let key = c.profileKey
+                if let overrideStrategy = ChromeStore.shared.activeStrategies[key] {
+                    c.proxyStrategy = overrideStrategy
+                } else if let preset = preset {
+                    c.proxyStrategy = preset.config.proxyStrategy
+                } else {
+                    c.proxyStrategy = r.config.proxyStrategy
+                }
+                if let activeNode = ChromeStore.shared.activeNodes[key] {
+                    c.proxyNodeName = activeNode
+                } else if let presetNode = preset?.config.proxyNodeName {
+                    c.proxyNodeName = presetNode
+                }
+            } else if let preset = preset {
+                c = preset.config
+                let key = c.profileKey
+                if let overrideStrategy = ChromeStore.shared.activeStrategies[key] {
+                    c.proxyStrategy = overrideStrategy
+                }
+                if let activeNode = ChromeStore.shared.activeNodes[key] {
+                    c.proxyNodeName = activeNode
+                }
+            }
+            return c
+        }
     }
 
     @Published private(set) var presets: [ChromePreset] = []
+    @Published private(set) var activeStrategies: [String: BrowserProxyStrategy] = [:]
+    @Published private(set) var activeNodes: [String: String] = [:]
     @Published private(set) var folderSizes: [String: UInt64] = [:]
     @Published private(set) var sizing = false
     /// Signed-in profile names per user-data-dir. Read off the main thread and
@@ -40,8 +74,18 @@ final class ChromeStore: ObservableObject {
         defaultBrowser = d.string(forKey: Self.defaultBrowserKey).flatMap(ChromiumBrowser.init)
             ?? installedBrowsers.first ?? .chrome
         if let data = d.data(forKey: Self.key) {
-            do { presets = try JSONDecoder().decode([ChromePreset].self, from: data) }
-            catch { errorMessage = L10n.shared.chromeLoadFailed }
+            do {
+                presets = try JSONDecoder().decode([ChromePreset].self, from: data)
+                for preset in presets {
+                    let key = preset.config.profileKey
+                    activeStrategies[key] = preset.config.proxyStrategy
+                    if let node = preset.config.proxyNodeName {
+                        activeNodes[key] = node
+                    }
+                }
+            } catch {
+                errorMessage = L10n.shared.chromeLoadFailed
+            }
         }
     }
 
@@ -103,7 +147,10 @@ final class ChromeStore: ObservableObject {
     // MARK: - Presets
 
     func save(_ instance: ChromeInstance) {
-        let c = instance.config
+        var c = instance.config
+        let key = c.profileKey
+        if let s = activeStrategies[key] { c.proxyStrategy = s }
+        if let n = activeNodes[key] { c.proxyNodeName = n }
         guard !presets.contains(where: { $0.config.browser == c.browser && $0.config.profileKey == c.profileKey }) else { return }
         presets.append(ChromePreset(name: defaultName(c), config: c))
         persist()
@@ -112,7 +159,11 @@ final class ChromeStore: ObservableObject {
     /// The instance was relaunched with different flags than the preset stores.
     func adopt(_ instance: ChromeInstance, into presetID: String) {
         guard let i = presets.firstIndex(where: { $0.id == presetID }) else { return }
-        presets[i].config = instance.config
+        var c = instance.config
+        let key = c.profileKey
+        if let s = activeStrategies[key] { c.proxyStrategy = s }
+        if let n = activeNodes[key] { c.proxyNodeName = n }
+        presets[i].config = c
         persist()
     }
 
@@ -138,10 +189,21 @@ final class ChromeStore: ObservableObject {
     func update(_ preset: ChromePreset) {
         guard let i = presets.firstIndex(where: { $0.id == preset.id }) else { return }
         presets[i] = preset
+        let key = preset.config.profileKey
+        activeStrategies[key] = preset.config.proxyStrategy
+        if let node = preset.config.proxyNodeName {
+            activeNodes[key] = node
+        } else {
+            activeNodes.removeValue(forKey: key)
+        }
         persist()
     }
 
     func remove(id: String) {
+        if let p = presets.first(where: { $0.id == id }) {
+            activeStrategies.removeValue(forKey: p.config.profileKey)
+            activeNodes.removeValue(forKey: p.config.profileKey)
+        }
         presets.removeAll { $0.id == id }
         persist()
     }
@@ -223,13 +285,31 @@ final class ChromeStore: ObservableObject {
 
     /// Updates or assigns proxy strategy to an instance/preset.
     func updateProxyStrategy(_ strategy: BrowserProxyStrategy, for entry: Entry) {
+        let key = entry.config.profileKey
+        activeStrategies[key] = strategy
+        if case .node(let name, _) = strategy {
+            activeNodes[key] = name
+        } else {
+            activeNodes.removeValue(forKey: key)
+        }
+
         if let preset = entry.preset {
             var p = preset
             p.config.proxyStrategy = strategy
+            if case .node(let name, _) = strategy {
+                p.config.proxyNodeName = name
+            } else {
+                p.config.proxyNodeName = nil
+            }
             update(p)
         } else if let r = entry.running {
             var c = r.config
             c.proxyStrategy = strategy
+            if case .node(let name, _) = strategy {
+                c.proxyNodeName = name
+            } else {
+                c.proxyNodeName = nil
+            }
             let preset = ChromePreset(name: defaultName(c), config: c)
             presets.append(preset)
             persist()

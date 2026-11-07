@@ -51,8 +51,11 @@ public enum BrowserProxyStrategy: Hashable, Sendable {
     case custom(String)
 
     public var isDirect: Bool {
-        if case .direct = self { return true }
-        return false
+        switch self {
+        case .direct: return true
+        case .node(let name, _): return name.uppercased() == "DIRECT"
+        default: return false
+        }
     }
 
     public var isClash: Bool {

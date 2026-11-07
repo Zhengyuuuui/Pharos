@@ -372,11 +372,19 @@ final class L10n: ObservableObject {
     func isolatedProxyAName(_ browser: String) -> String { en ? "\(browser) · Proxy A" : "\(browser) · 代理 A" }
     func isolatedProxyBName(_ browser: String) -> String { en ? "\(browser) · Proxy B" : "\(browser) · 代理 B" }
     var currentRunningProxy: String { en ? "Running with this proxy" : "当前已生效" }
-    var proxyDirectPill: String { en ? "Direct" : "直连" }
+    var proxyDirectPill: String { en ? "Direct" : "纯净直连" }
+    var proxyClashPill: String { en ? "Clash Rule" : "Clash 规则" }
     var proxyAPill: String { en ? "Proxy A · 7890" : "代理 A · 7890" }
     var proxyBPill: String { en ? "Proxy B · 7897" : "代理 B · 7897" }
     var proxySystemPill: String { en ? "System" : "跟随系统" }
     var proxyCustomPill: String { en ? "Custom…" : "⚙️ 自定义…" }
+    var proxyDirectToast: String { en ? "Switched to Pure Direct" : "已切换至纯净直连" }
+    var proxySystemToast: String { en ? "Switched to Follow System" : "已切换至跟随系统" }
+    func proxyClashToast(_ port: Int) -> String {
+        en ? "Switched to Clash Rule (:\(port))" : "已切换至 Clash 规则 (:\(port))"
+    }
+    var proxyNodeOption: String { en ? "Exit Node" : "指定出口节点" }
+    var proxyModeBarTitle: String { en ? "Startup & Proxy Mode" : "启动与代理模式" }
     var clashControlHub: String { en ? "Clash / Mihomo Network Hub" : "Clash / Mihomo 实时网络控制中心" }
     var clashClientRunning: String { en ? "Running" : "运行中" }
     var clashClientStopped: String { en ? "No Running Client" : "未检测到运行中的客户端" }

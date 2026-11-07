@@ -157,3 +157,44 @@ func testChromeProfileHelpers() {
     let back = (try? JSONEncoder().encode([preset])).flatMap { try? JSONDecoder().decode([ChromePreset].self, from: $0) }
     expectEq(back, [preset], "presets round-trip through JSON")
 }
+
+func testChromeProxyStrategiesAndNodeSwitching() {
+    var config = ChromeConfig(browser: .chrome, userDataDir: "/Users/me/chrome9222", debugPort: 9222)
+
+    // 1. Follow System
+    config.proxyStrategy = .followSystem
+    expectEq(config.proxyStrategy, .followSystem, "default follow system")
+    expect(!config.proxyStrategy.isDirect, "follow system is not direct")
+    expectEq(config.proxyServer, nil, "follow system has no proxy server")
+    expect(!config.extraFlags.contains("--no-proxy-server"), "no-proxy-server flag absent")
+
+    // 2. Pure Direct
+    config.proxyStrategy = .direct
+    expect(config.proxyStrategy.isDirect, "direct is direct")
+    expectEq(config.proxyServer, "direct://", "direct:// proxy server")
+    expect(config.extraFlags.contains("--no-proxy-server"), "has --no-proxy-server flag")
+
+    // 3. Clash Rule (7890)
+    config.proxyStrategy = .clashMixedPort(7890)
+    expectEq(config.proxyStrategy, .clashMixedPort(7890), "clash mixed port 7890")
+    expect(!config.proxyStrategy.isDirect, "clash is not direct")
+    expectEq(config.proxyServer, "http://127.0.0.1:7890", "clash proxy server")
+    expect(!config.extraFlags.contains("--no-proxy-server"), "--no-proxy-server removed")
+
+    // 4. Dedicated Node Selection
+    config.proxyStrategy = .node(name: "Korea 01", port: 19222)
+    expectEq(config.proxyStrategy, .node(name: "Korea 01", port: 19222), "node strategy preserved")
+    expectEq(config.proxyNodeName, "Korea 01", "node name preserved")
+    expectEq(config.proxyServer, "http://127.0.0.1:19222", "dedicated port proxy server")
+    expect(!config.proxyStrategy.isDirect, "proxy node is not direct")
+    expectEq(config.proxyStrategy.nodeName, "Korea 01", "nodeName helper")
+
+    // 5. Node named DIRECT
+    config.proxyStrategy = .node(name: "DIRECT", port: 19222)
+    expect(config.proxyStrategy.isDirect, "DIRECT node counts as direct")
+
+    // 6. Custom proxy
+    config.proxyStrategy = .custom("socks5://127.0.0.1:1080")
+    expectEq(config.proxyStrategy, .custom("socks5://127.0.0.1:1080"), "custom proxy")
+    expectEq(config.proxyServer, "socks5://127.0.0.1:1080", "custom proxy server")
+}

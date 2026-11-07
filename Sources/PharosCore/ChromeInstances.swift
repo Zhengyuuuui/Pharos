@@ -113,7 +113,7 @@ public struct ChromeConfig: Codable, Hashable, Sendable {
                 if proxy == "direct://" || extraFlags.contains("--no-proxy-server") {
                     return .direct
                 }
-                if proxy.contains("127.0.0.1:") || proxy.contains("localhost:") {
+                if proxy.hasPrefix("http://127.0.0.1:") || proxy.hasPrefix("http://localhost:") {
                     let portStr = proxy.components(separatedBy: ":").last?.trimmingCharacters(in: CharacterSet.decimalDigits.inverted)
                     if let p = portStr.flatMap(Int.init) {
                         if let node = proxyNodeName, !node.isEmpty {
