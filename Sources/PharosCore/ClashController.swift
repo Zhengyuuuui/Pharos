@@ -440,6 +440,50 @@ public enum ClashController {
         }
     }
 
+    /// Triggers concurrent latency health-check for proxies in a group.
+    /// Returns dictionary of node names to measured delay in milliseconds (0 indicates timeout/failure).
+    @discardableResult
+    public static func testGroupDelay(
+        endpoint: ControllerEndpoint,
+        groupName: String = "GLOBAL",
+        testURL: String = "http://www.gstatic.com/generate_204",
+        timeoutMs: Int = 3000
+    ) async throws -> [String: Int] {
+        let escapedURL = testURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? testURL
+        let escapedGroup = groupName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? groupName
+        let uri = "/group/\(escapedGroup)/delay?url=\(escapedURL)&timeout=\(timeoutMs)"
+
+        let (statusCode, data) = try await sendRequest(endpoint: endpoint, method: "GET", uri: uri)
+        guard statusCode == 200 else {
+            throw NSError(domain: "ClashController", code: statusCode, userInfo: [NSLocalizedDescriptionKey: "HTTP \(statusCode)"])
+        }
+        guard let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+            return [:]
+        }
+        var delays: [String: Int] = [:]
+        for (node, val) in json {
+            if let d = val as? Int {
+                delays[node] = d
+            }
+        }
+        return delays
+    }
+
+    /// Fetches all proxy group names (type: Selector, URLTest, Fallback) from Mihomo.
+    public static func fetchProxyGroupNames(
+        endpoint: ControllerEndpoint
+    ) async throws -> [String] {
+        let (statusCode, data) = try await sendRequest(endpoint: endpoint, method: "GET", uri: "/group")
+        guard statusCode == 200 else {
+            return []
+        }
+        guard let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let groups = json["proxies"] as? [[String: Any]] else {
+            return []
+        }
+        return groups.compactMap { $0["name"] as? String }
+    }
+
     /// Dynamically mounts an instance-specific listener and selector group into the Mihomo configuration.
     public static func ensureListenerAndGroup(
         port: Int,

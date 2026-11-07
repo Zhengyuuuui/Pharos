@@ -171,6 +171,27 @@ public struct MihomoProxyNode: Identifiable, Hashable, Sendable, Codable {
     public var region: ProxyNodeRegion {
         ProxyNodeRegion.detect(from: name)
     }
+
+    /// True if the node is alive and has a positive latency measurement (> 0 ms).
+    public var isHealthy: Bool {
+        alive && (delay ?? 0) > 0
+    }
+
+    /// Latency in milliseconds if healthy, or nil if timed out, failed, or untested.
+    public var validDelay: Int? {
+        guard isHealthy, let d = delay, d > 0 else { return nil }
+        return d
+    }
+
+    /// Status rank for UI sorting:
+    /// 0 = healthy with valid delay
+    /// 1 = untested (delay == nil, alive == true)
+    /// 2 = timeout or failed (delay == 0 or alive == false)
+    public var statusRank: Int {
+        if isHealthy { return 0 }
+        if alive && delay == nil { return 1 }
+        return 2
+    }
 }
 
 /// Geographic region classification for proxy nodes.

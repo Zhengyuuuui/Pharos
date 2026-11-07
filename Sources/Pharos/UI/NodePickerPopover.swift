@@ -70,9 +70,11 @@ struct NodePickerPopover: View {
                 guard !isRefreshing else { return }
                 isRefreshing = true
                 Task {
-                    await clash.refreshNodes()
-                    try? await Task.sleep(for: .milliseconds(400))
-                    isRefreshing = false
+                    await clash.refresh()
+                    await clash.refreshNodes(triggerSpeedTest: true)
+                    await MainActor.run {
+                        isRefreshing = false
+                    }
                 }
             } label: {
                 Image(systemName: "arrow.clockwise")
@@ -255,14 +257,14 @@ struct NodePickerPopover: View {
                 Spacer(minLength: 4)
 
                 // Latency Badge
-                if let delay = node.delay, delay > 0 {
+                if let delay = node.validDelay {
                     Text("\(delay) ms")
                         .font(PharosFont.captionDigits)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1.5)
                         .background(Capsule().fill(delayColor(delay).opacity(0.12)))
                         .foregroundStyle(delayColor(delay))
-                } else if !node.alive {
+                } else if node.statusRank == 2 {
                     Text("Timeout")
                         .font(PharosFont.captionDigits)
                         .padding(.horizontal, 5)
@@ -345,16 +347,23 @@ struct NodePickerPopover: View {
 
         // Hide offline
         if hideOffline {
-            result = result.filter { $0.alive && ($0.delay ?? 0) > 0 }
+            result = result.filter { $0.isHealthy }
         }
 
-        // Sort
-        if sortByLatency {
-            result.sort {
-                let d1 = $0.delay ?? 9999
-                let d2 = $1.delay ?? 9999
+        // Sort: Healthy nodes ALWAYS come first! Timeout/dead nodes ALWAYS come last!
+        result.sort { a, b in
+            // Primary sort: status rank (0 = healthy, 1 = untested, 2 = timeout)
+            if a.statusRank != b.statusRank {
+                return a.statusRank < b.statusRank
+            }
+
+            // Secondary sort: if sortByLatency, healthy nodes sort by latency asc
+            if sortByLatency, let d1 = a.validDelay, let d2 = b.validDelay, d1 != d2 {
                 return d1 < d2
             }
+
+            // Tertiary: natural alphanumeric name sorting
+            return a.name.localizedStandardCompare(b.name) == .orderedAscending
         }
 
         return result

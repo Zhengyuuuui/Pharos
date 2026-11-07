@@ -244,11 +244,31 @@ final class ClashStore: ObservableObject {
     // MARK: - Proxy Node Management
 
     /// Refreshes available proxy nodes from the Mihomo/Clash core.
-    func refreshNodes() async {
-        guard let ep = endpoint else { return }
+    /// If `triggerSpeedTest` is true, Mihomo executes a concurrent health-check to update live latencies.
+    func refreshNodes(triggerSpeedTest: Bool = false) async {
+        var ep = endpoint
+        if ep == nil {
+            ep = ClashController.detectActiveEndpoint()
+            if let detected = ep {
+                self.endpoint = detected
+            }
+        }
+        guard let validEp = ep else { return }
         lastNodesFetchTime = Date()
+
+        if triggerSpeedTest {
+            do {
+                _ = try await ClashController.testGroupDelay(endpoint: validEp, groupName: "GLOBAL")
+            } catch {
+                if let names = try? await ClashController.fetchProxyGroupNames(endpoint: validEp),
+                   let first = names.first(where: { $0 != "GLOBAL" }) {
+                    _ = try? await ClashController.testGroupDelay(endpoint: validEp, groupName: first)
+                }
+            }
+        }
+
         do {
-            let fetched = try await ClashController.fetchProxies(endpoint: ep)
+            let fetched = try await ClashController.fetchProxies(endpoint: validEp)
             self.nodes = fetched
         } catch {
             // Keep existing nodes if momentary error

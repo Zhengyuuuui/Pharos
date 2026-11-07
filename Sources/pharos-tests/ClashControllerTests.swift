@@ -187,6 +187,37 @@ func testMihomoProxyNodeAndStrategy() {
     expectEq(MihomoProxyNode(name: "KR 首尔 01", type: "ss").region, .korea, "detect KR")
     expectEq(MihomoProxyNode(name: "UK London 02", type: "ss").region, .europe, "detect EU")
     expectEq(MihomoProxyNode(name: "DIRECT", type: "direct").region, .other, "detect other")
+
+    // Test isHealthy, statusRank and validDelay
+    let healthyNode = MihomoProxyNode(name: "Fast-01", type: "ss", delay: 45, alive: true)
+    let slowNode = MihomoProxyNode(name: "Slow-02", type: "ss", delay: 350, alive: true)
+    let untestedNode = MihomoProxyNode(name: "Untested-03", type: "ss", delay: nil, alive: true)
+    let timeout0Node = MihomoProxyNode(name: "Timeout-04", type: "ss", delay: 0, alive: false)
+    let timeoutAliveNode = MihomoProxyNode(name: "Timeout-05", type: "ss", delay: 0, alive: true)
+
+    expect(healthyNode.isHealthy, "healthy is healthy")
+    expectEq(healthyNode.validDelay, 45, "healthy validDelay")
+    expectEq(healthyNode.statusRank, 0, "healthy statusRank 0")
+
+    expect(!untestedNode.isHealthy, "untested not healthy")
+    expectEq(untestedNode.validDelay, nil, "untested validDelay nil")
+    expectEq(untestedNode.statusRank, 1, "untested statusRank 1")
+
+    expect(!timeout0Node.isHealthy, "timeout 0 not healthy")
+    expectEq(timeout0Node.validDelay, nil, "timeout 0 validDelay nil")
+    expectEq(timeout0Node.statusRank, 2, "timeout 0 statusRank 2")
+
+    expect(!timeoutAliveNode.isHealthy, "timeout alive not healthy")
+    expectEq(timeoutAliveNode.statusRank, 2, "timeout alive statusRank 2")
+
+    // Test sort guarantee: healthy nodes MUST precede timeout nodes!
+    var testList = [timeout0Node, slowNode, timeoutAliveNode, healthyNode, untestedNode]
+    testList.sort { a, b in
+        if a.statusRank != b.statusRank { return a.statusRank < b.statusRank }
+        if let d1 = a.validDelay, let d2 = b.validDelay, d1 != d2 { return d1 < d2 }
+        return a.name < b.name
+    }
+    expectEq(testList.map(\.name), ["Fast-01", "Slow-02", "Untested-03", "Timeout-04", "Timeout-05"], "healthy nodes precede timeout nodes in sort")
 }
 
 func testChunkedHttpDecoding() {
