@@ -293,6 +293,7 @@ struct PharosPage<Header: View, Content: View>: View {
             .padding(PharosSpacing.page)
             .frame(maxWidth: maxWidth, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .pharosSlimScroller()
         }
         .background(Color.clear)
     }

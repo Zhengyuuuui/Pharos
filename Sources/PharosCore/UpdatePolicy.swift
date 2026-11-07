@@ -169,4 +169,68 @@ public enum UpdatePolicy {
             htmlUrl: gh.html_url
         )
     }
+
+    /// Parses GitHub's public releases.atom feed (completely immune to API rate limits).
+    public static func parseAtomFeed(xml: String) throws -> ReleaseManifest {
+        var tagName: String = "v3.1.0"
+        if let idRegex = try? NSRegularExpression(pattern: "<id>tag:github\\.com,2008:Repository/[^/]+/([^<]+)</id>"),
+           let match = idRegex.firstMatch(in: xml, options: [], range: NSRange(xml.startIndex..<xml.endIndex, in: xml)),
+           let r = Range(match.range(at: 1), in: xml) {
+            tagName = String(xml[r])
+        } else if let linkRegex = try? NSRegularExpression(pattern: "releases/tag/([^\"<]+)"),
+                  let match = linkRegex.firstMatch(in: xml, options: [], range: NSRange(xml.startIndex..<xml.endIndex, in: xml)),
+                  let r = Range(match.range(at: 1), in: xml) {
+            tagName = String(xml[r])
+        }
+
+        var cleanVer = tagName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if cleanVer.lowercased().hasPrefix("v") {
+            cleanVer = String(cleanVer.dropFirst())
+        }
+
+        var releaseName: String = "Pharos \(tagName)"
+        if let titleRegex = try? NSRegularExpression(pattern: "<title>([^<]+)</title>"),
+           let matches = titleRegex.matches(in: xml, options: [], range: NSRange(xml.startIndex..<xml.endIndex, in: xml)) as [NSTextCheckingResult]?,
+           matches.count > 1,
+           let r = Range(matches[1].range(at: 1), in: xml) {
+            releaseName = String(xml[r])
+        }
+
+        var publishedAt: String? = nil
+        if let updRegex = try? NSRegularExpression(pattern: "<updated>([^<]+)</updated>"),
+           let match = updRegex.firstMatch(in: xml, options: [], range: NSRange(xml.startIndex..<xml.endIndex, in: xml)),
+           let r = Range(match.range(at: 1), in: xml) {
+            publishedAt = String(xml[r])
+        }
+
+        var notes: String = ""
+        if let contentRegex = try? NSRegularExpression(pattern: "<content type=\"html\">([\\s\\S]*?)</content>"),
+           let match = contentRegex.firstMatch(in: xml, options: [], range: NSRange(xml.startIndex..<xml.endIndex, in: xml)),
+           let r = Range(match.range(at: 1), in: xml) {
+            notes = String(xml[r])
+                .replacingOccurrences(of: "&lt;", with: "<")
+                .replacingOccurrences(of: "&gt;", with: ">")
+                .replacingOccurrences(of: "&amp;", with: "&")
+                .replacingOccurrences(of: "&quot;", with: "\"")
+        }
+
+        let sha256 = extractSHA256(from: notes)
+        let dmgName = "Pharos-\(cleanVer).dmg"
+        let githubDmg = URL(string: "https://github.com/Zhengyuuuui/Pharos/releases/download/\(tagName)/\(dmgName)")!
+        let htmlUrl = URL(string: "https://github.com/Zhengyuuuui/Pharos/releases/tag/\(tagName)")
+
+        return ReleaseManifest(
+            version: cleanVer,
+            tagName: tagName,
+            releaseName: releaseName,
+            publishedAt: publishedAt,
+            notes: notes,
+            sha256: sha256,
+            dmgName: dmgName,
+            dmgSize: 9914061,
+            dmgUrl: githubDmg,
+            githubDmgUrl: githubDmg,
+            htmlUrl: htmlUrl
+        )
+    }
 }

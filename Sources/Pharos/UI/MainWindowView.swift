@@ -156,6 +156,7 @@ struct MainWindowView: View {
         VStack(spacing: 0) {
             ScrollView(showsIndicators: false) {
                 sidebarContentList
+                    .pharosHiddenScroller()
             }
             .overlay(alignment: .top) {
                 TunableFrostedHeader(transparency: trafficLightGlassTransparency)

@@ -29,6 +29,7 @@ struct OnboardingPreferencesStepView: View {
                 .animation(OnboardingMotion.collapseAnimation(level), value: coordinator.draft.chargingChoice)
                 .frame(maxWidth: 600)
                 .frame(maxWidth: .infinity)
+                .pharosHiddenScroller()
             }
             .scrollIndicators(.never)
             .disabled(coordinator.isCommitting)

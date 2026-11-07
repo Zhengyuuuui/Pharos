@@ -22,6 +22,7 @@ struct PharosInspectorIsland: View {
                     inspectorBody
                 }
                 .padding(.bottom, 14) // Safe bottom buffer
+                .pharosHiddenScroller()
             }
         }
         .frame(width: 260)

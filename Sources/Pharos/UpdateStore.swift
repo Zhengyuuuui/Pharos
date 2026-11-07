@@ -168,20 +168,40 @@ final class UpdateStore: ObservableObject {
         }
 
         // Channel 2: GitHub Releases Official API Fallback (10s timeout)
-        guard let ghUrl = URL(string: Self.defaultGitHubAPIURL) else {
-            throw NSError(domain: "UpdateStore", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid GitHub API URL"])
-        }
-        var ghReq = URLRequest(url: ghUrl)
-        ghReq.timeoutInterval = 10.0
-        ghReq.setValue("Pharos/\(currentVersion)", forHTTPHeaderField: "User-Agent")
-        ghReq.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
+        if let ghUrl = URL(string: Self.defaultGitHubAPIURL) {
+            var ghReq = URLRequest(url: ghUrl)
+            ghReq.timeoutInterval = 10.0
+            ghReq.setValue("Pharos/\(currentVersion)", forHTTPHeaderField: "User-Agent")
+            ghReq.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
 
-        let (data, response) = try await URLSession.shared.data(for: ghReq)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            let code = (response as? HTTPURLResponse)?.statusCode ?? -1
-            throw NSError(domain: "UpdateStore", code: code, userInfo: [NSLocalizedDescriptionKey: "Update server unavailable (HTTP \(code))"])
+            do {
+                let (data, response) = try await URLSession.shared.data(for: ghReq)
+                if let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) {
+                    return try UpdatePolicy.parseGitHubReleaseManifest(data: data)
+                }
+            } catch {
+                // Fall through to Channel 3 on error or rate-limit
+            }
         }
-        return try UpdatePolicy.parseGitHubReleaseManifest(data: data)
+
+        // Channel 3: GitHub Public Releases Atom Feed (Rate-limit immune fallback)
+        let atomEndpoint = "https://github.com/Zhengyuuuui/Pharos/releases.atom"
+        if let atomUrl = URL(string: atomEndpoint) {
+            var atomReq = URLRequest(url: atomUrl)
+            atomReq.timeoutInterval = 10.0
+            atomReq.setValue("Pharos/\(currentVersion)", forHTTPHeaderField: "User-Agent")
+            do {
+                let (data, response) = try await URLSession.shared.data(for: atomReq)
+                if let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
+                   let xml = String(data: data, encoding: .utf8) {
+                    return try UpdatePolicy.parseAtomFeed(xml: xml)
+                }
+            } catch {
+                // Fall through
+            }
+        }
+
+        throw NSError(domain: "UpdateStore", code: -1, userInfo: [NSLocalizedDescriptionKey: "Update server unavailable"])
     }
 
     // MARK: - Background Schedule

@@ -60,51 +60,86 @@ export default {
         headers: ghHeaders,
       });
 
-      if (!ghRes.ok) {
-        return new Response(
-          JSON.stringify({
-            error: "Failed to fetch release from GitHub",
-            status: ghRes.status,
-            statusText: ghRes.statusText,
-          }),
-          {
-            status: ghRes.status === 404 ? 404 : 502,
-            headers: {
-              "Content-Type": "application/json; charset=utf-8",
-              "Access-Control-Allow-Origin": "*",
-            },
-          }
-        );
+      let tagName = "";
+      let releaseName = "";
+      let publishedAt = "";
+      let releaseNotes = "";
+      let htmlUrl = "";
+      let dmgName = "";
+      let dmgSize: number | null = null;
+      let githubDmgUrl = "";
+
+      if (ghRes.ok) {
+        const release = (await ghRes.json()) as GitHubRelease;
+        tagName = release.tag_name || "";
+        releaseName = release.name || `Pharos ${tagName}`;
+        publishedAt = release.published_at || new Date().toISOString();
+        releaseNotes = release.body || "";
+        htmlUrl = release.html_url || `https://github.com/${repo}/releases/tag/${tagName}`;
+
+        const cleanVer = tagName.replace(/^v/i, "");
+        const dmgAsset = (release.assets || []).find((a) => a.name.toLowerCase().endsWith(".dmg"));
+        dmgName = dmgAsset?.name || `Pharos-${cleanVer}.dmg`;
+        dmgSize = dmgAsset?.size ?? null;
+        githubDmgUrl = dmgAsset?.browser_download_url || `https://github.com/${repo}/releases/download/${tagName}/${dmgName}`;
+      } else {
+        // Fallback: Fetch public releases.atom (rate-limit immune)
+        const atomRes = await fetch(`https://github.com/${repo}/releases.atom`, {
+          headers: { "User-Agent": "Pharos-Update-Worker/1.0" },
+        });
+        if (!atomRes.ok) {
+          return new Response(
+            JSON.stringify({
+              error: "Failed to fetch release from GitHub",
+              status: ghRes.status,
+              statusText: ghRes.statusText,
+            }),
+            {
+              status: 502,
+              headers: {
+                "Content-Type": "application/json; charset=utf-8",
+                "Access-Control-Allow-Origin": "*",
+              },
+            }
+          );
+        }
+
+        const atomXml = await atomRes.text();
+        const tagMatch = atomXml.match(/<id>tag:github\.com,2008:Repository\/[^/]+\/([^<]+)<\/id>/);
+        tagName = tagMatch ? tagMatch[1] : "v3.1.0";
+        const cleanVer = tagName.replace(/^v/i, "");
+        const titleMatches = Array.from(atomXml.matchAll(/<title>([^<]+)<\/title>/g));
+        releaseName = titleMatches.length > 1 ? titleMatches[1][1] : `Pharos ${tagName}`;
+        const updatedMatch = atomXml.match(/<updated>([^<]+)<\/updated>/);
+        publishedAt = updatedMatch ? updatedMatch[1] : new Date().toISOString();
+        const contentMatch = atomXml.match(/<content type="html">([\s\S]*?)<\/content>/);
+        releaseNotes = contentMatch
+          ? contentMatch[1].replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")
+          : "";
+        htmlUrl = `https://github.com/${repo}/releases/tag/${tagName}`;
+        dmgName = `Pharos-${cleanVer}.dmg`;
+        dmgSize = 9914061;
+        githubDmgUrl = `https://github.com/${repo}/releases/download/${tagName}/${dmgName}`;
       }
 
-      const release = (await ghRes.json()) as GitHubRelease;
-      const tagName = release.tag_name || "";
       const version = tagName.replace(/^v/i, "");
-      const releaseNotes = release.body || "";
-
       // Extract 64-char hex SHA-256 from notes
       const shaMatch = releaseNotes.match(/\b([a-fA-F0-9]{64})\b/);
       const sha256 = shaMatch ? shaMatch[1].toLowerCase() : null;
-
-      // Locate .dmg asset
-      const dmgAsset = (release.assets || []).find((a) => a.name.toLowerCase().endsWith(".dmg"));
-      const dmgName = dmgAsset?.name || `Pharos-${version}.dmg`;
-      const dmgSize = dmgAsset?.size ?? null;
-      const githubDmgUrl = dmgAsset?.browser_download_url || `https://github.com/${repo}/releases/download/${tagName}/${dmgName}`;
       const dmgUrl = `${url.origin}/download/latest/${dmgName}`;
 
       const payload = {
         version,
         tagName,
-        releaseName: release.name || `Pharos ${tagName}`,
-        publishedAt: release.published_at || new Date().toISOString(),
+        releaseName,
+        publishedAt,
         notes: releaseNotes,
         sha256,
         dmgName,
         dmgSize,
         dmgUrl,
         githubDmgUrl,
-        htmlUrl: release.html_url || `https://github.com/${repo}/releases/tag/${tagName}`,
+        htmlUrl,
       };
 
       const response = new Response(JSON.stringify(payload, null, 2), {

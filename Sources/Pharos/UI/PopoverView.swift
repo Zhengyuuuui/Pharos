@@ -200,7 +200,7 @@ struct PopoverTabsContent: View {
                         .background(GeometryReader { geo in
                             Color.clear.preference(key: ContentHeightKey.self, value: geo.size.height)
                         })
-                        .background(SlimScrollerAttacher())
+                        .pharosSlimScroller()
                 }
                 .scrollDisabled(!isScrollNeeded)
                 // Grow with the content, scroll past maxH pt.
@@ -342,63 +342,4 @@ private struct RefreshIcon: View {
     }
 }
 
-/// An ultra-slim (3.5pt), highly refined custom overlay scroller designed specifically for menu bar popovers.
-/// Eliminates the thick default macOS scroller and prevents obstructing buttons or text.
-final class SlimPopoverScroller: NSScroller {
-    override class var isCompatibleWithOverlayScrollers: Bool { true }
 
-    override func drawKnob() {
-        let knobRect = self.rect(for: .knob)
-        guard knobRect.width > 0, knobRect.height > 0 else { return }
-
-        let slimWidth: CGFloat = 3.5
-        let rightMargin: CGFloat = 2.0
-        let x = bounds.width - slimWidth - rightMargin
-        let y = knobRect.origin.y + 2
-        let h = max(16, knobRect.height - 4)
-
-        let pillRect = NSRect(x: x, y: y, width: slimWidth, height: h)
-        let path = NSBezierPath(roundedRect: pillRect, xRadius: slimWidth / 2, yRadius: slimWidth / 2)
-
-        let isDark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        let color = isDark ? NSColor.white.withAlphaComponent(0.40) : NSColor.black.withAlphaComponent(0.30)
-        color.setFill()
-        path.fill()
-    }
-
-    override func drawKnobSlot(in rect: NSRect, highlight: Bool) {
-        // Keep track background completely invisible
-    }
-}
-
-private struct SlimScrollerAttacher: NSViewRepresentable {
-    func makeNSView(context: Context) -> SlimScrollerNSView {
-        SlimScrollerNSView()
-    }
-    func updateNSView(_ nsView: SlimScrollerNSView, context: Context) {
-        nsView.attach()
-    }
-}
-
-private final class SlimScrollerNSView: NSView {
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        attach()
-    }
-
-    override func viewDidMoveToSuperview() {
-        super.viewDidMoveToSuperview()
-        attach()
-    }
-
-    func attach() {
-        guard let sv = enclosingScrollView else { return }
-        if !(sv.verticalScroller is SlimPopoverScroller) {
-            let s = SlimPopoverScroller()
-            sv.verticalScroller = s
-            sv.scrollerStyle = .overlay
-        }
-    }
-
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
-}

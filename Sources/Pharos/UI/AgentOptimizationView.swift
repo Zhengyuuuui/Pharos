@@ -69,6 +69,7 @@ struct AgentOptimizationView: View {
                     }
                 }
                 .padding(PharosSpacing.l)
+                .pharosSlimScroller()
             }
 
             Divider()
@@ -776,6 +777,7 @@ struct AgentRelocationView: View {
                     }
                 }
                 .padding(PharosSpacing.l)
+                .pharosSlimScroller()
             }
 
             Divider()

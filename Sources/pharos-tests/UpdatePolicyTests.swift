@@ -96,4 +96,29 @@ func testUpdatePolicy() {
     } catch {
         expect(false, "Failed to parse GitHub release manifest: \(error)")
     }
+
+    // 6. parseAtomFeed (rate-limit immune public Atom feed)
+    let sampleAtom = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <feed xmlns="http://www.w3.org/2005/Atom">
+      <entry>
+        <id>tag:github.com,2008:Repository/1412696005/v3.1.0</id>
+        <updated>2026-11-05T03:33:20Z</updated>
+        <link rel="alternate" type="text/html" href="https://github.com/Zhengyuuuui/Pharos/releases/tag/v3.1.0"/>
+        <title>Pharos v3.1.0</title>
+        <content type="html">&lt;h1&gt;Pharos v3.1.0&lt;/h1&gt;&lt;p&gt;SHA256: b2a4abb45ae5952bedb41723ab37e1471d69872d3c600964f35a9fe3e1f00be9&lt;/p&gt;</content>
+      </entry>
+    </feed>
+    """
+
+    do {
+        let atomManifest = try UpdatePolicy.parseAtomFeed(xml: sampleAtom)
+        expectEq(atomManifest.version, "3.1.0", "atom manifest version")
+        expectEq(atomManifest.tagName, "v3.1.0", "atom manifest tagName")
+        expectEq(atomManifest.sha256, "b2a4abb45ae5952bedb41723ab37e1471d69872d3c600964f35a9fe3e1f00be9", "atom manifest sha256")
+        expectEq(atomManifest.dmgName, "Pharos-3.1.0.dmg", "atom manifest dmgName")
+        expectEq(atomManifest.dmgUrl.absoluteString, "https://github.com/Zhengyuuuui/Pharos/releases/download/v3.1.0/Pharos-3.1.0.dmg", "atom manifest dmgUrl")
+    } catch {
+        expect(false, "Failed to parse Atom feed: \(error)")
+    }
 }
