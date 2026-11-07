@@ -423,7 +423,7 @@ final class AgentChatStore: ObservableObject {
             scope: scopeLabel
         )
         if isEditorRunning(entry.editor) {
-            info1 += "\n\n⚠️ " + l10n.deleteDbEditorRunningWarning(entry.editor.displayName)
+            info1 += "\n\n" + l10n.deleteDbEditorRunningWarning(entry.editor.displayName)
         }
         alert1.informativeText = info1
 

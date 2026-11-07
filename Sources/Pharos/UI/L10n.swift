@@ -283,8 +283,8 @@ final class L10n: ObservableObject {
            : "选择项目文件夹。Pharos 会读取 package.json、Makefile、manage.py 等文件来识别启动命令。"
     }
     var favoritesEmpty: String {
-        en ? "No favorites yet. Add a workspace folder, or click ☆ on a running project to keep it here with its start command."
-           : "还没有常用项目。添加一个工作区文件夹，或点击运行中项目的 ☆，把它连同启动命令保存到这里。"
+        en ? "No favorites yet. Add a workspace folder, or click the star button on a running project to keep it here with its start command."
+           : "还没有常用项目。添加一个工作区文件夹，或点击运行中项目的星标，把它连同启动命令保存到这里。"
     }
     var pinToFavorites: String { en ? "Add to Favorites" : "加入常用" }
     var pinned: String { en ? "In Favorites" : "已加入常用" }
@@ -306,7 +306,7 @@ final class L10n: ObservableObject {
         case .custom: return en ? "set by you" : "手动设置"
         }
     }
-    var noCommandSet: String { en ? "No start command — click ✎ to set one" : "没有启动命令——点 ✎ 设置" }
+    var noCommandSet: String { en ? "No start command — click edit to set one" : "没有启动命令——点编辑按钮设置" }
     var commandPlaceholder: String { en ? "e.g. pnpm run dev" : "例如 pnpm run dev" }
     var editCommand: String { en ? "Edit command" : "编辑命令" }
     var copyCommand: String { en ? "Copy cd + command" : "复制 cd + 命令" }
@@ -377,7 +377,17 @@ final class L10n: ObservableObject {
     var proxyAPill: String { en ? "Proxy A · 7890" : "代理 A · 7890" }
     var proxyBPill: String { en ? "Proxy B · 7897" : "代理 B · 7897" }
     var proxySystemPill: String { en ? "System" : "跟随系统" }
-    var proxyCustomPill: String { en ? "Custom…" : "⚙️ 自定义…" }
+    var proxyCustomPill: String { en ? "Custom…" : "自定义…" }
+    var proxyFollowSystemDesc: String { en ? "Follow macOS System / TUN" : "跟随 macOS 系统网络 / TUN 代理" }
+    var relaunchBrowserTitle: String { en ? "Relaunch Browser to Apply Proxy?" : "重启浏览器以应用新模式？" }
+    func relaunchBrowserMessage(_ mode: String) -> String {
+        en ? "Switching to “\(mode)” requires restarting this browser instance. Open tabs and unsaved pages will close."
+           : "切换至「\(mode)」模式需要重启该浏览器实例。当前所有打开的页面和标签页将被关闭并重新载入。确定要继续吗？"
+    }
+    var relaunchNow: String { en ? "Relaunch & Apply" : "立即重启并应用" }
+    func relaunchSuccessToast(_ mode: String) -> String {
+        en ? "Relaunched with “\(mode)”" : "已以「\(mode)」模式重启"
+    }
     var proxyDirectToast: String { en ? "Switched to Pure Direct" : "已切换至纯净直连" }
     var proxySystemToast: String { en ? "Switched to Follow System" : "已切换至跟随系统" }
     func proxyClashToast(_ port: Int) -> String {
@@ -1790,7 +1800,7 @@ final class L10n: ObservableObject {
     }
     var resetSettingsDone: String { en ? "All settings have been restored to defaults." : "所有设置已恢复为默认值。" }
     var launchAtLoginHelp: String { en ? "Automatically launch Pharos in the menu bar when you log into your Mac." : "在登录 Mac 时自动在菜单栏启动 Pharos。" }
-    var footerCrafted: String { en ? "By zys with ♡" : "由 zys 精心打造 ♡" }
+    var footerCrafted: String { en ? "By zys" : "由 zys 精心打造" }
     var trafficLightGlassTitle: String { en ? "Traffic Lights Glass Transparency" : "交通灯毛玻璃透明度" }
     var trafficLightGlassHint: String {
         en ? "Adjust the frosted glass translucency over the top-left traffic lights when scrolling the sidebar. Live preview on the left shows overlapping text."
@@ -2346,7 +2356,7 @@ final class L10n: ObservableObject {
     var upToDate: String { en ? "Pharos is up to date" : "当前已是最新版本" }
     var updateAvailable: String { en ? "New version available" : "发现新版本" }
     func updateBannerText(version: String) -> String {
-        en ? "✨ New version v\(version) · Click to update" : "✨ 发现新版本 v\(version) · 点击一键更新"
+        en ? "New version v\(version) · Click to update" : "发现新版本 v\(version) · 点击一键更新"
     }
     var updateAndRestart: String { en ? "Update & Restart" : "立即更新并重启" }
     var manualDownloadDMG: String { en ? "Download DMG" : "手动下载 DMG" }

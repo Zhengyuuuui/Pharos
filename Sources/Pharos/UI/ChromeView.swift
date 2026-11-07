@@ -180,6 +180,9 @@ private struct ChromeCard: View {
     @State private var showCustomProxyPrompt = false
     @State private var customProxyInput = ""
     @State private var hotSwitchToast: String? = nil
+    @State private var showRelaunchAlert = false
+    @State private var pendingRelaunchTarget: ChromeConfig? = nil
+    @State private var pendingRelaunchModeName: String = ""
 
     var body: some View {
         let c = entry.config
@@ -211,7 +214,7 @@ private struct ChromeCard: View {
                 Grid(alignment: .leading, horizontalSpacing: PharosSpacing.m, verticalSpacing: PharosSpacing.xs) {
                     if c.browser != .chrome { row(l10n.browserTitle, c.browser.appName, mono: false) }
                     row(l10n.profileFolder, c.isDefaultProfile ? l10n.defaultProfile : c.profileKey, mono: !c.isDefaultProfile)
-                    if let proxy = c.proxyServer { row(l10n.proxy, proxy, mono: true) }
+                    row(l10n.proxy, c.proxyServer ?? l10n.proxyFollowSystemDesc, mono: c.proxyServer != nil)
                     if let url = c.startURL { row(l10n.startURL, url, mono: true) }
                     let accounts = chrome.profileNames[c.profileKey] ?? []
                     if !accounts.isEmpty { row(l10n.chromeAccounts, accounts.joined(separator: ", "), mono: false) }
@@ -247,11 +250,9 @@ private struct ChromeCard: View {
                                 .transition(.opacity)
                         }
 
-                        if let r = entry.running {
+                        if entry.isRunning {
                             Button {
-                                chrome.relaunch(r, with: entry.config) {
-                                    await store.refresh()
-                                }
+                                requestRelaunch(target: entry.config, modeName: modeDisplayName(entry.config))
                             } label: {
                                 Label(l10n.relaunchWithProxy, systemImage: "arrow.clockwise")
                             }
@@ -275,7 +276,7 @@ private struct ChromeCard: View {
                             title: l10n.proxySystemPill,
                             icon: "arrow.triangle.2.circlepath",
                             isSelected: isFollowSystem(c),
-                            activeColor: PharosColor.textSecondary
+                            activeColor: Color.blue
                         ) {
                             applyProxyFollowSystem(c)
                         }
@@ -349,6 +350,19 @@ private struct ChromeCard: View {
                 }
             }
             Button(l10n.cancel, role: .cancel) {}
+        }
+        .alert(l10n.relaunchBrowserTitle, isPresented: $showRelaunchAlert) {
+            Button(l10n.cancel, role: .cancel) {
+                pendingRelaunchTarget = nil
+                pendingRelaunchModeName = ""
+            }
+            Button(l10n.relaunchNow, role: .destructive) {
+                if let target = pendingRelaunchTarget {
+                    confirmAndExecuteRelaunch(target: target)
+                }
+            }
+        } message: {
+            Text(l10n.relaunchBrowserMessage(pendingRelaunchModeName))
         }
     }
 
@@ -497,68 +511,90 @@ private struct ChromeCard: View {
         .buttonStyle(.plain)
     }
 
+    private func modeDisplayName(_ c: ChromeConfig) -> String {
+        switch c.proxyStrategy {
+        case .followSystem:
+            return l10n.proxySystemPill
+        case .direct:
+            return l10n.proxyDirectPill
+        case .clashMixedPort(let port):
+            return "\(l10n.proxyClashPill) (:\(port))"
+        case .node(let name, _):
+            return name
+        case .custom(let s):
+            return s
+        }
+    }
+
+    private func requestRelaunch(target: ChromeConfig, modeName: String) {
+        pendingRelaunchTarget = target
+        pendingRelaunchModeName = modeName
+        showRelaunchAlert = true
+    }
+
+    private func confirmAndExecuteRelaunch(target: ChromeConfig) {
+        guard let r = entry.running else { return }
+        chrome.updateProxyStrategy(target.proxyStrategy, for: entry)
+        Task {
+            if case .node(let name, _) = target.proxyStrategy, clash.snapshot.isRunning {
+                try? await clash.ensureInstanceListener(config: target)
+                _ = await clash.switchProxy(groupName: target.dedicatedGroupName, nodeName: name)
+            }
+            chrome.relaunch(r, with: target) {
+                await store.refresh()
+            }
+            let modeName = modeDisplayName(target)
+            withAnimation { hotSwitchToast = l10n.relaunchSuccessToast(modeName) }
+            try? await Task.sleep(for: .seconds(2.5))
+            withAnimation { hotSwitchToast = nil }
+        }
+    }
+
     private func applyProxyFollowSystem(_ c: ChromeConfig) {
         let strategy = BrowserProxyStrategy.followSystem
-        chrome.updateProxyStrategy(strategy, for: entry)
         if let r = entry.running {
             if case .followSystem = r.config.proxyStrategy { return }
             var target = r.config
             target.proxyStrategy = strategy
-            chrome.relaunch(r, with: target) {
-                await store.refresh()
-            }
-            withAnimation { hotSwitchToast = l10n.proxySystemToast }
-            Task {
-                try? await Task.sleep(for: .seconds(2.5))
-                withAnimation { hotSwitchToast = nil }
-            }
+            requestRelaunch(target: target, modeName: l10n.proxySystemPill)
+        } else {
+            chrome.updateProxyStrategy(strategy, for: entry)
         }
     }
 
     private func applyProxyDirect(_ c: ChromeConfig) {
         let strategy = BrowserProxyStrategy.direct
-        chrome.updateProxyStrategy(strategy, for: entry)
         if let r = entry.running {
             if r.config.proxyStrategy.isDirect { return }
             var target = r.config
             target.proxyStrategy = strategy
-            chrome.relaunch(r, with: target) {
-                await store.refresh()
-            }
-            withAnimation { hotSwitchToast = l10n.proxyDirectToast }
-            Task {
-                try? await Task.sleep(for: .seconds(2.5))
-                withAnimation { hotSwitchToast = nil }
-            }
+            requestRelaunch(target: target, modeName: l10n.proxyDirectPill)
+        } else {
+            chrome.updateProxyStrategy(strategy, for: entry)
         }
     }
 
     private func applyProxyClashMixed(_ c: ChromeConfig) {
         let port = clash.snapshot.mixedPort > 0 ? clash.snapshot.mixedPort : 7890
         let strategy = BrowserProxyStrategy.clashMixedPort(port)
-        chrome.updateProxyStrategy(strategy, for: entry)
         if let r = entry.running {
             if case .clashMixedPort(let p) = r.config.proxyStrategy, p == port { return }
             var target = r.config
             target.proxyStrategy = strategy
-            chrome.relaunch(r, with: target) {
-                await store.refresh()
-            }
-            withAnimation { hotSwitchToast = l10n.proxyClashToast(port) }
-            Task {
-                try? await Task.sleep(for: .seconds(2.5))
-                withAnimation { hotSwitchToast = nil }
-            }
+            requestRelaunch(target: target, modeName: "\(l10n.proxyClashPill) (:\(port))")
+        } else {
+            chrome.updateProxyStrategy(strategy, for: entry)
         }
     }
 
     private func applyProxyNode(_ name: String, config: ChromeConfig) {
         let port = config.dedicatedProxyPort
         let strategy = BrowserProxyStrategy.node(name: name, port: port)
-        chrome.updateProxyStrategy(strategy, for: entry)
         if let r = entry.running {
             let isAlreadyOnDedicatedPort = r.config.proxyServer == "http://127.0.0.1:\(port)"
             if isAlreadyOnDedicatedPort && clash.snapshot.isRunning {
+                // Hot-switch in Mihomo without browser restart!
+                chrome.updateProxyStrategy(strategy, for: entry)
                 Task {
                     let ok = await clash.switchProxy(groupName: config.dedicatedGroupName, nodeName: name)
                     if ok {
@@ -568,34 +604,26 @@ private struct ChromeCard: View {
                     }
                 }
             } else {
+                // Switching from another mode requires restarting Chrome with proxy flags
                 var target = r.config
                 target.proxyStrategy = strategy
                 target.proxyNodeName = name
-                Task {
-                    if clash.snapshot.isRunning {
-                        try? await clash.ensureInstanceListener(config: target)
-                        _ = await clash.switchProxy(groupName: target.dedicatedGroupName, nodeName: name)
-                    }
-                    chrome.relaunch(r, with: target) {
-                        await store.refresh()
-                    }
-                    withAnimation { hotSwitchToast = l10n.proxyNodeSwitchedToast(name, port) }
-                    try? await Task.sleep(for: .seconds(2.5))
-                    withAnimation { hotSwitchToast = nil }
-                }
+                requestRelaunch(target: target, modeName: name)
             }
+        } else {
+            chrome.updateProxyStrategy(strategy, for: entry)
         }
     }
 
     private func applyCustomProxy(_ proxyUrl: String) {
         let strategy = BrowserProxyStrategy.custom(proxyUrl)
-        chrome.updateProxyStrategy(strategy, for: entry)
         if let r = entry.running {
+            if case .custom(let cur) = r.config.proxyStrategy, cur == proxyUrl { return }
             var target = r.config
             target.proxyStrategy = strategy
-            chrome.relaunch(r, with: target) {
-                await store.refresh()
-            }
+            requestRelaunch(target: target, modeName: proxyUrl)
+        } else {
+            chrome.updateProxyStrategy(strategy, for: entry)
         }
     }
 
@@ -605,41 +633,45 @@ private struct ChromeCard: View {
         case .direct:
             Text(l10n.proxyDirectPill)
                 .font(PharosFont.captionDigits)
-                .padding(.horizontal, 6).padding(.vertical, 1)
+                .padding(.horizontal, 6).padding(.vertical, 1.5)
                 .background(Capsule().fill(PharosColor.success.opacity(0.13)))
                 .foregroundStyle(PharosColor.success)
         case .node(let name, let port):
             if name == "DIRECT" {
                 Text(l10n.proxyDirectPill)
                     .font(PharosFont.captionDigits)
-                    .padding(.horizontal, 6).padding(.vertical, 1)
+                    .padding(.horizontal, 6).padding(.vertical, 1.5)
                     .background(Capsule().fill(PharosColor.success.opacity(0.13)))
                     .foregroundStyle(PharosColor.success)
             } else {
                 Text("\(name) :\(port)")
                     .font(PharosFont.captionDigits)
-                    .padding(.horizontal, 6).padding(.vertical, 1)
+                    .padding(.horizontal, 6).padding(.vertical, 1.5)
                     .background(Capsule().fill(PharosColor.accent.opacity(0.13)))
                     .foregroundStyle(PharosColor.accent)
             }
         case .clashMixedPort(let port):
             Text("Clash :\(String(port))")
                 .font(PharosFont.captionDigits)
-                .padding(.horizontal, 6).padding(.vertical, 1)
+                .padding(.horizontal, 6).padding(.vertical, 1.5)
                 .background(Capsule().fill(PharosColor.accent.opacity(0.13)))
                 .foregroundStyle(PharosColor.accent)
         case .custom(let s):
             Text(s)
                 .font(PharosFont.captionDigits)
-                .padding(.horizontal, 6).padding(.vertical, 1)
+                .padding(.horizontal, 6).padding(.vertical, 1.5)
                 .background(Capsule().fill(PharosColor.fill))
                 .foregroundStyle(PharosColor.textSecondary)
         case .followSystem:
-            Text(l10n.proxySystemPill)
-                .font(PharosFont.captionDigits)
-                .padding(.horizontal, 6).padding(.vertical, 1)
-                .background(Capsule().fill(PharosColor.fill))
-                .foregroundStyle(PharosColor.textSecondary)
+            HStack(spacing: 3) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 8, weight: .semibold))
+                Text(l10n.proxySystemPill)
+            }
+            .font(PharosFont.captionDigits)
+            .padding(.horizontal, 6).padding(.vertical, 1.5)
+            .background(Capsule().fill(Color.blue.opacity(0.14)))
+            .foregroundStyle(Color.blue)
         }
     }
 
