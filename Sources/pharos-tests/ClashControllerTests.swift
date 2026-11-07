@@ -177,6 +177,16 @@ func testMihomoProxyNodeAndStrategy() {
     } else {
         expect(false, "node strategy failed codable")
     }
+
+    // Test ProxyNodeRegion classification
+    expectEq(MihomoProxyNode(name: "[IPLC] 专线-香港01-BGP", type: "ss").region, .hongKong, "detect HK")
+    expectEq(MihomoProxyNode(name: "JP Tokyo 03", type: "vmess").region, .japan, "detect JP")
+    expectEq(MihomoProxyNode(name: "SG 新加坡 02", type: "trojan").region, .singapore, "detect SG")
+    expectEq(MihomoProxyNode(name: "US Los Angeles 01", type: "ss").region, .unitedStates, "detect US")
+    expectEq(MihomoProxyNode(name: "TW 台北 05", type: "vmess").region, .taiwan, "detect TW")
+    expectEq(MihomoProxyNode(name: "KR 首尔 01", type: "ss").region, .korea, "detect KR")
+    expectEq(MihomoProxyNode(name: "UK London 02", type: "ss").region, .europe, "detect EU")
+    expectEq(MihomoProxyNode(name: "DIRECT", type: "direct").region, .other, "detect other")
 }
 
 func testChunkedHttpDecoding() {

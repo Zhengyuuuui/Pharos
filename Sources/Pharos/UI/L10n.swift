@@ -479,6 +479,38 @@ final class L10n: ObservableObject {
     var clashRefreshNodes: String { en ? "Refresh Proxies" : "刷新节点" }
     var noProxyNodesFound: String { en ? "No proxies detected" : "未发现可用节点" }
     var proxyExitNode: String { en ? "Exit Node" : "出口节点" }
+    func regionDisplayName(_ region: ProxyNodeRegion) -> String {
+        switch region {
+        case .all: return en ? "All" : "全部"
+        case .hongKong: return en ? "HK · Hong Kong" : "HK · 香港"
+        case .japan: return en ? "JP · Japan" : "JP · 日本"
+        case .singapore: return en ? "SG · Singapore" : "SG · 新加坡"
+        case .unitedStates: return en ? "US · United States" : "US · 美国"
+        case .taiwan: return en ? "TW · Taiwan" : "TW · 台湾"
+        case .korea: return en ? "KR · Korea" : "KR · 韩国"
+        case .europe: return en ? "EU · Europe" : "EU · 欧洲"
+        case .other: return en ? "Other" : "其他"
+        }
+    }
+    func regionShortName(_ region: ProxyNodeRegion) -> String {
+        switch region {
+        case .all: return en ? "All" : "全部"
+        case .hongKong: return en ? "Hong Kong" : "香港"
+        case .japan: return en ? "Japan" : "日本"
+        case .singapore: return en ? "Singapore" : "新加坡"
+        case .unitedStates: return en ? "United States" : "美国"
+        case .taiwan: return en ? "Taiwan" : "台湾"
+        case .korea: return en ? "Korea" : "韩国"
+        case .europe: return en ? "Europe" : "欧洲"
+        case .other: return en ? "Other" : "其他"
+        }
+    }
+    var searchNodePlaceholder: String { en ? "Search nodes (e.g. hk, 01, iplc)…" : "搜索节点或地区 (例如 hk, 01, 专线)…" }
+    var noMatchingNodes: String { en ? "No matching proxy nodes" : "未找到匹配的代理节点" }
+    var recentNodesTitle: String { en ? "Recent Nodes" : "最近使用" }
+    var allRegionsTitle: String { en ? "All Nodes" : "全部节点" }
+    var sortByLatency: String { en ? "Sort by Latency" : "延迟排序" }
+    var hideOfflineNodes: String { en ? "Hide Offline" : "隐藏不可用" }
     func proxyNodeSwitchedToast(_ node: String, _ port: Int) -> String {
         if port > 0 {
             return en ? "Switched to \(node) (Port :\(port))" : "已实时切换至 \(node) (端口 :\(port))"

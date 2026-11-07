@@ -183,6 +183,7 @@ private struct ChromeCard: View {
     @State private var showRelaunchAlert = false
     @State private var pendingRelaunchTarget: ChromeConfig? = nil
     @State private var pendingRelaunchModeName: String = ""
+    @State private var showNodePopover = false
 
     var body: some View {
         let c = entry.config
@@ -435,27 +436,8 @@ private struct ChromeCard: View {
 
     private func nodeMenuPill(_ c: ChromeConfig) -> some View {
         let isSelected = isNodeSelected(c)
-        return Menu {
-            if clash.nodes.isEmpty {
-                Text(l10n.noProxyNodesFound)
-            } else {
-                ForEach(clash.nodes) { node in
-                    Button {
-                        applyProxyNode(node.name, config: c)
-                    } label: {
-                        HStack {
-                            Text(node.name)
-                            if let delay = node.delay {
-                                Spacer()
-                                Text("\(delay) ms")
-                            }
-                            if (c.proxyNodeName ?? "") == node.name {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            }
+        return Button {
+            showNodePopover = true
         } label: {
             HStack(spacing: 4) {
                 Circle()
@@ -479,8 +461,18 @@ private struct ChromeCard: View {
                     .fill(isSelected ? PharosColor.accent.opacity(0.12) : PharosColor.fill)
             )
         }
-        .menuStyle(.borderlessButton)
+        .buttonStyle(.plain)
         .fixedSize()
+        .popover(isPresented: $showNodePopover, arrowEdge: .bottom) {
+            NodePickerPopover(
+                config: c,
+                currentNode: currentNodeTitle(c),
+                onSelect: { nodeName in
+                    showNodePopover = false
+                    applyProxyNode(nodeName, config: c)
+                }
+            )
+        }
     }
 
     private func customProxyPill(_ c: ChromeConfig) -> some View {

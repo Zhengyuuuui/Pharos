@@ -53,6 +53,7 @@ final class ChromeStore: ObservableObject {
     @Published private(set) var presets: [ChromePreset] = []
     @Published private(set) var activeStrategies: [String: BrowserProxyStrategy] = [:]
     @Published private(set) var activeNodes: [String: String] = [:]
+    @Published private(set) var recentNodeNames: [String] = []
     @Published private(set) var folderSizes: [String: UInt64] = [:]
     @Published private(set) var sizing = false
     /// Signed-in profile names per user-data-dir. Read off the main thread and
@@ -87,6 +88,7 @@ final class ChromeStore: ObservableObject {
                 errorMessage = L10n.shared.chromeLoadFailed
             }
         }
+        recentNodeNames = d.stringArray(forKey: "pharos.recentNodeNames") ?? []
     }
 
     var chromeInstalled: Bool { !installedBrowsers.isEmpty }
@@ -283,12 +285,23 @@ final class ChromeStore: ObservableObject {
         }
     }
 
+    /// Records a chosen node to recent history (max 6 items).
+    func recordRecentNode(_ name: String) {
+        guard !name.isEmpty, name != "DIRECT" else { return }
+        var list = recentNodeNames.filter { $0 != name }
+        list.insert(name, at: 0)
+        if list.count > 6 { list = Array(list.prefix(6)) }
+        recentNodeNames = list
+        UserDefaults.standard.set(list, forKey: "pharos.recentNodeNames")
+    }
+
     /// Updates or assigns proxy strategy to an instance/preset.
     func updateProxyStrategy(_ strategy: BrowserProxyStrategy, for entry: Entry) {
         let key = entry.config.profileKey
         activeStrategies[key] = strategy
         if case .node(let name, _) = strategy {
             activeNodes[key] = name
+            recordRecentNode(name)
         } else {
             activeNodes.removeValue(forKey: key)
         }

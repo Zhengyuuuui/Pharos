@@ -167,6 +167,65 @@ public struct MihomoProxyNode: Identifiable, Hashable, Sendable, Codable {
         let nonLeaf = ["selector", "urltest", "fallback", "loadbalance", "relay", "compatible", "reject", "rejectdrop", "pass"]
         return !nonLeaf.contains(t)
     }
+
+    public var region: ProxyNodeRegion {
+        ProxyNodeRegion.detect(from: name)
+    }
+}
+
+/// Geographic region classification for proxy nodes.
+public enum ProxyNodeRegion: String, CaseIterable, Identifiable, Sendable {
+    case all
+    case hongKong
+    case japan
+    case singapore
+    case unitedStates
+    case taiwan
+    case korea
+    case europe
+    case other
+
+    public var id: String { rawValue }
+
+    public var code: String {
+        switch self {
+        case .all: return "ALL"
+        case .hongKong: return "HK"
+        case .japan: return "JP"
+        case .singapore: return "SG"
+        case .unitedStates: return "US"
+        case .taiwan: return "TW"
+        case .korea: return "KR"
+        case .europe: return "EU"
+        case .other: return "GL"
+        }
+    }
+
+    public static func detect(from name: String) -> ProxyNodeRegion {
+        let n = name.uppercased()
+        if n.contains("香港") || n.contains("HK") || n.contains("HONG KONG") || n.contains("HONGKONG") {
+            return .hongKong
+        }
+        if n.contains("日本") || n.contains("JP") || n.contains("JAPAN") || n.contains("TOKYO") || n.contains("OSAKA") {
+            return .japan
+        }
+        if n.contains("新加坡") || n.contains("SG") || n.contains("SINGAPORE") || n.contains("狮城") {
+            return .singapore
+        }
+        if n.contains("美国") || n.contains("US") || n.contains("USA") || n.contains("UNITED STATES") || n.contains("洛杉矶") || n.contains("圣何塞") || n.contains("西雅图") || n.contains("硅谷") {
+            return .unitedStates
+        }
+        if n.contains("台湾") || n.contains("TW") || n.contains("TAIWAN") || n.contains("台北") {
+            return .taiwan
+        }
+        if n.contains("韩国") || n.contains("KR") || n.contains("KOREA") || n.contains("首尔") {
+            return .korea
+        }
+        if n.contains("英国") || n.contains("UK") || n.contains("德国") || n.contains("DE") || n.contains("法国") || n.contains("FR") || n.contains("欧洲") || n.contains("EU") {
+            return .europe
+        }
+        return .other
+    }
 }
 
 /// Real-time status snapshot of the local Clash/Mihomo daemon.
