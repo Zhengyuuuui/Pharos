@@ -66,6 +66,5 @@ Never use generic hype words ("超强", "黑科技", "极致赋能"). Always use
                    ▼
        产出带时间戳的最终宣传片 MP4
    ```
-2. **在当前 Antigravity 中唤起**：
-   直接使用 `invoke_subagent` 或对我说：  
-   *“让 `pharos-video-director` 针对我新录制的内存监控视频出分镜文案和 Claude 执行 prompt”*。
+3. **宣发与社媒文案联动**：
+   视频渲染完成后的全平台发布文案、简介、推特与小红书图文帖子，遵循 `docs/AGENTS_PHAROS_COPYWRITER.md` 中的**双轨叙事体系（轨道 A 官方旗舰风 + 轨道 B 独立开发真人去 AI 增长风）**。

@@ -54,6 +54,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
 
+        UpdateStore.shared.startBackgroundSchedule()
+
         if OnboardingCoordinator.shouldPresentOnLaunch() {
             OnboardingWindowController.shared.show(store: store, isReplay: false)
         } else {

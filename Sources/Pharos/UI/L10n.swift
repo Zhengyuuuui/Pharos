@@ -2338,4 +2338,30 @@ final class L10n: ObservableObject {
     var ambientNotReady: String { en ? "Not Ready" : "未就绪" }
     var ambientHotkeyHint: String { en ? "⌥ + P to Toggle" : "快捷键 ⌥ + P 唤醒" }
     var ambientCopied: String { en ? "Copied" : "已复制" }
+
+    // MARK: - In-App Self-Update
+    var aboutAndSoftwareUpdates: String { en ? "About & Software Update" : "关于与软件更新" }
+    var checkForUpdates: String { en ? "Check for Updates" : "检查更新" }
+    var checkingForUpdates: String { en ? "Checking for updates…" : "正在检查更新…" }
+    var upToDate: String { en ? "Pharos is up to date" : "当前已是最新版本" }
+    var updateAvailable: String { en ? "New version available" : "发现新版本" }
+    func updateBannerText(version: String) -> String {
+        en ? "✨ New version v\(version) · Click to update" : "✨ 发现新版本 v\(version) · 点击一键更新"
+    }
+    var updateAndRestart: String { en ? "Update & Restart" : "立即更新并重启" }
+    var manualDownloadDMG: String { en ? "Download DMG" : "手动下载 DMG" }
+    var skipThisVersion: String { en ? "Skip this version" : "跳过此版本" }
+    var autoCheckUpdates: String { en ? "Automatically check for updates" : "自动检查更新" }
+    var autoCheckUpdatesDesc: String {
+        en ? "Silently check for new releases in the background" : "在后台静默检查 GitHub 与边缘网关的最新版本"
+    }
+    var updateDownloading: String { en ? "Downloading update…" : "正在下载更新…" }
+    var updateVerifying: String { en ? "Verifying package integrity (SHA-256)…" : "正在校验安装包完整性 (SHA-256)…" }
+    var updateInstalling: String { en ? "Installing and preparing to restart…" : "正在安装并准备重启…" }
+    var updateHashMismatch: String {
+        en ? "Downloaded DMG SHA-256 checksum mismatch" : "安装包 SHA-256 校验和不匹配"
+    }
+    var updateFailed: String { en ? "Update failed" : "更新失败" }
+    var updateRetry: String { en ? "Retry" : "重试" }
+    var releaseNotes: String { en ? "Release Notes" : "更新日志" }
 }

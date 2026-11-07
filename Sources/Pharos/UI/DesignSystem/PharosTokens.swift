@@ -67,6 +67,7 @@ enum PharosColor {
     })
     static let success = Color.green
     static let warning = Color.orange
+    static let amber = Color(red: 0.96, green: 0.62, blue: 0.12)
     static let error = Color.red
 
     private static func dynamic(

@@ -15,6 +15,7 @@
 - 唯一例外：App 图标允许在 `Makefile` 中调用 Apple 工具链自带的 `iconutil` 与 `actool`
   （Xcode 命令行工具）编译图标资源；不得因此引入 `.xcodeproj` / `.xcworkspace`。
   `actool` 不可用时必须自动退回只打包 `.icns`，`make app` 不得因此失败。
+- 云端边缘网关：位于 `cloud/pharos-update-worker/`，仅作为部署在 Cloudflare Workers 上的无状态独立服务，不属于客户端运行时组成部分，绝不进入 `Package.swift` 或 `Pharos.app` 客户端分发包。
 - 原因：本项目是轻量菜单栏工具，保持纯 Swift 栈可确保：
   可审计、无供应链风险、与系统 API（ARC、Swift Concurrency）行为一致。
 
@@ -159,6 +160,11 @@ Swift 通过 **ARC（自动引用计数）** 管理内存：编译器自动插�
   `RegisterEventHotKey`，不需要辅助功能权限，不监听其他按键。
 - 备份（`PharosCore/Backup.swift` + `BackupActions.swift`）：只读写用户在保存/打开面板中选的那个文件；
   导入只添加新条目，已有的跳过，不覆盖、不删除。
+- 「应用内自更新（In-App Update）」（`UpdatePolicy.swift` + `UpdateStore.swift`）：
+  - 检查机制：只读向 Cloudflare Worker 边缘更新网关（默认 `https://pharos-update.zysgm123.workers.dev/api/v1/latest`，支持用户通过 `UserDefaults` 覆盖）拉取最新版本元数据，失败时无缝自动回退到 GitHub Releases 官方接口；不上传任何设备或用户隐私。
+  - 用户确认原则：绝不强制静默下载安装。仅在用户显式点击「立即更新并重启」后才流式下载 `.dmg` 安装包至沙盒临时目录（`NSTemporaryDirectory()`）。
+  - 双重完整性校验：下载完成后必须通过 `CryptoKit.SHA256` 比对 Release Notes 中提取的 64 位哈希值；挂载后对释出的 `Pharos.app` 调用系统 `/usr/bin/codesign --verify --deep --strict` 校验原生代码签名，任一校验失败立即销毁临时文件并终止流程。
+  - 原子级替换与交接：移除 macOS 隔离属性（`xattr -dr com.apple.quarantine`）后，通过独立后台子进程（或管理员授权）原子替换目标 App 并自动 `open` 重启，当前进程主动调用 `NSApp.terminate(nil)` 退出。
 - 风扇控制（`pharos-fand` + `FanStore.swift` + `FanPolicy.swift`）——**唯一以 root 运行的部分**：
   - 默认不安装。只有用户在「风扇与温度」页点击「安装风扇控制」并在 macOS 自带的管理员密码框中确认后，
     才把 `pharos-fand` 复制到 `/Library/PrivilegedHelperTools/local.pharos.fand`、

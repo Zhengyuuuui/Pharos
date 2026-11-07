@@ -341,6 +341,7 @@ struct MainSettingsView: View {
     @ObservedObject private var packageStore = PackageStore.shared
     @ObservedObject private var agentStore = AgentChatStore.shared
     @ObservedObject private var chrome = ChromeStore.shared
+    @ObservedObject private var updateStore = UpdateStore.shared
 
     @AppStorage("pharos.gauge3DAcceleration") private var gauge3DAcceleration: Bool = true
     @AppStorage("pharos.popoverGaussianBlur") private var popoverGaussianBlur: Bool = true
@@ -391,40 +392,8 @@ struct MainSettingsView: View {
                 }
             }
 
-            // 2. License & About (Shield checkmark icon)
-            VStack(alignment: .leading, spacing: PharosSpacing.s) {
-                SettingsSectionHeader(title: l10n.aboutPharos, systemImage: "checkmark.shield.fill")
-                PharosCard(padding: 16) {
-                    HStack(spacing: 16) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Pharos v3.0")
-                                .font(PharosFont.sectionTitle)
-                                .foregroundStyle(PharosColor.textPrimary)
-                            Text(l10n.openSourceSubtitle)
-                                .font(PharosFont.caption)
-                                .foregroundStyle(PharosColor.textSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        Spacer(minLength: 8)
-                        Button {
-                            NSWorkspace.shared.open(URL(string: "https://github.com/Zhengyuuuui/Pharos")!)
-                        } label: {
-                            HStack(spacing: 5) {
-                                Text(l10n.viewOnGitHub)
-                                Image(systemName: "arrow.up.forward.app")
-                                    .font(PharosFont.caption)
-                            }
-                            .font(PharosFont.rowLabel)
-                            .foregroundStyle(PharosColor.textPrimary)
-                            .padding(.horizontal, 14)
-                            .frame(height: 32)
-                            .background(Capsule().fill(PharosColor.fill))
-                            .overlay(Capsule().stroke(PharosColor.separator.opacity(0.3), lineWidth: 0.5))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
+            // 2. License & About / Software Update
+            aboutAndSoftwareUpdatesSection
 
             // 3. General & System (Gearshape icon)
             VStack(alignment: .leading, spacing: PharosSpacing.s) {
@@ -689,7 +658,7 @@ struct MainSettingsView: View {
 
             // 9. Footer (Matching reference app footer)
             HStack {
-                Text("Pharos v3.0 · macOS 14+")
+                Text("Pharos v\(updateStore.currentVersion) · macOS 14+")
                     .font(PharosFont.captionDigits)
                     .foregroundStyle(PharosColor.textTertiary)
                 Spacer()
@@ -737,6 +706,257 @@ struct MainSettingsView: View {
             }
         } message: {
             Text(l10n.resetAllSettingsConfirm)
+        }
+    }
+
+    // MARK: - About & Software Update Helpers
+
+    private var updateStatusSubtitle: String {
+        switch updateStore.state {
+        case .idle:
+            if let last = updateStore.lastCheckedDate {
+                let formatter = DateFormatter()
+                formatter.dateStyle = .none
+                formatter.timeStyle = .short
+                return "\(l10n.openSourceSubtitle) · \(l10n.updated(formatter.string(from: last)))"
+            }
+            return l10n.openSourceSubtitle
+        case .checking:
+            return l10n.checkingForUpdates
+        case .upToDate:
+            return l10n.upToDate
+        case let .available(m):
+            return "\(l10n.updateAvailable): v\(m.version)"
+        case .downloading:
+            return l10n.updateDownloading
+        case .verifying:
+            return l10n.updateVerifying
+        case .installing:
+            return l10n.updateInstalling
+        case .failed:
+            return l10n.updateFailed
+        }
+    }
+
+    private var progressStatusText: String {
+        switch updateStore.state {
+        case .downloading:
+            return l10n.updateDownloading
+        case .verifying:
+            return l10n.updateVerifying
+        case .installing:
+            return l10n.updateInstalling
+        default:
+            return ""
+        }
+    }
+
+    private var aboutAndSoftwareUpdatesSection: some View {
+        VStack(alignment: .leading, spacing: PharosSpacing.s) {
+            SettingsSectionHeader(title: l10n.aboutAndSoftwareUpdates, systemImage: "arrow.triangle.2.circlepath.circle.fill")
+            PharosCard(padding: 16) {
+                VStack(spacing: 14) {
+                    // Header row: Icon, App title & Version, Subtitle, Action Buttons
+                    HStack(alignment: .center, spacing: 14) {
+                        Image(nsImage: NSApp.applicationIconImage ?? NSWorkspace.shared.icon(forFile: Bundle.main.bundlePath))
+                            .resizable()
+                            .frame(width: 44, height: 44)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 8) {
+                                Text("Pharos v\(updateStore.currentVersion)")
+                                    .font(PharosFont.sectionTitle)
+                                    .foregroundStyle(PharosColor.textPrimary)
+
+                                if updateStore.availableManifest != nil {
+                                    Text("NEW")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundStyle(PharosColor.amber)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Capsule().fill(PharosColor.amber.opacity(0.15)))
+                                }
+                            }
+
+                            Text(updateStatusSubtitle)
+                                .font(PharosFont.caption)
+                                .foregroundStyle(updateStore.availableManifest != nil ? PharosColor.amber : PharosColor.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        Spacer(minLength: 8)
+
+                        HStack(spacing: 8) {
+                            // Check for Updates button
+                            Button {
+                                updateStore.checkForUpdates(manual: true)
+                            } label: {
+                                HStack(spacing: 5) {
+                                    if updateStore.isChecking {
+                                        ProgressView()
+                                            .controlSize(.small)
+                                            .scaleEffect(0.7)
+                                    } else {
+                                        Image(systemName: "arrow.clockwise")
+                                            .font(.system(size: 11, weight: .semibold))
+                                    }
+                                    Text(updateStore.isChecking ? l10n.checkingForUpdates : l10n.checkForUpdates)
+                                }
+                                .font(PharosFont.rowLabel)
+                                .foregroundStyle(PharosColor.textPrimary)
+                                .padding(.horizontal, 12)
+                                .frame(height: 30)
+                                .background(Capsule().fill(PharosColor.fill))
+                                .overlay(Capsule().stroke(Color.secondary.opacity(0.3), lineWidth: 0.5))
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(updateStore.isWorking || updateStore.isChecking)
+
+                            // GitHub button
+                            Button {
+                                NSWorkspace.shared.open(URL(string: "https://github.com/Zhengyuuuui/Pharos")!)
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Text(l10n.viewOnGitHub)
+                                    Image(systemName: "arrow.up.forward.app")
+                                        .font(.system(size: 10))
+                                }
+                                .font(PharosFont.rowLabel)
+                                .foregroundStyle(PharosColor.textPrimary)
+                                .padding(.horizontal, 12)
+                                .frame(height: 30)
+                                .background(Capsule().fill(PharosColor.fill))
+                                .overlay(Capsule().stroke(Color.secondary.opacity(0.3), lineWidth: 0.5))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    // Available Update details panel
+                    if case let .available(manifest) = updateStore.state {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Divider()
+
+                            HStack(alignment: .top) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack(spacing: 6) {
+                                        Text("v\(manifest.version)")
+                                            .font(.system(size: 13, weight: .bold))
+                                            .foregroundStyle(PharosColor.textPrimary)
+                                        if let size = manifest.dmgSize, size > 0 {
+                                            Text("· \(ByteFormat.disk(UInt64(size)))")
+                                                .font(PharosFont.caption)
+                                                .foregroundStyle(PharosColor.textSecondary)
+                                        }
+                                        if let published = manifest.publishedAt {
+                                            Text("· \(published.prefix(10))")
+                                                .font(PharosFont.captionDigits)
+                                                .foregroundStyle(PharosColor.textTertiary)
+                                        }
+                                    }
+
+                                    if !manifest.notes.isEmpty {
+                                        Text(manifest.notes.trimmingCharacters(in: .whitespacesAndNewlines).prefix(240) + (manifest.notes.count > 240 ? "…" : ""))
+                                            .font(PharosFont.caption)
+                                            .foregroundStyle(PharosColor.textSecondary)
+                                            .lineLimit(3)
+                                    }
+                                }
+
+                                Spacer(minLength: 12)
+
+                                HStack(spacing: 8) {
+                                    Button {
+                                        NSWorkspace.shared.open(manifest.dmgUrl)
+                                    } label: {
+                                        Text(l10n.manualDownloadDMG)
+                                            .font(PharosFont.rowLabel)
+                                            .foregroundStyle(PharosColor.textSecondary)
+                                            .padding(.horizontal, 10)
+                                            .frame(height: 28)
+                                            .background(Capsule().fill(PharosColor.fill))
+                                            .overlay(Capsule().stroke(Color.secondary.opacity(0.3), lineWidth: 0.5))
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    Button {
+                                        updateStore.downloadAndInstall(manifest)
+                                    } label: {
+                                        HStack(spacing: 5) {
+                                            Image(systemName: "arrow.down.circle.fill")
+                                                .font(.system(size: 11, weight: .bold))
+                                            Text(l10n.updateAndRestart)
+                                        }
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(PharosColor.onAccent)
+                                        .padding(.horizontal, 14)
+                                        .frame(height: 28)
+                                        .background(Capsule().fill(PharosColor.accentFill))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+
+                    // Progress View (Downloading / Verifying / Installing)
+                    if updateStore.isWorking {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Divider()
+
+                            HStack {
+                                Text(progressStatusText)
+                                    .font(PharosFont.caption)
+                                    .foregroundStyle(PharosColor.textPrimary)
+
+                                Spacer()
+
+                                if case let .downloading(_, progress, downloaded, total) = updateStore.state {
+                                    Text("\(ByteFormat.disk(UInt64(max(0, downloaded)))) / \(total > 0 ? ByteFormat.disk(UInt64(total)) : "--") (\(Int(progress * 100))%)")
+                                        .font(PharosFont.captionDigits)
+                                        .foregroundStyle(PharosColor.textSecondary)
+                                }
+                            }
+
+                            if case let .downloading(_, progress, _, _) = updateStore.state {
+                                ProgressView(value: progress)
+                                    .progressViewStyle(.linear)
+                            } else {
+                                ProgressView()
+                                    .progressViewStyle(.linear)
+                            }
+                        }
+                    }
+
+                    // Error Banner
+                    if case let .failed(msg) = updateStore.state {
+                        VStack(spacing: 8) {
+                            Divider()
+                            HStack {
+                                PharosBanner(kind: .warning, text: msg)
+                                Spacer(minLength: 8)
+                                Button(l10n.updateRetry) {
+                                    updateStore.checkForUpdates(manual: true)
+                                }
+                                .font(PharosFont.rowLabel)
+                                .buttonStyle(.pharos)
+                            }
+                        }
+                    }
+
+                    Divider()
+
+                    // Automatically check for updates toggle
+                    PharosSettingRow(
+                        title: l10n.autoCheckUpdates,
+                        systemImage: "clock.arrow.2.circlepath",
+                        help: l10n.autoCheckUpdatesDesc
+                    ) {
+                        Toggle("", isOn: $updateStore.autoCheckEnabled)
+                            .toggleStyle(.switch)
+                    }
+                }
+            }
         }
     }
 }

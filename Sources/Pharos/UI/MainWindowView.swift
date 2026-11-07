@@ -9,6 +9,7 @@ struct MainWindowView: View {
     @ObservedObject private var packageStore = PackageStore.shared
     @ObservedObject private var router = WindowRouter.shared
     @ObservedObject private var l10n = L10n.shared
+    @ObservedObject private var updateStore = UpdateStore.shared
     @AppStorage("pharos.trafficLightGlassTransparency") private var trafficLightGlassTransparency: Double = 0.75
     @AppStorage("pharos.showInspector") private var showInspector: Bool = true
     @State private var selection: SidebarItem?
@@ -118,6 +119,39 @@ struct MainWindowView: View {
         }
     }
 
+    @ViewBuilder
+    private func updateNotificationPill(manifest: ReleaseManifest) -> some View {
+        Button {
+            selection = .settings
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(PharosColor.amber)
+                Text(l10n.updateBannerText(version: manifest.version))
+                    .font(.system(size: 11, weight: .medium))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .foregroundStyle(PharosColor.amber)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(PharosColor.amber.opacity(0.8))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(PharosColor.amber.opacity(0.12))
+            )
+            .overlay(
+                Capsule()
+                    .strokeBorder(PharosColor.amber.opacity(0.35), lineWidth: 0.5)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
     private func sidebarIsland(isWideScreen: Bool) -> some View {
         VStack(spacing: 0) {
             ScrollView(showsIndicators: false) {
@@ -127,6 +161,12 @@ struct MainWindowView: View {
                 TunableFrostedHeader(transparency: trafficLightGlassTransparency)
                     .frame(height: 40)
                     .allowsHitTesting(false)
+            }
+
+            if let manifest = updateStore.availableManifest {
+                updateNotificationPill(manifest: manifest)
+                    .padding(.horizontal, PharosSpacing.s)
+                    .padding(.bottom, PharosSpacing.xs)
             }
 
             sidebarBottomIsland(isWideScreen: isWideScreen)
@@ -371,12 +411,21 @@ struct MainWindowView: View {
             Button {
                 selection = .settings
             } label: {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(selection == .settings ? PharosColor.accent : PharosColor.textSecondary)
-                    .frame(width: 32, height: 32)
-                    .background(Circle().fill(selection == .settings ? PharosColor.accent.opacity(0.14) : PharosColor.fill))
-                    .overlay(Circle().stroke(selection == .settings ? PharosColor.accent.opacity(0.4) : PharosColor.separator.opacity(0.35), lineWidth: 0.5))
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(selection == .settings ? PharosColor.accent : PharosColor.textSecondary)
+                        .frame(width: 32, height: 32)
+                        .background(Circle().fill(selection == .settings ? PharosColor.accent.opacity(0.14) : PharosColor.fill))
+                        .overlay(Circle().stroke(selection == .settings ? PharosColor.accent.opacity(0.4) : PharosColor.separator.opacity(0.35), lineWidth: 0.5))
+
+                    if updateStore.availableManifest != nil {
+                        Circle()
+                            .fill(PharosColor.amber)
+                            .frame(width: 7, height: 7)
+                            .offset(x: 1, y: 1)
+                    }
+                }
             }
             .buttonStyle(.plain)
             .help(l10n.settings)

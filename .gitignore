@@ -4,3 +4,9 @@ dist/
 .specstory/
 .cursorindexingignore
 .claude/
+
+# Cloudflare Worker artifacts
+cloud/pharos-update-worker/node_modules/
+cloud/pharos-update-worker/.wrangler/
+cloud/pharos-update-worker/.dev.vars*
+
