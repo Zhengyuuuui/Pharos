@@ -43,13 +43,9 @@
 前往 GitHub Releases 下载最新的 [**Pharos-3.2.0.dmg**](https://github.com/Zhengyuuuui/Pharos/releases/download/v3.2.0/Pharos-3.2.0.dmg)（SHA-256: `dd678c6eb2367616057948c7ed63a14df4df5ae1b016790ca4699a6925f3c857`，或查看 [GitHub Releases 页面](https://github.com/Zhengyuuuui/Pharos/releases/latest)），双击打开后将 `Pharos.app` 拖入 `/Applications` 文件夹即可。
 
 ### 方式二：Homebrew 一键安装
-通过 Homebrew Cask 单行命令安装：
+通过专属 Tap 源一键安装：
 ```sh
-brew install --cask https://raw.githubusercontent.com/Zhengyuuuui/Pharos/main/Casks/pharos.rb
-```
-或通过专属 Tap 源安装：
-```sh
-brew tap zhengyuuuui/tap && brew install --cask pharos
+brew tap zhengyuuuui/pharos && brew install --cask pharos
 ```
 
 ---

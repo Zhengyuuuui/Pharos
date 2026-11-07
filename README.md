@@ -44,11 +44,7 @@ Download the latest [**Pharos-3.2.0.dmg**](https://github.com/Zhengyuuuui/Pharos
 
 ### Option 2: Homebrew
 ```sh
-brew install --cask https://raw.githubusercontent.com/Zhengyuuuui/Pharos/main/Casks/pharos.rb
-```
-Or via tap:
-```sh
-brew tap zhengyuuuui/tap && brew install --cask pharos
+brew tap zhengyuuuui/pharos && brew install --cask pharos
 ```
 
 ---
