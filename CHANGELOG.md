@@ -8,6 +8,7 @@ Times are UTC+8. 时间为北京时间（UTC+8）。
 ---
 
 ## 目录 / Quick Links
+- [v3.2.0 (2026-11-07)](#v320--2026-11-07) — Spotlight Node Popover, Active Concurrency Ping, In-App Edge Self-Update & Slim Scroller / Spotlight 风格出口节点选择浮窗、并发主动测速刷新、边缘自更新与极窄滚动条降噪
 - [v3.1.0 (2026-11-05)](#v310--2026-11-05-official-release--官方正式版) — Official Release: Memory Bloat Doctor & Daemon Governance (`Not Launch`), Fan Cockpit GPU Optimization & Adaptive Light/Dark App Icon / 官方正式版发布：内存膨胀体检与系统守护进程永久禁用治理、风扇座舱 GPU 降载优化与深浅色图标自动切换
 - [v3.0 (2026-10-24)](#v30--2026-10-24-0840) — Global Design System Overhaul, Domain-Categorized Pure Sidebar & Adaptive Anti-Squeezing Popover Customizer / 全局设计系统规范落地、领域分类纯净侧边栏与自适应防挤压小组件布局
 - [v2.9 (2026-10-23)](#v29--2026-10-23-1546) — Persistent Lid-Closed Battery Guard, SMC Write Deduplication, Incremental Scanners & Modular Architecture / 电池合盖持续守护、SMC 写入去重、增量扫描缓存与模块化重构
@@ -21,6 +22,51 @@ Times are UTC+8. 时间为北京时间（UTC+8）。
 - [v2.1 (2026-10-13)](#v21--2026-10-13-1327) — SMC Fans & Temperature / SMC 风扇与温度监控
 - [v2.0 (2026-10-13)](#v20--2026-10-13-1233) — Multi-Chromium Browser Instances / 多 Chromium 浏览器实例管理
 - [Earlier Versions (2026-10-10 ~ 2026-10-13)](#2026-10-13--disk-usage--browser-favorites--磁盘用量与浏览器收藏)
+
+---
+
+### v3.2.0 — 2026-11-07
+
+> Author / 作者：zys · Model / 模型：Gemini 4 Argon
+
+**English**
+- **Browsers & Clash / Mihomo Hub (Major Overhaul)**:
+  - **Spotlight-Style Node Picker Popover**: Replaced the overflowing 300+ item native menus with a 380×430 pt floating popover panel with instant fuzzy search (`TextField`), Enter-key quick selection, and recent node memory (`recentNodes`).
+  - **Region Categorization Chips**: Added instant region filtering chips (`ProxyNodeRegion`: All, HK, JP, SG, US, TW, KR, EU, Other) with live node count badges.
+  - **Active Concurrency Latency Ping**: Added a dedicated active refresh button that directly calls the Mihomo core (`GET /group/GLOBAL/delay?url=...&timeout=3000`), executing high-concurrency delay testing across nodes in real-time and refreshing stale historical metrics.
+  - **Intelligent Status Ranking & Offline Filtering**: Implemented a 3-tier status model (`statusRank`: 0=healthy, 1=untested, 2=timeout). Responsive, healthy nodes always sort to the top; timeout nodes (`delay == 0` or offline) are relegated to the bottom with red `Timeout` badges, and can be cleanly hidden with the "Hide Offline" toggle.
+  - **Instance-Level Proxy Isolation Routing**: Dynamic local listener proxy routing (`10000 + debugPort`), allowing individual Chromium instances to bind to specific proxy nodes while other instances run direct or follow rules.
+- **UI/UX Polish & Noise Reduction**:
+  - **PharosSlimScroller (3.5pt Ultra-Slim Overlay Scroller)**: Replaced thick 15pt macOS default scrollbars across all scrollable pages with a 3.5pt semi-transparent floating capsule scroller with zero gutter width and transparent track, permanently eliminating scroller obstruction over action buttons and text.
+  - **Follow System Mode UI Enhancement**: Highlighted in prominent Apple System Blue capsule with `arrow.triangle.2.circlepath` and clear descriptive metadata (`Proxy: Follow macOS System / TUN`).
+  - **Zero Emoji Compliance (`DESIGN.md` §2.6)**: 100% purged all decorative emoji characters across the app UI, standardizing strictly on monochrome SF Symbols with semantic color tokens.
+  - **Browser Relaunch Confirmation Modal**: Added safety confirmation dialog before relaunching running Chromium instances with updated proxy flags, preventing accidental tab closure.
+- **In-App Background Self-Update Engine (Dual-Channel & Atomic Swap)**:
+  - **Cloudflare Worker Edge Update Gateway**: High-speed, low-latency update checks powered by `pharos-update-worker` (`https://pharos-update.zysgm123.workers.dev/api/v1/latest`), with automatic fallback to GitHub Releases REST API and rate-limit immune `releases.atom` XML feeds.
+  - **Silent Background Schedule & Notification Badge**: Low-overhead periodic update checks with unobtrusive sidebar notification badge and release notes preview.
+  - **Double Integrity & Security Verification**: SHA-256 binary checksum validation via `CryptoKit`, DMG mounting, and macOS deep codesign verification (`codesign --verify --deep --strict`).
+  - **Seamless Atomic Swap & Restart**: Automatic quarantine removal (`xattr -dr com.apple.quarantine`), atomic staging replacement, and instant app restart with zero manual drag-and-drop required.
+- **Codebase Integrity**: 100% native Swift/SwiftUI, zero third-party dependencies, all **1373 unit assertions passed**.
+
+**简体中文**
+- **浏览器与 Clash / Mihomo 网络中心（重大升级）**：
+  - **Spotlight 风格出口节点选择浮窗**：彻底替换原有长达数百条的系统菜单，采用 380×430 pt 悬浮 Popover 窗口，支持关键词实时拼音与英文模糊搜索，回车键快速选中，并自动记忆最近使用过的节点。
+  - **国家与地区标签分类**：支持「全部节点 / HK 香港 / JP 日本 / SG 新加坡 / US 美国 / TW 台湾 / KR 韩国 / EU 欧洲 / 其他地区」分流筛选，芯片标签实时显示该区域节点总数。
+  - **内核级高并发主动测速刷新**：点击测速刷新按钮，直接驱动 Mihomo 内核执行实时测速接口（`GET /group/GLOBAL/delay?url=...&timeout=3000`），数秒内并发打通所有节点最新延迟，抛弃陈旧历史缓存。
+  - **智能三级健康度排序与离线过滤**：建立严密的健康分级模型（`statusRank`：0=健康低延迟、1=未测速、2=超时/离线）。正常可用节点永远置顶优先显示；超时（delay 为 0 或不可达）节点自动沉底并标记醒目红色 `Timeout` 标签，配合「隐藏不可用」开关一键净化列表。
+  - **专属出口节点动态端口路由**：支持将特定浏览器实例精准绑定到某一出国节点（通过 `10000 + debugPort` 动态分配专用本地 Listener），实现主 Profile 直连办公、实例 A 走香港节点、实例 B 走美国节点的完全物理隔离网络环境。
+- **全局 UI/UX 细节打磨与降噪**：
+  - **PharosSlimScroller 3.5pt 极窄浮动滚动条**：全页面（含主窗口所有标签、菜单栏下拉弹窗与节点浮窗）统一接入 3.5 pt 极窄半透明悬浮滚动条，零额外边距且背景全透，杜绝 macOS 原生 15 pt 粗滚动条对按钮与文字的遮挡。
+  - **跟随系统网络模式显著增强**：以高对比 Apple System Blue 醒目胶囊高亮显示，配有 `arrow.triangle.2.circlepath` 图标与详尽说明元数据（`代理: 跟随 macOS 系统网络 / TUN 代理`）。
+  - **100% 杜绝 Emoji 设计规范落地（`DESIGN.md` §2.6）**：全面移除界面中所有非标准彩色 Emoji，统一规范为单色语义化 SF Symbols 与系统配色。
+  - **热重启确认弹窗安全防护**：对运行中的浏览器切换代理模式或重启时，弹出二次确认对话框，防止误触导致未保存的网页表单或工作区标签页丢失。
+- **应用内后台自更新引擎（双通道与原子重启）**：
+  - **Cloudflare Worker 边缘更新网关**：内置无状态边缘更新服务（默认 `https://pharos-update.zysgm123.workers.dev/api/v1/latest`），毫秒级响应最新版本元数据，支持设置中自定义网关地址。
+  - **GitHub 官方双通道无缝回退**：边缘网关不可用时自动回退至 GitHub Releases REST API 与免鉴权防流控 `releases.atom` XML 源，确保全天候可达。
+  - **后台静默巡检与徽标提醒**：侧边栏无感微章提示，一键预览最新版本 Changelog 更新日志与更新体积。
+  - **双重安全校验**：下载完成后经 `CryptoKit` 比对官方 64 位 SHA-256 校验和，挂载后执行系统 `codesign --verify --deep --strict` 原生代码签名核验。
+  - **原子替换与无缝接力重启**：自动抹除隔离属性（`xattr -dr com.apple.quarantine`），通过独立后台进程原子替换 `/Applications/Pharos.app` 并调用 `open` 重新拉起，无需用户手动拖拽替换。
+- **工程质量与纯净度**：纯 Apple 原生 Swift / SwiftUI，零第三方依赖，全量单测套件 **1373 项断言全绿通过**。
 
 ---
 

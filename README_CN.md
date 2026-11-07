@@ -15,19 +15,19 @@
   <img src="https://img.shields.io/badge/dependencies-none-brightgreen" alt="Dependencies">
   <img src="https://img.shields.io/badge/network-none-lightgrey" alt="No network">
   <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License">
-  <img src="https://img.shields.io/badge/version-3.1.0-blue" alt="Version 3.1.0">
-  <img src="https://img.shields.io/badge/updated-2026--11--05-informational" alt="Last updated 2026-11-05">
+  <img src="https://img.shields.io/badge/version-3.2.0-blue" alt="Version 3.2.0">
+  <img src="https://img.shields.io/badge/updated-2026--11--07-informational" alt="Last updated 2026-11-07">
 </p>
 
-<p align="center"><sub>最后更新 / Last updated：2026-11-05 · v3.1.0 (官方正式版) · 作者 / Author：zys · 模型 / Model：Gemini 4 Argon</sub></p>
+<p align="center"><sub>最后更新 / Last updated：2026-11-07 · v3.2.0 (官方正式版) · 作者 / Author：zys · 模型 / Model：Gemini 4 Argon</sub></p>
 
 <p align="center"><a href="README.md">English</a> · <b>简体中文</b> · <a href="CHANGELOG.md">更新记录 / Changelog</a></p>
 
 ---
 
 > [!TIP]
-> **🚀 Pharos v3.1.0 官方正式版全面上线！**
-> 专为 macOS 开发者打造的高颜值轻量菜单栏工具正式发布：支持系统级内存膨胀诊断与后台守护进程治理（`Not Launch` 永久禁用）、60 FPS 机车座舱双表盘风扇控制、硬件级电池充电阈值守护（支持合盖与后台接管）、Clash/Mihomo 代理网络隔离与 23+ 种 AI 编程助手数据库管理。纯原生 Swift 编写，零第三方依赖。即刻下载 DMG 尝鲜体验！
+> **🚀 Pharos v3.2.0 官方版本正式发布！**
+> 全新推出 **Spotlight 风格出口节点选择浮窗**，支持毫秒级模糊搜索、国家/地区标签分类（HK/JP/SG/US/TW/KR/EU）与高并发主动测速刷新；集成 **Cloudflare Worker 边缘自更新引擎**（双通道智能回退、SHA-256 完整性校验与 DMG 静默原子替换重启）；全页面接入 **PharosSlimScroller** 3.5pt 极窄浮动滚动条，大幅降低 UI/UX 视觉噪音，100% 遵循设计规范杜绝 Emoji。即刻下载 DMG 尝鲜体验！
 
 <p align="center">
   <img src="img/01-dashboard-ports.png" width="880" alt="Pharos 仪表盘与端口管理">
@@ -40,7 +40,7 @@
 运行环境要求：**macOS 14+**（Sonoma / Sequoia · 支持 Apple Silicon 与 Intel）。
 
 ### 方式一：直接下载 DMG 安装包（推荐）
-前往 GitHub Releases 下载最新的 [**Pharos-3.1.0.dmg**](https://github.com/Zhengyuuuui/Pharos/releases/download/v3.1.0/Pharos-3.1.0.dmg)（或查看 [GitHub Releases 页面](https://github.com/Zhengyuuuui/Pharos/releases/latest)），双击打开后将 `Pharos.app` 拖入 `/Applications` 文件夹即可。
+前往 GitHub Releases 下载最新的 [**Pharos-3.2.0.dmg**](https://github.com/Zhengyuuuui/Pharos/releases/download/v3.2.0/Pharos-3.2.0.dmg)（SHA-256: `dd678c6eb2367616057948c7ed63a14df4df5ae1b016790ca4699a6925f3c857`，或查看 [GitHub Releases 页面](https://github.com/Zhengyuuuui/Pharos/releases/latest)），双击打开后将 `Pharos.app` 拖入 `/Applications` 文件夹即可。
 
 ### 方式二：Homebrew 一键安装
 通过 Homebrew Cask 单行命令安装：
@@ -73,10 +73,11 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
 | **结束进程** | 先 `SIGTERM`，拒不退出才 `SIGKILL`；不碰系统进程和其他用户的进程 |
 | **磁盘清理** | 四大专业清理模块：基础与系统缓存（含子目录明细探查与单项清理）、已卸载应用残留数据扫描、npkill 风格项目构建产物清理（休眠判定与批量释放）、开发者与 AI 专项（Homebrew 历史版本、Ollama/HuggingFace 大模型与 Blob 垃圾回收、Docker.raw 与 Xcode 模拟器） |
 | **常用项目与跨机器启动规范** | 跨生态项目启动契约智能识别引擎（穿透 `cross-env`/`dotenv` 包装器精准反查 `package.json`，深度支持 `go.mod`、`Cargo.toml`、`uv`/`poetry`/Django、Gradle/Maven 等声明），面向团队与多机协作提供 100% 具备复用性的标准启动命令；一键在终端中启动与直接复制 |
-| **浏览器与代理网络** | 整合 Clash/Mihomo 实时网络控制中心（全主流客户端自动探测、双通道通信、毫秒级切模与断连）与 Chromium 实例网络隔离矩阵（一键纯净直连 direct:// 隔离本地调试 vs Clash 规则代理）；支持 Chrome、Edge、Brave 等多浏览器实例 |
+| **浏览器与代理网络** | 整合 Clash/Mihomo 实时网络控制中心（全主流客户端自动探测、双通道通信、毫秒级切模与断连）与 Chromium 实例网络隔离矩阵；全新推出 **Spotlight 风格出口节点选择浮窗**，支持毫秒级模糊搜索、国家/地区标签分类（HK/JP/SG/US/TW/KR/EU）、并发主动测速刷新、智能健康分级排序与实例级独立出口端口代理路由 |
+| **应用内自更新** | 双通道边缘自更新引擎（Cloudflare Worker 边缘网关 + GitHub Releases 官方接口自动回退），后台静默定时巡检、SHA-256 完整性双重校验、系统代码签名核验与 DMG 静默原子替换重启 |
 | **AI 助手会话管理** | 扫描、分析、备份与清理 23+ 种本地 AI 编程助手与编辑器（Cursor、Trae、Windsurf、VS Code、Antigravity、OpenCode、Claude Code、MiniMax 等）的会话数据库；内置纳秒级 `DB + WAL` 指纹增量缓存，未变动大库免重复解析；识别孤立工作区，支持手动添加扫描 `/Applications` 下的任意应用 |
 | **依赖与软件包** | 真实 Homebrew Cellar 与 Caskroom 软件包深度管理、环境自检与缓存清理；全局命令行软件统一管理（Node、Homebrew、Rust、Python、Go 等）；支持两阶段渐进式首屏秒开与 `mtime` + 锁文件指纹缓存的全生态项目依赖识别（`.venv`、`node_modules`、`.build`、`target` 等）；语言缓存仓库概览 |
-| **全局设计系统与侧边栏** | 全局统一明度层级架构（`background` → `surface` → `fill`，支持浅/深色高对比度校准与 `Font.TextStyle` 动态字号）、圆角悬浮侧边栏浮岛与原生交通灯毛玻璃滚动模糊（支持在设置中 0%–100% 连续调节通透度并配有左上角三按钮实时预览图），彻底杜绝原生蓝条高亮反差冲突；内置响应式防挤压小组件布局引擎（`ViewThatFits`） |
+| **全局设计系统与侧边栏** | 全局统一明度层级架构（`background` → `surface` → `fill`，支持浅/深色高对比度校准与 `Font.TextStyle` 动态字号）、圆角悬浮侧边栏浮岛与原生交通灯毛玻璃滚动模糊（支持在设置中 0%–100% 连续调节通透度并配有左上角三按钮实时预览图）；接入 **PharosSlimScroller** 3.5pt 极窄浮动滚动条杜绝遮挡与视觉噪音，100% 遵循无 Emoji 设计规范；内置响应式防挤压小组件布局引擎（`ViewThatFits`） |
 
 ---
 
@@ -159,20 +160,36 @@ Pharos（法罗斯）是古代亚历山大港的灯塔，世界七大奇迹之�
    - 自动探测本机运行的主流 Mihomo 内核客户端（Mihomo Party / Clash Party 的 Unix Domain Socket 免密通道、Clash Verge Rev、Clash Nyanpasu、ClashX.Meta 及独立 Mihomo CLI）。
    - 实时掌握混合端口（Mixed Port）、SOCKS 端口、TUN 虚拟网卡接管状态、活跃连接数与实时上下行流量速率。
    - 毫秒级热切换**「规则模式 (Rule)」/「直连模式 (Direct)」/「全局模式 (Global)」**，无需重启客户端；一键切断所有活跃连接确保新请求瞬时迁移至新通道；一键复制终端代理环境变量（`export http_proxy` / `unset`）。
-2. **浏览器代理隔离快速矩阵**：
+2. **Spotlight 风格出口节点选择浮窗与并发主动测速**：
+   - **悬浮 Spotlight 式选择浮窗**：彻底替换原有长达数百条的系统菜单，采用 380×430 pt 悬浮 Popover 窗口，支持关键词实时拼音与英文模糊搜索，回车键快速选中。
+   - **国家与地区标签分类**：支持「全部节点」、「HK 香港」、「JP 日本」、「SG 新加坡」、「US 美国」、「TW 台湾」、「KR 韩国」、「EU 欧洲」与「其他地区」分流筛选，芯片标签实时显示该区域节点总数。
+   - **内核级高并发主动测速刷新**：点击测速刷新按钮，直接驱动 Mihomo 内核执行实时测速接口（`GET /group/GLOBAL/delay?url=...&timeout=3000`），数秒内并发打通所有节点最新延迟，抛弃陈旧历史缓存。
+   - **智能三级健康度排序与离线过滤**：建立严密的健康分级模型（`statusRank`：0=健康低延迟、1=未测速、2=超时/离线）。正常可用节点永远置顶优先显示；超时（delay 为 0 或不可达）节点自动沉底并标记醒目红色 `Timeout` 标签，配合「隐藏不可用」开关一键净化列表。
+   - **最近使用记忆**：自动记录最近切换过的节点，置顶列出，高频切换无需重复翻找。
+3. **Chromium 实例代理隔离矩阵与专属出口路由**：
    - **本地调试纯净浏览器**：一键以 `--proxy-server="direct://"` 及 `--no-proxy-server` 启动专属 Chromium 实例，即使 Clash 开启系统代理或 TUN 模式，所有发出的 `localhost`、`127.0.0.1` 及内网 API 请求强制 100% 直连，彻底免除证书错误与代理分流干扰。
+   - **跟随系统网络模式**：以高对比 Apple System Blue 醒目胶囊高亮显示，配有 `arrow.triangle.2.circlepath` 图标与详尽说明元数据（`代理: 跟随 macOS 系统网络 / TUN 代理`）。
+   - **专属出口节点动态端口路由**：支持将特定浏览器实例精准绑定到某一出国节点（通过 `10000 + debugPort` 动态分配专用本地 Listener），实现主 Profile 直连办公、实例 A 走香港节点、实例 B 走美国节点的完全物理隔离网络环境。
    - **海外与 AI 加速浏览器**：一键以 `--proxy-server="http://127.0.0.1:7890"` 启动，享受智能节点分流与海外 AI 接口加速。
-3. **Chromium 多浏览器实例管理**：
-   - 支持 Google Chrome、Chrome Beta、Chrome Canary、Chromium、Microsoft Edge 和 Brave；每个实例卡片均标明代理策略胶囊 Badge（如 `[直连 Direct]` 或 `[Clash :7890]`），抽屉编辑中支持快速切换策略。
-   - 多个浏览器并行的工作环境（例如 Chrome 办公、Edge 测试、Brave 个人）：顶部筛选栏切换浏览器，「全部」时按浏览器分组，显示各自的运行数量和内存
-   - **设置 → 浏览器**：列出所有支持的浏览器，显示是否安装、运行中和已保存的数量以及默认配置文件夹；可隐藏不用的浏览器，并选择「新建实例」默认使用的浏览器
-   - 列出所有运行中的浏览器，按配置文件夹（`--user-data-dir`）区分：调试端口、代理、启动网址、已登录账号、内存（含全部 Helper 进程）、按需计算文件夹大小。调试用的 Chrome 不再混在项目列表里
-   - ☆ 把运行中的实例连同全部参数保存为预设；**新建实例**自动选下一个空闲端口和 `~/chromeNNNN` 文件夹；所有字段可编辑
-   - 收藏的实例在 Chrome 关闭后仍会列出（「已收藏 · 未运行」），显示端口和完整的**启动命令**——可直接粘贴到终端的 `open -na 'Google Chrome' --args …`，带复制按钮；再点 ★ 即取消收藏
-   - 如果收藏的实例在别处用不同参数重新启动，卡片会提示，点**更新预设**即可改用当前参数
-   - **启动**：检查文件夹未被占用、端口空闲后执行 `open -na "Google Chrome" --args …`
-   - **退出**：发送 `SIGTERM`（Chrome 正常关闭，下次可恢复标签页），3 秒后仍未退出才提供强制结束
-   - 🐞 用默认浏览器打开 `http://127.0.0.1:端口`（DevTools 调试列表）。Pharos 本身不连接调试端口
+4. **Chromium 多浏览器实例管理与重启保护**：
+   - 支持 Google Chrome、Chrome Beta、Chrome Canary、Chromium、Microsoft Edge 和 Brave；每个实例卡片均标明代理策略胶囊 Badge（如 `[直连 Direct]`、`[Clash :7890]` 或 `[节点名 :端口]`），抽屉编辑中支持快速切换策略。
+   - 多个浏览器并行的工作环境（例如 Chrome 办公、Edge 测试、Brave 个人）：顶部筛选栏切换浏览器，「全部」时按浏览器分组，显示各自的运行数量和内存。
+   - **设置 → 浏览器**：列出所有支持的浏览器，显示是否安装、运行中和已保存的数量以及默认配置文件夹；可隐藏不用的浏览器，并选择「新建实例」默认使用的浏览器。
+   - 列出所有运行中的浏览器，按配置文件夹（`--user-data-dir`）区分：调试端口、代理、启动网址、已登录账号、内存（含全部 Helper 进程）、按需计算文件夹大小。调试用的 Chrome 不再混在项目列表里。
+   - **热重启确认弹窗安全防护**：对运行中的浏览器切换代理模式或重启时，弹出二次确认对话框，防止误触导致未保存的网页表单或工作区标签页丢失。
+   - ☆ 把运行中的实例连同全部参数保存为预设；**新建实例**自动选下一个空闲端口和 `~/chromeNNNN` 文件夹；所有字段可编辑。
+   - 收藏的实例在 Chrome 关闭后仍会列出（「已收藏 · 未运行」），显示端口和完整的**启动命令**——可直接粘贴到终端的 `open -na 'Google Chrome' --args …`，带复制按钮；再点 ★ 即取消收藏。
+   - 如果收藏的实例在别处用不同参数重新启动，卡片会提示，点**更新预设**即可改用当前参数。
+   - **启动**：检查文件夹未被占用、端口空闲后执行 `open -na "Google Chrome" --args …`。
+   - **退出**：发送 `SIGTERM`（Chrome 正常关闭，下次可恢复标签页），3 秒后仍未退出才提供强制结束。
+   - 🐞 用默认浏览器打开 `http://127.0.0.1:端口`（DevTools 调试列表）。Pharos 本身不连接调试端口。
+
+### 应用内自更新（双通道与原子重启）
+- **Cloudflare Worker 边缘更新网关**：内置无状态边缘更新服务（默认 `https://pharos-update.zysgm123.workers.dev/api/v1/latest`），毫秒级响应最新版本元数据，支持设置中自定义网关地址。
+- **GitHub 官方双通道无缝回退**：边缘网关不可用时自动回退至 GitHub Releases REST API 与免鉴权防流控 `releases.atom` XML 源，确保全天候可达。
+- **后台静默巡检与徽标提醒**：侧边栏无感微章提示，一键预览最新版本 Changelog 更新日志与更新体积。
+- **双重安全校验**：下载完成后经 `CryptoKit` 比对官方 64 位 SHA-256 校验和，挂载后执行系统 `codesign --verify --deep --strict` 原生代码签名核验。
+- **原子替换与无缝接力重启**：自动抹除隔离属性（`xattr -dr com.apple.quarantine`），通过独立后台进程原子替换 `/Applications/Pharos.app` 并调用 `open` 重新拉起，无需用户手动拖拽替换。
 
 ### 磁盘清理
 全新升级的四大专业级清理中心，在纯原生 Swift 栈下实现 CleanMyMac 与 Mole 的全部核心清理能力，并针对现代 AI 时代与开发者场景深度定制：
@@ -338,6 +355,11 @@ make icon                           # 重新生成浅色/深色 App 图标
 ---
 
 ## 最新版本更新速览
+
+### v3.2 (2026-11-07)
+- **Spotlight 风格节点选择浮窗与内核级高并发主动测速**：彻底替代冗长易溢出的系统级菜单，采用 380×430 pt 悬浮 Popover，支持关键词毫秒级拼音/英文模糊搜索；支持「全部节点 / HK / JP / SG / US / TW / KR / EU / 其他」地区分类标签与动态节点计数；刷新按钮直调 Mihomo 内核接口（`GET /group/GLOBAL/delay`）并发完成真实验证；引入严格的 3 级状态健康度排序（`statusRank`：健康节点置顶，超时/不可达节点沉底并标注红色 `Timeout`），配合「隐藏不可用」开关一键过滤。
+- **应用内后台自更新引擎（双通道与原子重启）**：接入无状态 Cloudflare Worker 边缘更新网关（`pharos-update-worker`），兼具 GitHub Releases 官方 REST 接口与免流控 `releases.atom` XML 双通道智能回退；低功耗后台定时静默检查，SHA-256 完整性校验与原生代码签名双重安全防护，原子级静默替换与无缝接力拉起新进程。
+- **全局 UI/UX 细节打磨与降噪**：全页面（含主窗口、菜单栏下拉弹窗与节点浮窗）统一接入 3.5 pt 极窄半透明悬浮滚动条（`PharosSlimScroller`），零额外边距且背景全透，杜绝 macOS 原生 15 pt 粗滚动条对按钮与文字的遮挡；100% 遵循 `DESIGN.md` §2.6 规范移除所有非标准彩色 Emoji，全面回归单色语义化 SF Symbols； Chromium 实例热重启加入二次确认弹窗防护。
 
 ### v3.1 (2026-10-31)
 - **内存膨胀体检与系统守护进程永久禁用治理（`Not Launch`）**：实时诊断 8 类常见 macOS 后台内存膨胀守护进程（`mediaanalysisd` / `photoanalysisd`、`mds_stores`、`diagnosticd`、`bird`、`WallpaperVideoExtension`、`suggestd` / `intelligenceplatformd`、`commerce`、`SimLaunchHostService`）；既支持一键安全休眠释放（`SIGTERM`），也支持通过用户域 `launchctl disable` 永久禁用自启（`Not Launch`）及随时一键恢复自启。
