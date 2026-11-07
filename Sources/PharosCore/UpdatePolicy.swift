@@ -172,7 +172,7 @@ public enum UpdatePolicy {
 
     /// Parses GitHub's public releases.atom feed (completely immune to API rate limits).
     public static func parseAtomFeed(xml: String) throws -> ReleaseManifest {
-        var tagName: String = "v3.1.0"
+        var tagName: String = "v3.2.0"
         if let idRegex = try? NSRegularExpression(pattern: "<id>tag:github\\.com,2008:Repository/[^/]+/([^<]+)</id>"),
            let match = idRegex.firstMatch(in: xml, options: [], range: NSRange(xml.startIndex..<xml.endIndex, in: xml)),
            let r = Range(match.range(at: 1), in: xml) {

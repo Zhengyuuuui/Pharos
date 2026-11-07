@@ -23,7 +23,7 @@ final class UpdateStore: ObservableObject {
     }
 
     public var currentVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "3.1.0"
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "3.2.0"
     }
 
     // MARK: - State

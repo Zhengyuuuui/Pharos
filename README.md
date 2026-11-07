@@ -15,19 +15,19 @@
   <img src="https://img.shields.io/badge/dependencies-none-brightgreen" alt="Dependencies">
   <img src="https://img.shields.io/badge/network-none-lightgrey" alt="No network">
   <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License">
-  <img src="https://img.shields.io/badge/version-3.1.0-blue" alt="Version 3.1.0">
-  <img src="https://img.shields.io/badge/updated-2026--11--05-informational" alt="Last updated 2026-11-05">
+  <img src="https://img.shields.io/badge/version-3.2.0-blue" alt="Version 3.2.0">
+  <img src="https://img.shields.io/badge/updated-2026--11--07-informational" alt="Last updated 2026-11-07">
 </p>
 
-<p align="center"><sub>Last updated / 最后更新：2026-11-05 · v3.1.0 (Official Release / 正式版) · Author / 作者：zys · Model / 模型：Gemini 4 Argon</sub></p>
+<p align="center"><sub>Last updated / 最后更新：2026-11-07 · v3.2.0 (Official Release / 正式版) · Author / 作者：zys · Model / 模型：Gemini 4 Argon</sub></p>
 
 <p align="center"><b>English</b> · <a href="README_CN.md">简体中文</a> · <a href="CHANGELOG.md">Changelog / 更新记录</a></p>
 
 ---
 
 > [!TIP]
-> **🚀 Pharos v3.1.0 Official Release is now live!**
-> Pharos is officially released! Featuring memory bloat diagnostics & permanent daemon governance (`Not Launch`), 60 FPS tachometer cockpit fan control, hardware battery charge limit with lid-closed persistence, full Clash/Mihomo proxy isolation matrix, 23+ AI IDE chat database analyzer, and CleanMyMac-parity disk cleanup in 100% native Swift.
+> **🚀 Pharos v3.2.0 is now live!**
+> Featuring the all-new **Spotlight-Style Proxy Node Picker Popover** with active concurrency latency ping testing and region categorization chips, an **In-App Background Self-Update Engine** powered by Cloudflare Worker edge gateway with GitHub fallback and SHA-256 verification, and **PharosSlimScroller** (3.5 pt ultra-slim overlay scroller) eliminating visual UI noise across all pages. 100% native Swift, zero third-party dependencies.
 
 <p align="center">
   <img src="img/01-dashboard-ports.png" width="880" alt="Pharos Dashboard & Ports Overview">
@@ -40,7 +40,7 @@
 Requires **macOS 14+** (Sonoma / Sequoia · Apple Silicon & Intel).
 
 ### Option 1: Direct Download (DMG)
-Download the latest [**Pharos-3.1.0.dmg**](https://github.com/Zhengyuuuui/Pharos/releases/download/v3.1.0/Pharos-3.1.0.dmg) (or view on [GitHub Releases](https://github.com/Zhengyuuuui/Pharos/releases/latest)), open it, and drag `Pharos.app` to your `/Applications` folder.
+Download the latest [**Pharos-3.2.0.dmg**](https://github.com/Zhengyuuuui/Pharos/releases/download/v3.2.0/Pharos-3.2.0.dmg) (SHA-256: `dd678c6eb2367616057948c7ed63a14df4df5ae1b016790ca4699a6925f3c857`, or view on [GitHub Releases](https://github.com/Zhengyuuuui/Pharos/releases/latest)), open it, and drag `Pharos.app` to your `/Applications` folder.
 
 ### Option 2: Homebrew
 ```sh
@@ -72,10 +72,11 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
 | **Stop processes** | `SIGTERM` first, `SIGKILL` only if it refuses; never system or other users' processes |
 | **Disk cleanup** | 4 specialized cleaning hubs: System & Caches (with sub-directory inspection & single-item clean), Orphaned App Leftovers scanner, npkill-style Project Purge (dormancy detection & batch release), and Dev & AI Tools (Homebrew multi-versions, Ollama/HuggingFace model weights with layer blob GC, Docker.raw & Xcode simulators) |
 | **Favorite projects & portable start contract** | Cross-ecosystem project start engine (peels through wrappers like `cross-env`/`dotenv` to match `package.json`, detects `go.mod`, `Cargo.toml`, `uv`/`poetry`/Django, Gradle/Maven), offering 100% portable start commands across developer machines; open in Terminal or copy command |
-| **Browsers & Proxy** | Clash / Mihomo network control hub (automatic detection of all major clients, UDS & HTTP dual-channel, hot mode switching & connection reset) and Chromium proxy isolation matrix (pure direct `direct://` for local debugging vs Clash rule proxy); manage Chrome, Edge, Brave profiles |
+| **Browsers & Proxy** | Clash / Mihomo network control hub (automatic detection of all major clients, UDS & HTTP dual-channel, hot mode switching & connection reset) and Chromium proxy isolation matrix; **Spotlight-Style Node Picker Popover** with fuzzy search, region filter chips (HK, JP, SG, US, TW, KR, EU), active concurrency latency ping testing, intelligent health ranking, and dedicated per-instance outbound listener proxy routing |
+| **In-App Self-Update** | Dual-channel edge update engine (Cloudflare Worker gateway + GitHub Releases fallback), silent background check schedule, SHA-256 integrity validation, code signature verification, and atomic app swap & restart |
 | **AI agent chat databases** | Inspect, clean and backup local chat / session databases from 23+ AI IDEs and editors (Cursor, Trae, Windsurf, VS Code, Antigravity, OpenCode, Claude Code, MiniMax…); nanosecond-precision incremental fingerprint cache (`DB + WAL` size/mtime) skips unchanged databases; detect orphaned workspaces; manually add and scan any custom application under `/Applications` |
 | **Packages & CLI tools** | Real Homebrew Cellar formula & Caskroom package scanning, diagnostics (`brew doctor`/`services`) and cache cleanup; global CLI tools (Node, Homebrew, Rust, Python, Go) with terminal run, reveal and uninstall; two-stage progressive project dependency scanning with `mtime` + lockfile fingerprint cache across 10 developer workspace directories (`.venv`, `node_modules`, `.build`, `target`); language cache repos overview |
-| **Design system & sidebar** | Strict 3-step lightness hierarchy (`background` → `surface` → `fill` with calibrated high-contrast tokens and `Font.TextStyle` dynamic typography), floating sidebar island with native traffic lights and customizable frosted-glass scroll blur (0%–100% slider + live top-left 3-buttons preview in Settings), zero AppKit blue highlight clashing, and adaptive responsive popover customizer (`ViewThatFits`) |
+| **Design system & sidebar** | Strict 3-step lightness hierarchy (`background` → `surface` → `fill` with calibrated high-contrast tokens and `Font.TextStyle` dynamic typography), floating sidebar island with native traffic lights and customizable frosted-glass scroll blur (0%–100% slider + live preview in Settings), **PharosSlimScroller** (3.5pt ultra-slim overlay scroller, zero gutter, transparent track) across all pages, 100% zero-emoji design compliance, and adaptive responsive popover customizer (`ViewThatFits`) |
 
 ---
 
@@ -159,20 +160,35 @@ The icon is that idea drawn literally: a radar-like beam sweeping a dot grid, li
    - Automatically detects active local Mihomo/Clash engines: Mihomo Party / Clash Party (via `/tmp/mihomo-party-*.sock` Unix Domain Socket without credentials), Clash Verge Rev, Clash Nyanpasu, ClashX.Meta, Flclash, and generic Mihomo CLI.
    - Live display of Mixed Port, SOCKS Port, TUN virtual network adapter state, active connections, and real-time upload/download speeds.
    - Millisecond-level hot switching between **Rule**, **Direct**, and **Global** routing modes without restarting the client; one-click reset for all open connections to immediately route traffic to the new mode; one-click copy for terminal proxy configuration (`export http_proxy` / `unset`).
-2. **Browser Proxy Isolation Matrix**:
+2. **Spotlight-Style Node Picker Popover & Real-time Ping Testing**:
+   - **Floating Spotlight Popover**: Replaces cumbersome 300+ item native menus with a sleek 380×430 pt floating popover panel with instant fuzzy search (`TextField` with Enter-key instant selection).
+   - **Region Categorization Chips**: One-click region filtering across `All`, `HK`, `JP`, `SG`, `US`, `TW`, `KR`, `EU`, and `Other` with live node count badges.
+   - **Active Concurrency Latency Ping**: The refresh button directly commands the Mihomo core (`GET /group/GLOBAL/delay?url=...&timeout=3000`) to test all node latencies concurrently in real-time, completely refreshing stale cached values in seconds.
+   - **Intelligent Status Ranking & Offline Filtering**: Three-tier ranking model (`statusRank`: 0=healthy, 1=untested, 2=timeout). Healthy, responsive nodes always sort to the top; timeout nodes (`delay == 0` or connection failed) are relegated to the bottom with red `Timeout` badges, and can be cleanly hidden with the "Hide Offline" toggle.
+   - **Recent Node Memory**: Remembers recently selected nodes for instant one-click switching.
+3. **Browser Proxy Isolation Matrix & Per-Instance Outbound Routing**:
    - **Local Dev Direct Browser**: Launch dedicated Chromium profiles with `--proxy-server="direct://"` and `--no-proxy-server`. Even when Clash system proxy or TUN mode is running, 100% of requests to `localhost`, `127.0.0.1`, and internal APIs bypass the proxy, eliminating SSL errors and proxy interference.
+   - **Follow System Mode**: Prominently styled in Apple System Blue capsule with `arrow.triangle.2.circlepath` and clear descriptive metadata (`代理: 跟随 macOS 系统网络 / TUN 代理`).
+   - **Dedicated Node Proxy Listener**: Chromium instances can be mapped to dedicated outbound proxy nodes via dynamic local listeners (`10000 + debugPort`), allowing individual browser profiles to route through separate nodes simultaneously (e.g. Work profile direct, Profile A via HK, Profile B via US).
    - **AI & Research Browser**: Launch profiles with `--proxy-server="http://127.0.0.1:7890"` to take advantage of node acceleration and smart split routing for foreign docs and LLM APIs.
-3. **Chromium Browser Instance Management**:
-   - Supports Google Chrome, Chrome Beta, Chrome Canary, Chromium, Microsoft Edge and Brave; every instance card features a proxy strategy capsule badge (`[Direct]` or `[Clash :7890]`) with in-drawer strategy editing.
-   - Several browsers side by side (e.g. Chrome for work, Edge for testing, Brave for personal): a filter bar switches between them, and “All” groups instances per browser with running count and memory
-   - **Settings → Browsers**: every supported browser with installed / running / saved counts and its default profile folder; hide browsers you don't use and choose which one “New Instance” uses
-   - Every running browser, identified by its profile folder (`--user-data-dir`): debug port, proxy, start URL, signed-in profiles, memory incl. all helper processes, folder size on demand. Debug-profile browsers no longer clutter the project list
-   - ☆ saves a running instance as a preset with its exact flags; **New Instance** picks the next free port and a `~/chromeNNNN` folder; every field is editable
-   - Saved instances stay listed after you quit Chrome (“saved · not running”) with their port and the exact **launch command** — a ready-to-paste `open -na 'Google Chrome' --args …` with a copy button; ★ again removes it
-   - If a saved instance is relaunched elsewhere with different flags, the card says so and **Update Preset** adopts the running flags
-   - **Start** runs `open -na "Google Chrome" --args …` after checking the folder isn't already open and the port is free
-   - **Quit** sends `SIGTERM` (normal Chrome shutdown, tabs restore next time); force quit is offered only if it's still open after 3 s
-   - 🐞 opens `http://127.0.0.1:<port>` (DevTools target list) in your default browser. Pharos itself never connects to debug ports
+4. **Chromium Browser Instance Management & Relaunch Safeguards**:
+   - Supports Google Chrome, Chrome Beta, Chrome Canary, Chromium, Microsoft Edge and Brave; every instance card features a proxy strategy capsule badge (`[Direct]`, `[Clash :7890]`, or `[NodeName :Port]`) with in-drawer strategy editing.
+   - Several browsers side by side (e.g. Chrome for work, Edge for testing, Brave for personal): a filter bar switches between them, and “All” groups instances per browser with running count and memory.
+   - **Settings → Browsers**: every supported browser with installed / running / saved counts and its default profile folder; hide browsers you don't use and choose which one “New Instance” uses.
+   - Every running browser, identified by its profile folder (`--user-data-dir`): debug port, proxy, start URL, signed-in profiles, memory incl. all helper processes, folder size on demand. Debug-profile browsers no longer clutter the project list.
+   - **Relaunch Confirmation Modal**: Prevents accidental tab closure when hot-switching or relaunching a running browser with new proxy flags; destructive operations require explicit user confirmation.
+   - ☆ saves a running instance as a preset with its exact flags; **New Instance** picks the next free port and a `~/chromeNNNN` folder; every field is editable.
+   - Saved instances stay listed after you quit Chrome (“saved · not running”) with their port and the exact **launch command** — a ready-to-paste `open -na 'Google Chrome' --args …` with a copy button; ★ again removes it.
+   - If a saved instance is relaunched elsewhere with different flags, the card says so and **Update Preset** adopts the running flags.
+   - **Start** runs `open -na "Google Chrome" --args …` after checking the folder isn't already open and the port is free.
+   - **Quit** sends `SIGTERM` (normal Chrome shutdown, tabs restore next time); force quit is offered only if it's still open after 3 s.
+   - 🐞 opens `http://127.0.0.1:<port>` (DevTools target list) in your default browser. Pharos itself never connects to debug ports.
+
+### In-App Background Self-Update (Dual-Channel & Atomic Swap)
+- **Cloudflare Worker Edge Update Gateway**: Fast, low-latency update checks powered by `pharos-update-worker` (`https://pharos-update.zysgm123.workers.dev/api/v1/latest`), with transparent zero-config fallback to GitHub Releases REST API and rate-limit immune `releases.atom` XML feeds.
+- **Automated Silent Background Checks**: Low-overhead background check with unobtrusive sidebar update badges and release notes preview.
+- **Double Integrity & Security Verification**: SHA-256 binary checksum validation via `CryptoKit`, DMG mount, and macOS deep codesign verification (`codesign --verify --deep --strict`).
+- **Seamless Atomic Handover**: Automatic quarantine attribute removal (`xattr -dr com.apple.quarantine`), atomic staging replacement, and instant app restart with zero manual drag-and-drop required.
 
 ### Disk cleanup
 Four dedicated cleaning modules engineered in pure Apple Swift to deliver all major capabilities of CleanMyMac and Mole, tailored specifically for modern AI agents and developer workflows:
@@ -337,6 +353,11 @@ make icon                           # regenerate the app icon from Scripts/make-
 ---
 
 ## Recent Updates
+
+### v3.2 (2026-11-07)
+- **Spotlight-Style Proxy Node Picker Popover & Concurrency Latency Ping**: replaced clumsy native menus with a 380×430 pt floating popover featuring real-time fuzzy search, country/region classification chips (HK, JP, SG, US, TW, KR, EU), active concurrency latency ping testing directly calling Mihomo core (`GET /group/GLOBAL/delay`), intelligent health ranking (`statusRank`: healthy top, timeout bottom), and "Hide Offline" toggle.
+- **In-App Background Self-Update Engine**: Cloudflare Worker edge update gateway (`pharos-update-worker`) with transparent GitHub Releases REST API and `releases.atom` dual-channel fallback, automatic low-overhead background check schedule, SHA-256 binary integrity verification, deep codesign validation, and atomic DMG replacement & relaunch.
+- **PharosSlimScroller UI/UX Polish**: unified 3.5 pt ultra-slim semi-transparent floating capsule scroller (`PharosSlimScroller`) with zero gutter and transparent track across all scrollable pages, eliminating macOS 15 pt thick scrollbar visual noise and button obstruction; 100% emoji-free design compliance (`DESIGN.md` §2.6) with monochrome SF Symbols; and destructive browser relaunch confirmation dialog.
 
 ### v3.1 (2026-10-31)
 - **Memory Bloat Doctor & Permanent System Daemon Governance (`Not Launch`)**: diagnoses 8 categories of macOS background memory-bloating daemons (`mediaanalysisd` / `photoanalysisd`, `mds_stores`, `diagnosticd`, `bird`, `WallpaperVideoExtension`, `suggestd` / `intelligenceplatformd`, `commerce`, `SimLaunchHostService`); supports both one-click safe `SIGTERM` memory reclamation and permanent user-domain `launchctl disable` (`Not Launch`) with one-click restore.

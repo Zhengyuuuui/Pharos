@@ -192,3 +192,23 @@ swift build          # 编译通过
 make test            # 全部 assertions 通过（含真实端口扫描测试）
 .build/debug/Pharos --check   # 打印当前项目/端口/内存（--all 含后台应用）
 ```
+
+## 7. 版本发布流水线（Release Workflow）
+
+当需要发布新版本（如 `v3.2.0`）时，流程严格按以下三步执行：
+
+1. **本地编译与打包**：
+   - 在 `Resources/Info.plist`、`Makefile`、`Casks/pharos.rb` 中更新版本号。
+   - 执行 `make dmg`：生成 `dist/Pharos-<版本号>.dmg`，并自动计算输出 `dist/Pharos-<版本号>.dmg.sha256`。
+2. **发布 GitHub Release**：
+   - 在 GitHub 仓库推送对应 tag（如 `v3.2.0`）并创建 Release。
+   - 上传 `dist/Pharos-<版本号>.dmg`。
+   - 在 Release Notes 正文中必须写明 64 位 SHA-256 校验和（格式：`| Pharos-x.y.z.dmg | <sha256> |` 或独立代码行），客户端与 Worker 会用正则自动提取。
+3. **更新 Homebrew Cask**：
+   - 提交并推送 `Casks/pharos.rb`（包含新 version 与对应 sha256）到 `main` 分支。
+4. **Cloudflare Worker 边缘网关状态（无需重新部署，全自动感知）**：
+   - 位于 `cloud/pharos-update-worker/` 的 Worker 是**纯无状态边缘网关**，**无需每次发版时手动部署**。
+   - Worker 采用动态代理模式，实时拉取并缓存（300 秒）GitHub Releases / releases.atom。
+   - 一旦 GitHub Release 上线，全球 Cloudflare 边缘节点在 300 秒缓存失效后**自动无缝更新**最新版本元数据与 DMG 流式下载，客户端应用内更新立即生效。
+   - **仅当 Worker 自身代码（如路由分发规则、缓存策略）发生变更时**，才需要在 `cloud/pharos-update-worker/` 执行 `npx wrangler deploy`。
+

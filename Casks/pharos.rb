@@ -1,6 +1,6 @@
 cask "pharos" do
-  version "3.1.0"
-  sha256 "b2a4abb45ae5952bedb41723ab37e1471d69872d3c600964f35a9fe3e1f00be9"
+  version "3.2.0"
+  sha256 "dd678c6eb2367616057948c7ed63a14df4df5ae1b016790ca4699a6925f3c857"
 
   url "https://github.com/Zhengyuuuui/Pharos/releases/download/v#{version}/Pharos-#{version}.dmg"
   name "Pharos"
