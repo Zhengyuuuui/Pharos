@@ -149,6 +149,7 @@ public struct HardwareSettingsBackup: Codable, Sendable, Equatable {
     public var batteryLimitEnabled: Bool?
     public var batteryPersistentGuard: Bool?
     public var batterySyncMagSafe: Bool?
+    public var batteryHysteresisMargin: Int?
     public var fanFixedRPM: Int?
 
     public init(
@@ -156,12 +157,14 @@ public struct HardwareSettingsBackup: Codable, Sendable, Equatable {
         batteryLimitEnabled: Bool? = nil,
         batteryPersistentGuard: Bool? = nil,
         batterySyncMagSafe: Bool? = nil,
+        batteryHysteresisMargin: Int? = nil,
         fanFixedRPM: Int? = nil
     ) {
         self.batteryTargetLimit = batteryTargetLimit
         self.batteryLimitEnabled = batteryLimitEnabled
         self.batteryPersistentGuard = batteryPersistentGuard
         self.batterySyncMagSafe = batterySyncMagSafe
+        self.batteryHysteresisMargin = batteryHysteresisMargin
         self.fanFixedRPM = fanFixedRPM
     }
 }

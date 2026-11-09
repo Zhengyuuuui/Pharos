@@ -352,6 +352,7 @@ struct MainSettingsView: View {
     @State private var loginError: String? = nil
     @State private var backupMessage: String? = nil
     @State private var showResetAlert = false
+    @State private var showReleaseNotesSheet = false
 
     var body: some View {
         PharosPage {
@@ -671,7 +672,32 @@ struct MainSettingsView: View {
                     .foregroundStyle(PharosColor.textTertiary)
             }
             .padding(.top, PharosSpacing.s)
-            .padding(.bottom, PharosSpacing.l)
+            .padding(.bottom, DemoMode.isEnabled ? PharosSpacing.s : PharosSpacing.l)
+
+            if DemoMode.isEnabled {
+                HStack {
+                    Spacer()
+                    Button {
+                        DemoMode.resetToPreUpdate()
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "arrow.uturn.backward.circle.fill")
+                                .font(.system(size: 10, weight: .semibold))
+                            Text(l10n.demoResetButtonText)
+                                .font(.system(size: 10.5, weight: .medium))
+                        }
+                        .foregroundStyle(PharosColor.amber.opacity(0.85))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(PharosColor.amber.opacity(0.08)))
+                        .overlay(Capsule().stroke(PharosColor.amber.opacity(0.25), lineWidth: 0.5))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Cmd + Shift + R")
+                    Spacer()
+                }
+                .padding(.bottom, PharosSpacing.l)
+            }
         }
         .alert(l10n.resetAllSettings, isPresented: $showResetAlert) {
             Button(l10n.cancel, role: .cancel) {}
@@ -741,7 +767,7 @@ struct MainSettingsView: View {
     private var progressStatusText: String {
         switch updateStore.state {
         case .downloading:
-            return l10n.updateDownloading
+            return DemoMode.isEnabled ? l10n.demoDownloadingSpeed : l10n.updateDownloading
         case .verifying:
             return l10n.updateVerifying
         case .installing:
@@ -768,13 +794,24 @@ struct MainSettingsView: View {
                                     .font(PharosFont.sectionTitle)
                                     .foregroundStyle(PharosColor.textPrimary)
 
-                                if updateStore.availableManifest != nil {
-                                    Text("NEW")
+                                if let manifest = updateStore.availableManifest {
+                                    Text("✨ v\(manifest.version) \(l10n.readyBadge)")
                                         .font(.system(size: 9, weight: .bold))
                                         .foregroundStyle(PharosColor.amber)
                                         .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
+                                        .padding(.vertical, 2.5)
                                         .background(Capsule().fill(PharosColor.amber.opacity(0.15)))
+                                } else if case .upToDate = updateStore.state {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.system(size: 9, weight: .bold))
+                                        Text(l10n.upToDateBadge)
+                                            .font(.system(size: 9, weight: .bold))
+                                    }
+                                    .foregroundStyle(PharosColor.success)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2.5)
+                                    .background(Capsule().fill(PharosColor.success.opacity(0.15)))
                                 }
                             }
 
@@ -861,6 +898,20 @@ struct MainSettingsView: View {
                                             .foregroundStyle(PharosColor.textSecondary)
                                             .lineLimit(3)
                                     }
+
+                                    Button {
+                                        showReleaseNotesSheet = true
+                                    } label: {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "doc.text.magnifyingglass")
+                                                .font(.system(size: 10))
+                                            Text(l10n.viewReleaseNotes)
+                                        }
+                                        .font(PharosFont.caption)
+                                        .foregroundStyle(PharosColor.accent)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .padding(.top, 2)
                                 }
 
                                 Spacer(minLength: 12)
@@ -954,6 +1005,14 @@ struct MainSettingsView: View {
                     ) {
                         Toggle("", isOn: $updateStore.autoCheckEnabled)
                             .toggleStyle(.switch)
+                    }
+                }
+            }
+            .sheet(isPresented: $showReleaseNotesSheet) {
+                if let manifest = updateStore.availableManifest {
+                    ReleaseNotesSheetView(manifest: manifest) {
+                        showReleaseNotesSheet = false
+                        updateStore.downloadAndInstall(manifest)
                     }
                 }
             }
@@ -1216,5 +1275,175 @@ private struct TrafficLightsGlassPreview: View {
         )
         .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
         .allowsHitTesting(false)
+    }
+}
+
+// MARK: - Release Notes Modal Sheet (v3.2.0 Demo & Production)
+
+struct ReleaseNotesSheetView: View {
+    let manifest: ReleaseManifest
+    let onUpdate: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var l10n = L10n.shared
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack(alignment: .top, spacing: 14) {
+                Image(nsImage: NSApp.applicationIconImage ?? NSWorkspace.shared.icon(forFile: Bundle.main.bundlePath))
+                    .resizable()
+                    .frame(width: 44, height: 44)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 8) {
+                        Text("Pharos v\(manifest.version)")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(PharosColor.textPrimary)
+
+                        Text("✨ \(l10n.readyBadge)")
+                            .font(.system(size: 9.5, weight: .bold))
+                            .foregroundStyle(PharosColor.amber)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(PharosColor.amber.opacity(0.15)))
+                    }
+
+                    Text(l10n.isChinese ? "一次安装，自此常新 · 纤毫毕现，视界无遮" : "Install Once, Forever Fresh · Unobstructed Focus")
+                        .font(PharosFont.caption)
+                        .foregroundStyle(PharosColor.textSecondary)
+                }
+
+                Spacer()
+
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(PharosColor.textTertiary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(16)
+            .background(PharosColor.surfaceSecondary)
+
+            Divider()
+
+            // Content
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    // Feature Highlight Cards
+                    featureHighlightRow(
+                        icon: "bolt.horizontal.circle.fill",
+                        iconColor: PharosColor.accent,
+                        title: l10n.isChinese ? "Spotlight 节点调度与实例直通" : "Spotlight Route Dispatcher",
+                        desc: l10n.isChinese ? "380×430 悬浮岛设计，支持实例级网络直通，毫秒级模糊检索与地区分片过滤。" : "Spotlight floating popover with instance route dispatching and instant fuzzy search."
+                    )
+
+                    featureHighlightRow(
+                        icon: "antenna.radiowaves.left.and.right",
+                        iconColor: PharosColor.success,
+                        title: l10n.isChinese ? "内核级全并发毫秒探活" : "Concurrent Millisecond Latency Telemetry",
+                        desc: l10n.isChinese ? "真机双向往返时延极速遥测，最优高速链路自动置顶，告别卡顿与级联层级。" : "Kernel-level bidirectional telemetry with automatic top-ranking of fastest links."
+                    )
+
+                    featureHighlightRow(
+                        icon: "slider.horizontal.below.rectangle",
+                        iconColor: Color.blue,
+                        title: l10n.isChinese ? "PharosSlimScroller 3.5pt 极窄浮动滚动条" : "PharosSlimScroller 3.5pt Ultra-Slim Scrollbar",
+                        desc: l10n.isChinese ? "阻尼悬浮、完全透明槽位、动态微光，视界无遮，消除外接鼠标粗黑底槽。" : "3.5pt floating pill, zero-gutter transparency, and dynamic sheen without OS intrusion."
+                    )
+
+                    featureHighlightRow(
+                        icon: "arrow.triangle.2.circlepath.circle.fill",
+                        iconColor: PharosColor.amber,
+                        title: l10n.isChinese ? "应用内边缘静默自更新" : "In-App Edge Atomic Self-Update",
+                        desc: l10n.isChinese ? "Cloudflare Worker 边缘网关毫秒分发，SHA-256 + CodeSign 双重验签与原子热更。" : "Cloudflare Worker edge gateway distribution with dual verification and atomic relaunch."
+                    )
+
+                    if !manifest.notes.isEmpty {
+                        Divider()
+                            .padding(.vertical, 2)
+
+                        Text(l10n.releaseNotes)
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(PharosColor.textPrimary)
+
+                        Text(manifest.notes.trimmingCharacters(in: .whitespacesAndNewlines))
+                            .font(.system(size: 11))
+                            .foregroundStyle(PharosColor.textSecondary)
+                            .lineSpacing(3)
+                            .textSelection(.enabled)
+                    }
+                }
+                .padding(16)
+            }
+            .pharosSlimScroller()
+
+            Divider()
+
+            // Footer
+            HStack {
+                if let size = manifest.dmgSize, size > 0 {
+                    Text("\(ByteFormat.disk(UInt64(size))) · SHA-256 Verified")
+                        .font(PharosFont.captionDigits)
+                        .foregroundStyle(PharosColor.textTertiary)
+                }
+
+                Spacer()
+
+                Button(l10n.isChinese ? "稍后" : "Later") {
+                    dismiss()
+                }
+                .buttonStyle(.pharos)
+                .controlSize(.small)
+
+                Button {
+                    dismiss()
+                    onUpdate()
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "arrow.down.circle.fill")
+                            .font(.system(size: 11, weight: .bold))
+                        Text(l10n.updateAndRestart)
+                    }
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(PharosColor.onAccent)
+                    .padding(.horizontal, 14)
+                    .frame(height: 28)
+                    .background(Capsule().fill(PharosColor.accentFill))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(PharosColor.surfaceSecondary)
+        }
+        .frame(width: 480, height: 490)
+    }
+
+    private func featureHighlightRow(icon: String, iconColor: Color, title: String, desc: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 15))
+                .foregroundStyle(iconColor)
+                .frame(width: 20)
+                .padding(.top, 1)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(PharosColor.textPrimary)
+                Text(desc)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(PharosColor.textSecondary)
+                    .lineSpacing(2)
+            }
+        }
+        .padding(8)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(PharosColor.fill)
+        )
     }
 }

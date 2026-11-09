@@ -30,9 +30,9 @@ public enum ClashClientKind: String, Sendable, CaseIterable, Codable {
 
     public var iconName: String {
         switch self {
-        case .mihomoParty: return "party.popper.fill"
+        case .mihomoParty: return "point.3.connected.trianglepath.dotted"
         case .clashVerge: return "shield.lefthalf.filled"
-        case .clashNyanpasu: return "cat.fill"
+        case .clashNyanpasu: return "arrow.triangle.branch"
         case .clashX: return "paperplane.fill"
         case .flclash: return "bolt.shield.fill"
         case .singBox: return "cube.box.fill"
@@ -172,13 +172,20 @@ public struct MihomoProxyNode: Identifiable, Hashable, Sendable, Codable {
         ProxyNodeRegion.detect(from: name)
     }
 
-    /// True if the node is alive and has a positive latency measurement (> 0 ms).
+    /// True if the node is alive and has a positive latency measurement (> 0 ms),
+    /// or if it is a local direct/intranet link with 0 ms.
     public var isHealthy: Bool {
-        alive && (delay ?? 0) > 0
+        if type.lowercased() == "direct" || name.contains("Direct") || name.contains("Intranet") {
+            return alive && (delay ?? 0) >= 0
+        }
+        return alive && (delay ?? 0) > 0
     }
 
     /// Latency in milliseconds if healthy, or nil if timed out, failed, or untested.
     public var validDelay: Int? {
+        if (type.lowercased() == "direct" || name.contains("Direct") || name.contains("Intranet")) && alive {
+            return delay ?? 0
+        }
         guard isHealthy, let d = delay, d > 0 else { return nil }
         return d
     }

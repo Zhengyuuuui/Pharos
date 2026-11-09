@@ -67,6 +67,18 @@ final class BatteryStore: ObservableObject {
         }
     }
 
+    /// Hysteresis margin before recharging resumes (e.g. 2% or 3%).
+    @Published var hysteresisMargin: Int = UserDefaults.standard.object(forKey: "batteryHysteresisMargin") as? Int ?? BatteryPolicy.defaultHysteresisMargin {
+        didSet {
+            guard hysteresisMargin != oldValue else { return }
+            UserDefaults.standard.set(hysteresisMargin, forKey: "batteryHysteresisMargin")
+            let margin = hysteresisMargin
+            Task {
+                _ = await Task.detached { BatteryStore.send(.setHysteresis(margin)) }.value
+            }
+        }
+    }
+
     private var heartbeatTimer: Timer?
     private var telemetryTimer: Timer?
     private var wakeObserver: Any?
@@ -264,8 +276,27 @@ final class BatteryStore: ObservableObject {
     func resetSettings() {
         setSystemMode()
         targetLimit = 80
+        hysteresisMargin = BatteryPolicy.defaultHysteresisMargin
         persistentGuard = true
         syncMagSafe = true
+    }
+
+    /// Battery recharge lower threshold: when battery drops to or below this percentage, charging automatically kicks in.
+    var rechargeThreshold: Int {
+        max(20, (activeLimit ?? targetLimit) - hysteresisMargin)
+    }
+
+    /// Whether the battery is currently holding in the hysteresis sailing buffer (between rechargeThreshold and targetLimit).
+    var isInHysteresisBuffer: Bool {
+        guard isHolding, let limit = activeLimit ?? (mode == .system ? nil : targetLimit) else { return false }
+        return reading.currentPercent < limit && reading.currentPercent >= rechargeThreshold
+    }
+
+    /// Manually triggers immediate recharging up to the active target limit (skipping hysteresis).
+    func rechargeToLimitNow() {
+        guard helper == .ready, !busy else { return }
+        let limit = targetLimit
+        apply(.limit(maxPercent: limit))
     }
 
     /// True only when the daemon confirms it is enforcing a limit — the UI never guesses.
@@ -334,9 +365,11 @@ final class BatteryStore: ObservableObject {
             restoredAfterLaunch = true
             let curGuard = persistentGuard
             let curMagSafe = syncMagSafe
+            let curHysteresis = hysteresisMargin
             Task {
                 _ = await Task.detached { BatteryStore.send(.setPersistentGuard(curGuard)) }.value
                 _ = await Task.detached { BatteryStore.send(.syncMagSafe(curMagSafe)) }.value
+                _ = await Task.detached { BatteryStore.send(.setHysteresis(curHysteresis)) }.value
             }
             if limitEnabled, reply.mode == .system, !reply.unsupported {
                 apply(.limit(maxPercent: targetLimit))

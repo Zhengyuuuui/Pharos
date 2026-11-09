@@ -7,7 +7,8 @@ public enum BatteryPolicy {
     public static let heartbeatTimeout: TimeInterval = 15.0
 
     /// Default hysteresis margin (percentage points below limit before charging resumes).
-    public static let defaultHysteresisMargin = 5
+    /// Defaults to 2% (buffer range of 2%–3% prevents high-frequency mini-cycling while keeping charge tightly near limit).
+    public static let defaultHysteresisMargin = 2
 
     /// Maximum safe battery cell temperature (°C) before forcing charging stop.
     public static let maxSafeTemperatureCelsius = 50.0
@@ -57,17 +58,20 @@ public enum BatteryPolicy {
         public var sleepDirective: SleepDirective
         public var magSafeColor: MagSafeColor
         public var progress: ChargingProgress
+        public var rechargeThreshold: Int?
 
         public init(
             action: Action,
             sleepDirective: SleepDirective,
             magSafeColor: MagSafeColor,
-            progress: ChargingProgress
+            progress: ChargingProgress,
+            rechargeThreshold: Int? = nil
         ) {
             self.action = action
             self.sleepDirective = sleepDirective
             self.magSafeColor = magSafeColor
             self.progress = progress
+            self.rechargeThreshold = rechargeThreshold
         }
     }
 
@@ -79,6 +83,7 @@ public enum BatteryPolicy {
         temperatureCelsius: Double = 25.0,
         syncMagSafe: Bool = true,
         persistentGuard: Bool = true,
+        hysteresisMargin: Int = defaultHysteresisMargin,
         lastHeartbeat: Date?,
         now: Date,
         state: inout State
@@ -171,7 +176,8 @@ public enum BatteryPolicy {
 
         case .limit(let rawLimit):
             let limit = clampLimit(rawLimit)
-            let lowerThreshold = Swift.max(20, limit - defaultHysteresisMargin)
+            let margin = Swift.max(1, Swift.min(hysteresisMargin, 5))
+            let lowerThreshold = Swift.max(20, limit - margin)
             state.isAdapterBypassed = false
 
             if currentPercent >= limit {
@@ -189,14 +195,16 @@ public enum BatteryPolicy {
                     action: .inhibitCharge,
                     sleepDirective: .allowSleep,
                     magSafeColor: syncMagSafe ? .orange : .system,
-                    progress: .holding(limit: limit)
+                    progress: .holding(limit: limit),
+                    rechargeThreshold: lowerThreshold
                 )
             } else {
                 return Decision(
                     action: .allowCharge,
                     sleepDirective: .preventSleep,
                     magSafeColor: syncMagSafe ? .orange : .system,
-                    progress: .charging(target: limit)
+                    progress: .charging(target: limit),
+                    rechargeThreshold: lowerThreshold
                 )
             }
         }

@@ -43,6 +43,7 @@ func testBatteryPolicyHysteresis() {
     expectEq(d3.action, .inhibitCharge, "80% reaches target, inhibit charge")
     expectEq(d3.sleepDirective, .allowSleep, "charge target reached, sleep is allowed")
     expectEq(d3.progress, .holding(limit: 80), "progress holding at 80 (native plug state)")
+    expectEq(d3.rechargeThreshold, 78, "recharge threshold is 78 with default 2% margin")
     expectEq(state.isHolding, true, "holding state activated")
 
     // 4. Minor fluctuation down to 79%: hysteresis holds the inhibit state!
@@ -57,30 +58,45 @@ func testBatteryPolicyHysteresis() {
     expectEq(d4.action, .inhibitCharge, "79% after holding stays inhibited via hysteresis")
     expectEq(state.isHolding, true, "still holding")
 
-    // 5. Minor fluctuation down to 76%: hysteresis still holds
+    // 5. Drops to 78% (80 - 2 default hysteresis margin): charge resumes!
     let d5 = BatteryPolicy.decide(
         mode: .limit(maxPercent: 80),
-        currentPercent: 76,
+        currentPercent: 78,
         isACConnected: true,
         lastHeartbeat: now,
         now: now,
         state: &state
     )
-    expectEq(d5.action, .inhibitCharge, "76% stays inhibited")
-    expectEq(state.isHolding, true, "still holding")
-
-    // 6. Drops to 75% (80 - 5 hysteresis margin): charge resumes!
-    let d6 = BatteryPolicy.decide(
-        mode: .limit(maxPercent: 80),
-        currentPercent: 75,
-        isACConnected: true,
-        lastHeartbeat: now,
-        now: now,
-        state: &state
-    )
-    expectEq(d6.action, .allowCharge, "75% reaches lower threshold, charge resumes")
-    expectEq(d6.sleepDirective, .preventSleep, "prevent sleep while recharging to 80")
+    expectEq(d5.action, .allowCharge, "78% reaches lower threshold (80 - 2), charge resumes")
+    expectEq(d5.sleepDirective, .preventSleep, "prevent sleep while recharging to 80")
     expectEq(state.isHolding, false, "holding reset")
+
+    // 6. Test with 3% margin: lowerThreshold = 77%
+    var state3 = BatteryPolicy.State(isHolding: true)
+    let d6_hold = BatteryPolicy.decide(
+        mode: .limit(maxPercent: 80),
+        currentPercent: 78,
+        isACConnected: true,
+        hysteresisMargin: 3,
+        lastHeartbeat: now,
+        now: now,
+        state: &state3
+    )
+    expectEq(d6_hold.action, .inhibitCharge, "78% with 3% margin stays inhibited")
+    expectEq(d6_hold.rechargeThreshold, 77, "recharge threshold is 77 with 3% margin")
+    expectEq(state3.isHolding, true, "still holding with 3% margin at 78%")
+
+    let d6_resume = BatteryPolicy.decide(
+        mode: .limit(maxPercent: 80),
+        currentPercent: 77,
+        isACConnected: true,
+        hysteresisMargin: 3,
+        lastHeartbeat: now,
+        now: now,
+        state: &state3
+    )
+    expectEq(d6_resume.action, .allowCharge, "77% with 3% margin resumes charging")
+    expectEq(state3.isHolding, false, "holding reset at 77%")
 }
 
 func testBatteryPolicyHeartbeatTimeout() {
@@ -241,6 +257,8 @@ func testBatteryProtocolEncodeDecode() {
         (.syncMagSafe(false), "magsafe 0"),
         (.setPersistentGuard(true), "persistent 1"),
         (.setPersistentGuard(false), "persistent 0"),
+        (.setHysteresis(2), "hysteresis 2"),
+        (.setHysteresis(3), "hysteresis 3"),
     ]
 
     for (cmd, str) in commands {
@@ -254,6 +272,8 @@ func testBatteryProtocolEncodeDecode() {
     expectEq(BatteryProtocol.decode("limit 10"), nil, "limit below 20 rejected")
     expectEq(BatteryProtocol.decode("limit 120"), nil, "limit above 100 rejected")
     expectEq(BatteryProtocol.decode("limit abc"), nil, "non-integer limit rejected")
+    expectEq(BatteryProtocol.decode("hysteresis 0"), nil, "hysteresis 0 rejected")
+    expectEq(BatteryProtocol.decode("hysteresis 10"), nil, "hysteresis 10 rejected")
 
     // Reply JSON round-trip
     let reply = BatteryProtocol.Reply(
@@ -262,7 +282,8 @@ func testBatteryProtocolEncodeDecode() {
         isHolding: true,
         isAdapterBypassed: false,
         magSafeSync: true,
-        unsupported: false
+        unsupported: false,
+        hysteresisMargin: 2
     )
     let data = try? JSONEncoder().encode(reply)
     let decoded = data.flatMap { try? JSONDecoder().decode(BatteryProtocol.Reply.self, from: $0) }

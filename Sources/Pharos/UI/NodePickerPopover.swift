@@ -41,7 +41,7 @@ struct NodePickerPopover: View {
                     .font(.system(size: 11))
                     .foregroundStyle(PharosColor.textSecondary)
 
-                TextField(l10n.searchNodePlaceholder, text: $searchText)
+                TextField(DemoMode.isEnabled ? l10n.demoSearchPlaceholder : l10n.searchNodePlaceholder, text: $searchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 11.5))
                     .onSubmit {
@@ -73,6 +73,11 @@ struct NodePickerPopover: View {
                     await clash.refresh()
                     await clash.refreshNodes(triggerSpeedTest: true)
                     await MainActor.run {
+                        if DemoMode.isEnabled {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                sortByLatency = true
+                            }
+                        }
                         isRefreshing = false
                     }
                 }
@@ -86,7 +91,7 @@ struct NodePickerPopover: View {
                     .background(RoundedRectangle(cornerRadius: 6).fill(PharosColor.fill))
             }
             .buttonStyle(.plain)
-            .help(l10n.clashRefreshNodes)
+            .help(DemoMode.isEnabled ? l10n.demoProbeLatency : l10n.clashRefreshNodes)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
@@ -151,7 +156,7 @@ struct NodePickerPopover: View {
                     HStack(spacing: 3) {
                         Image(systemName: "bolt.horizontal")
                             .font(.system(size: 9))
-                        Text(l10n.sortByLatency)
+                        Text(DemoMode.isEnabled ? l10n.demoLatencySort : l10n.sortByLatency)
                             .font(.system(size: 9.5))
                     }
                     .padding(.horizontal, 5)
@@ -168,7 +173,7 @@ struct NodePickerPopover: View {
                     HStack(spacing: 3) {
                         Image(systemName: hideOffline ? "eye.slash" : "eye")
                             .font(.system(size: 9))
-                        Text(l10n.hideOfflineNodes)
+                        Text(DemoMode.isEnabled ? l10n.demoHideUnreachable : l10n.hideOfflineNodes)
                             .font(.system(size: 9.5))
                     }
                     .padding(.horizontal, 5)
@@ -249,7 +254,7 @@ struct NodePickerPopover: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
 
-                    Text(node.type.uppercased())
+                    Text(nodeSubtitle(node))
                         .font(.system(size: 8.5))
                         .foregroundStyle(PharosColor.textTertiary)
                 }
@@ -298,7 +303,7 @@ struct NodePickerPopover: View {
                 .font(.system(size: 9))
                 .foregroundStyle(PharosColor.textTertiary)
 
-            Text("\(l10n.proxyExitNode):")
+            Text("\(DemoMode.isEnabled ? l10n.demoExitRoute : l10n.proxyExitNode):")
                 .font(.system(size: 10))
                 .foregroundStyle(PharosColor.textTertiary)
 
@@ -382,5 +387,27 @@ struct NodePickerPopover: View {
         } else {
             return PharosColor.error
         }
+    }
+
+    private func nodeSubtitle(_ node: MihomoProxyNode) -> String {
+        if DemoMode.isEnabled {
+            switch node.name {
+            case "HK-Direct-Alpha":
+                return l10n.isChinese ? "香港专线" : "Dedicated"
+            case "JP-Tokyo-Cluster-02":
+                return l10n.isChinese ? "东京核心" : "Tokyo Cluster"
+            case "SG-SingTel-Dedicated":
+                return l10n.isChinese ? "新加坡直达" : "SingTel Dedicated"
+            case "US-SiliconValley-Fast":
+                return l10n.isChinese ? "美西直连" : "Silicon Valley Fast"
+            case "DE-Frankfurt-Peer":
+                return l10n.isChinese ? "欧洲出口" : "Frankfurt Peer"
+            case "Direct-Office-Intranet":
+                return l10n.isChinese ? "本地直连" : "Office Intranet"
+            default:
+                return node.type.uppercased()
+            }
+        }
+        return node.type.uppercased()
     }
 }

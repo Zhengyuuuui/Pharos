@@ -104,6 +104,10 @@ final class ClashStore: ObservableObject {
         self.snapshot = s
     }
 
+    func applyMockNodes(_ mockNodes: [MihomoProxyNode]) {
+        self.nodes = mockNodes
+    }
+
     // MARK: - State Refresh & Testing
 
     /// Tests connectivity to a given endpoint and secret token.
@@ -148,7 +152,12 @@ final class ClashStore: ObservableObject {
     }
 
     func refresh() async {
-        if DemoMode.isEnabled { return }
+        if DemoMode.isEnabled {
+            if nodes.isEmpty {
+                nodes = DemoMode.canonicalDemoNodes
+            }
+            return
+        }
         guard !isRefreshing else { return }
         isRefreshing = true
         defer { isRefreshing = false }
@@ -246,6 +255,20 @@ final class ClashStore: ObservableObject {
     /// Refreshes available proxy nodes from the Mihomo/Clash core.
     /// If `triggerSpeedTest` is true, Mihomo executes a concurrent health-check to update live latencies.
     func refreshNodes(triggerSpeedTest: Bool = false) async {
+        if DemoMode.isEnabled {
+            lastNodesFetchTime = Date()
+            if triggerSpeedTest {
+                // Realistic probe delay of 350ms
+                try? await Task.sleep(nanoseconds: 350_000_000)
+                self.nodes = DemoMode.refreshedDemoNodes
+            } else {
+                if self.nodes.isEmpty {
+                    self.nodes = DemoMode.canonicalDemoNodes
+                }
+            }
+            return
+        }
+
         var ep = endpoint
         if ep == nil {
             ep = ClashController.detectActiveEndpoint()
@@ -278,6 +301,9 @@ final class ClashStore: ObservableObject {
     /// Hot switches a proxy group to the selected node in milliseconds without restarting the browser.
     @discardableResult
     func switchProxy(groupName: String, nodeName: String) async -> Bool {
+        if DemoMode.isEnabled {
+            return true
+        }
         guard let ep = endpoint else { return false }
         isOperating = true
         defer { isOperating = false }

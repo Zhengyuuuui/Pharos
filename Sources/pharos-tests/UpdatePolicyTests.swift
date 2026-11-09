@@ -121,4 +121,17 @@ func testUpdatePolicy() {
     } catch {
         expect(false, "Failed to parse Atom feed: \(error)")
     }
+
+    // 7. Censorship-Free Demo Nodes & Direct 0ms Latency
+    let directNode = MihomoProxyNode(name: "Direct-Office-Intranet", type: "Direct", delay: 0, alive: true)
+    expect(directNode.isHealthy, "direct intranet node is healthy with 0ms delay")
+    expectEq(directNode.validDelay, 0, "direct intranet validDelay is 0")
+    expectEq(directNode.statusRank, 0, "direct intranet statusRank is 0 (healthy)")
+
+    expectEq(MihomoProxyNode(name: "HK-Direct-Alpha", type: "Dedicated").region, .hongKong, "HK-Direct-Alpha is HK")
+    expectEq(MihomoProxyNode(name: "JP-Tokyo-Cluster-02", type: "Dedicated").region, .japan, "JP-Tokyo-Cluster-02 is JP")
+    expectEq(MihomoProxyNode(name: "SG-SingTel-Dedicated", type: "Dedicated").region, .singapore, "SG-SingTel-Dedicated is SG")
+    expectEq(MihomoProxyNode(name: "US-SiliconValley-Fast", type: "Direct").region, .unitedStates, "US-SiliconValley-Fast is US")
+    expectEq(MihomoProxyNode(name: "DE-Frankfurt-Peer", type: "Direct").region, .europe, "DE-Frankfurt-Peer is EU")
+    expectEq(MihomoProxyNode(name: "Direct-Office-Intranet", type: "Direct").region, .other, "Direct-Office-Intranet is other (GL)")
 }

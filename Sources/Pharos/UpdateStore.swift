@@ -1,6 +1,7 @@
 import AppKit
 import CryptoKit
 import Foundation
+import SwiftUI
 import PharosCore
 
 /// Manages in-app update checks, streaming download, SHA-256 verification,
@@ -23,7 +24,10 @@ final class UpdateStore: ObservableObject {
     }
 
     public var currentVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "3.2.0"
+        if DemoMode.isEnabled {
+            return DemoMode.currentDemoVersion.rawValue
+        }
+        return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "3.2.0"
     }
 
     // MARK: - State
@@ -120,6 +124,19 @@ final class UpdateStore: ObservableObject {
     public func checkForUpdates(manual: Bool = false) {
         guard !isWorking && !isChecking else { return }
         state = .checking
+
+        if DemoMode.isEnabled {
+            Task { [weak self] in
+                guard let self = self else { return }
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s check delay
+                if DemoMode.currentDemoVersion == .v3_1_0 {
+                    self.state = .available(DemoMode.demoReleaseManifest)
+                } else {
+                    self.state = .upToDate(lastChecked: Date())
+                }
+            }
+            return
+        }
 
         Task { [weak self] in
             guard let self = self else { return }
@@ -232,6 +249,11 @@ final class UpdateStore: ObservableObject {
     public func downloadAndInstall(_ manifest: ReleaseManifest) {
         guard !isWorking else { return }
 
+        if DemoMode.isEnabled {
+            DemoMode.simulateUpdateWorkflow()
+            return
+        }
+
         downloadTask?.cancel()
         downloadTask = Task { [weak self] in
             guard let self = self else { return }
@@ -257,6 +279,73 @@ final class UpdateStore: ObservableObject {
                 if !Task.isCancelled {
                     self.state = .failed(error.localizedDescription)
                 }
+            }
+        }
+    }
+
+    // MARK: - Demo Simulation Helpers
+
+    public func setDemoAvailableManifest() {
+        self.state = .available(DemoMode.demoReleaseManifest)
+        self.objectWillChange.send()
+    }
+
+    public func setDemoUpToDate() {
+        self.state = .upToDate(lastChecked: Date())
+        self.objectWillChange.send()
+    }
+
+    public func simulateDownloadAndRelaunch(completion: @escaping () -> Void) {
+        guard !isWorking else { return }
+        downloadTask?.cancel()
+
+        downloadTask = Task { [weak self] in
+            guard let self = self else { return }
+            let manifest = DemoMode.demoReleaseManifest
+            let totalBytes: Int64 = manifest.dmgSize ?? 26_004_684
+
+            // 1. Smoothly interpolate progress 0.0 -> 1.0 in 0.8s (16 steps of 50ms)
+            let steps = 16
+            let interval = 0.05
+            for i in 1...steps {
+                if Task.isCancelled { return }
+                try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                let progress = min(1.0, Double(i) / Double(steps))
+                let downloaded = Int64(Double(totalBytes) * progress)
+                self.state = .downloading(
+                    manifest: manifest,
+                    progress: progress,
+                    downloadedBytes: downloaded,
+                    totalBytes: totalBytes
+                )
+            }
+
+            // 2. .verifying (signature verified)
+            self.state = .verifying(manifest)
+            try? await Task.sleep(nanoseconds: 250_000_000) // 0.25s
+            if Task.isCancelled { return }
+
+            // 3. .installing (0.3s)
+            self.state = .installing(manifest)
+            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s
+            if Task.isCancelled { return }
+
+            // 4. Window breathing fade out 0.2s (atomic reload simulation)
+            withAnimation(.easeInOut(duration: 0.2)) {
+                DemoMode.windowOpacity = 0.08
+            }
+            try? await Task.sleep(nanoseconds: 200_000_000) // 0.2s
+            if Task.isCancelled { return }
+
+            // 5. Complete transition
+            DemoMode.currentDemoVersion = .v3_2_0
+            self.state = .upToDate(lastChecked: Date())
+            completion()
+            self.objectWillChange.send()
+
+            // 6. Graceful return fade in 0.2s
+            withAnimation(.easeInOut(duration: 0.2)) {
+                DemoMode.windowOpacity = 1.0
             }
         }
     }

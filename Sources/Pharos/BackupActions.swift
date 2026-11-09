@@ -46,6 +46,7 @@ enum BackupActions {
                 batteryLimitEnabled: UserDefaults.standard.bool(forKey: "batteryLimitEnabled"),
                 batteryPersistentGuard: BatteryStore.shared.persistentGuard,
                 batterySyncMagSafe: BatteryStore.shared.syncMagSafe,
+                batteryHysteresisMargin: BatteryStore.shared.hysteresisMargin,
                 fanFixedRPM: FanStore.shared.fixedRPM
             )
             let module = ModuleSettingsBackup(
@@ -125,6 +126,7 @@ enum BackupActions {
                 }
                 if let pg = h.batteryPersistentGuard { BatteryStore.shared.persistentGuard = pg }
                 if let sm = h.batterySyncMagSafe { BatteryStore.shared.syncMagSafe = sm }
+                if let hm = h.batteryHysteresisMargin { BatteryStore.shared.hysteresisMargin = hm }
                 if let rpm = h.fanFixedRPM { FanStore.shared.fixedRPM = rpm }
             }
             if let mod = backup.moduleSettings {

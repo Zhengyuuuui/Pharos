@@ -37,10 +37,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                           CommandLine.arguments.contains("--capture-light") ||
                           NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .aqua
             NSApp.appearance = NSAppearance(named: isLight ? .aqua : .darkAqua)
-            UserDefaults.standard.set("en", forKey: "appLanguage")
+            let isScreenshot = CommandLine.arguments.contains("--capture-screenshots") || CommandLine.arguments.contains("--capture-light")
+            if isScreenshot {
+                UserDefaults.standard.set("en", forKey: "appLanguage")
+                L10n.shared.language = .english
+            } else if CommandLine.arguments.contains("--zh") {
+                UserDefaults.standard.set("zh-Hans", forKey: "appLanguage")
+                L10n.shared.language = .simplifiedChinese
+            } else if let saved = UserDefaults.standard.string(forKey: "appLanguage"), let lang = AppLanguage(rawValue: saved) {
+                L10n.shared.language = lang
+            }
             UserDefaults.standard.set(true, forKey: "pharos.onboardingCompleted")
-            L10n.shared.language = .english
             ScreenshotCapture.setupMockData(store: store)
+            DemoMode.resetToPreUpdate()
 
             if CommandLine.arguments.contains("--capture-screenshots") || CommandLine.arguments.contains("--capture-light") {
                 Task { @MainActor in

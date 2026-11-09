@@ -141,6 +141,10 @@ struct BatteryControlView: View {
                                 Label(l10n.batteryHoldingAboveLimit(r.currentPercent, limit: limit), systemImage: "powerplug.fill")
                                     .font(PharosFont.sectionTitle)
                                     .foregroundStyle(Color.teal)
+                            } else if r.currentPercent < limit {
+                                Label(l10n.batteryHoldingInHysteresis(r.currentPercent, limit: limit, rechargeAt: battery.rechargeThreshold), systemImage: "powerplug.fill")
+                                    .font(PharosFont.sectionTitle)
+                                    .foregroundStyle(Color.teal)
                             } else {
                                 Label(l10n.batteryHoldingAtLimit(limit), systemImage: "powerplug.fill")
                                     .font(PharosFont.sectionTitle)
@@ -174,13 +178,29 @@ struct BatteryControlView: View {
                     }
 
                     Text(isHolding
-                         ? (r.currentPercent > limit ? l10n.batteryAboveLimitNote : l10n.batteryHoldingSubtitle)
+                         ? (r.currentPercent > limit
+                            ? l10n.batteryAboveLimitNote
+                            : (r.currentPercent < limit
+                               ? l10n.batteryHoldingHysteresisNote(rechargeAt: battery.rechargeThreshold, limit: limit)
+                               : l10n.batteryHoldingSubtitle))
                          : (r.adapterName ?? l10n.batteryAdapter))
                         .font(PharosFont.body)
                         .foregroundStyle(PharosColor.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    powerFlowEvidence(r)
+                    HStack(spacing: PharosSpacing.s) {
+                        powerFlowEvidence(r)
+                        if isHolding, r.currentPercent < limit, battery.helper == .ready {
+                            Button {
+                                battery.rechargeToLimitNow()
+                            } label: {
+                                Label(l10n.batteryRechargeNowTo(limit), systemImage: "bolt.fill")
+                                    .font(.system(size: 11, weight: .medium))
+                            }
+                            .buttonStyle(.pharos)
+                            .controlSize(.mini)
+                        }
+                    }
 
                     HStack(spacing: PharosSpacing.l) {
                         if let watts = r.adapterWatts, watts > 0 {
@@ -275,6 +295,31 @@ struct BatteryControlView: View {
 
                 PharosListDivider()
 
+                // Hysteresis sailing buffer controls
+                VStack(alignment: .leading, spacing: PharosSpacing.xs) {
+                    HStack {
+                        Label(l10n.batteryHysteresisTitle, systemImage: "arrow.triangle.swap")
+                            .font(PharosFont.rowLabel)
+                        Spacer()
+                        Text(l10n.batteryHysteresisValue(battery.hysteresisMargin, rechargeAt: battery.rechargeThreshold))
+                            .font(PharosFont.caption)
+                            .foregroundStyle(PharosColor.accent)
+                    }
+
+                    HStack(spacing: PharosSpacing.s) {
+                        hysteresisButton(2, label: l10n.batteryHysteresis2Percent)
+                        hysteresisButton(3, label: l10n.batteryHysteresis3Percent)
+                        hysteresisButton(1, label: l10n.batteryHysteresis1Percent)
+                    }
+
+                    Text(l10n.batteryHysteresisDesc(margin: battery.hysteresisMargin, limit: battery.targetLimit, rechargeAt: battery.rechargeThreshold))
+                        .font(PharosFont.caption)
+                        .foregroundStyle(PharosColor.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                PharosListDivider()
+
                 // Action buttons
                 HStack(spacing: PharosSpacing.m) {
                     Button {
@@ -359,6 +404,20 @@ struct BatteryControlView: View {
         let active = battery.activeLimit == percent
         Button {
             battery.selectLimit(percent)
+        } label: {
+            Text(label)
+                .font(active ? PharosFont.rowLabel : PharosFont.body)
+        }
+        .buttonStyle(active ? .pharosPrimary : .pharos)
+        .controlSize(.small)
+        .disabled(battery.helper != .ready || battery.busy)
+    }
+
+    @ViewBuilder
+    private func hysteresisButton(_ margin: Int, label: String) -> some View {
+        let active = battery.hysteresisMargin == margin
+        Button {
+            battery.hysteresisMargin = margin
         } label: {
             Text(label)
                 .font(active ? PharosFont.rowLabel : PharosFont.body)

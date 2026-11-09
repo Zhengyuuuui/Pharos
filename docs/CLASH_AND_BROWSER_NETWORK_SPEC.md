@@ -268,7 +268,7 @@ public enum ClashClientKind: String, Sendable, CaseIterable {
 
     public var iconName: String {
         switch self {
-        case .mihomoParty: return "party.popper.fill"
+        case .mihomoParty: return "point.3.connected.trianglepath.dotted"
         case .clashVerge: return "shield.lefthalf.filled"
         case .clashNyanpasu: return "cat.fill"
         case .clashX: return "paperplane.fill"

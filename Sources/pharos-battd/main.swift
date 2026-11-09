@@ -56,6 +56,7 @@ final class BatteryDaemon: @unchecked Sendable {
     private var mode: BatteryMode = .system
     private var syncMagSafe = true
     private var persistentGuard = true
+    private var hysteresisMargin = BatteryPolicy.defaultHysteresisMargin
     private var lastHeartbeat: Date?
     private var policyState = BatteryPolicy.State()
     private var sleepAssertionID: IOPMAssertionID = 0
@@ -87,7 +88,8 @@ final class BatteryDaemon: @unchecked Sendable {
         let dict: [String: Any] = [
             "mode": BatteryProtocol.encode(.setMode(mode)),
             "syncMagSafe": syncMagSafe,
-            "persistentGuard": persistentGuard
+            "persistentGuard": persistentGuard,
+            "hysteresisMargin": hysteresisMargin
         ]
         if let data = try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted]) {
             try? data.write(to: URL(fileURLWithPath: Self.statePath), options: .atomic)
@@ -107,6 +109,9 @@ final class BatteryDaemon: @unchecked Sendable {
         if let guardOn = dict["persistentGuard"] as? Bool {
             self.persistentGuard = guardOn
         }
+        if let margin = dict["hysteresisMargin"] as? Int, (1...5).contains(margin) {
+            self.hysteresisMargin = margin
+        }
     }
 
     // MARK: - Commands
@@ -124,6 +129,7 @@ final class BatteryDaemon: @unchecked Sendable {
             mode = m
             lastHeartbeat = Date()
             lastHardwareWriteTime = .distantPast
+            policyState.isHolding = false
             saveStateLocked()
             log("mode set to \(BatteryProtocol.encode(.setMode(m)))")
         case .syncMagSafe(let on):
@@ -136,6 +142,12 @@ final class BatteryDaemon: @unchecked Sendable {
             persistentGuard = on
             saveStateLocked()
             log("persistent guard set to \(on)")
+        case .setHysteresis(let m):
+            hysteresisMargin = m
+            lastHardwareWriteTime = .distantPast
+            saveStateLocked()
+            log("hysteresis margin set to \(m)%")
+            DispatchQueue.global().async { self.tick() }
         }
 
         let reply = BatteryProtocol.Reply(
@@ -145,7 +157,8 @@ final class BatteryDaemon: @unchecked Sendable {
             isAdapterBypassed: policyState.isAdapterBypassed,
             magSafeSync: syncMagSafe,
             persistentGuard: persistentGuard,
-            unsupported: unsupported
+            unsupported: unsupported,
+            hysteresisMargin: hysteresisMargin
         )
         if case .setMode = command {
             DispatchQueue.global().async { self.tick() }
@@ -179,6 +192,7 @@ final class BatteryDaemon: @unchecked Sendable {
             temperatureCelsius: reading.temperatureCelsius,
             syncMagSafe: syncMagSafe,
             persistentGuard: persistentGuard,
+            hysteresisMargin: hysteresisMargin,
             lastHeartbeat: lastHeartbeat,
             now: now,
             state: &policyState

@@ -14,6 +14,7 @@ public enum BatteryProtocol {
         case setMode(BatteryMode)
         case syncMagSafe(Bool)
         case setPersistentGuard(Bool)
+        case setHysteresis(Int)
     }
 
     public static func encode(_ c: Command) -> String {
@@ -26,6 +27,7 @@ public enum BatteryProtocol {
         case .setMode(.discharge): return "discharge"
         case .syncMagSafe(let on): return "magsafe \(on ? 1 : 0)"
         case .setPersistentGuard(let on): return "persistent \(on ? 1 : 0)"
+        case .setHysteresis(let margin): return "hysteresis \(margin)"
         }
     }
 
@@ -48,6 +50,9 @@ public enum BatteryProtocol {
         case "persistent" where parts.count == 2:
             guard let flag = Int(parts[1]), flag == 0 || flag == 1 else { return nil }
             return .setPersistentGuard(flag == 1)
+        case "hysteresis" where parts.count == 2:
+            guard let margin = Int(parts[1]), (1...5).contains(margin) else { return nil }
+            return .setHysteresis(margin)
         default:
             return nil
         }
@@ -63,6 +68,7 @@ public enum BatteryProtocol {
         public var magSafeSync: Bool
         public var persistentGuard: Bool
         public var unsupported: Bool
+        public var hysteresisMargin: Int?
 
         public init(
             ok: Bool,
@@ -72,7 +78,8 @@ public enum BatteryProtocol {
             isAdapterBypassed: Bool = false,
             magSafeSync: Bool = true,
             persistentGuard: Bool = true,
-            unsupported: Bool = false
+            unsupported: Bool = false,
+            hysteresisMargin: Int? = nil
         ) {
             self.version = BatteryProtocol.version
             self.ok = ok
@@ -83,10 +90,11 @@ public enum BatteryProtocol {
             self.magSafeSync = magSafeSync
             self.persistentGuard = persistentGuard
             self.unsupported = unsupported
+            self.hysteresisMargin = hysteresisMargin
         }
 
         private enum CodingKeys: String, CodingKey {
-            case version, ok, error, mode, isHolding, isAdapterBypassed, magSafeSync, persistentGuard, unsupported
+            case version, ok, error, mode, isHolding, isAdapterBypassed, magSafeSync, persistentGuard, unsupported, hysteresisMargin
         }
 
         public init(from decoder: Decoder) throws {
@@ -100,6 +108,7 @@ public enum BatteryProtocol {
             magSafeSync = try c.decodeIfPresent(Bool.self, forKey: .magSafeSync) ?? true
             persistentGuard = try c.decodeIfPresent(Bool.self, forKey: .persistentGuard) ?? true
             unsupported = try c.decodeIfPresent(Bool.self, forKey: .unsupported) ?? false
+            hysteresisMargin = try c.decodeIfPresent(Int.self, forKey: .hysteresisMargin)
         }
     }
 }

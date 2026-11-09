@@ -7,9 +7,9 @@ func testClashModels() {
     expectEq(ClashRoutingMode.global.rawValue, "global", "ClashRoutingMode.global")
     expectEq(ClashRoutingMode.script.rawValue, "script", "ClashRoutingMode.script")
 
-    expectEq(ClashClientKind.mihomoParty.iconName, "party.popper.fill", "Mihomo party icon")
+    expectEq(ClashClientKind.mihomoParty.iconName, "point.3.connected.trianglepath.dotted", "Mihomo party icon")
     expectEq(ClashClientKind.clashVerge.iconName, "shield.lefthalf.filled", "Clash verge icon")
-    expectEq(ClashClientKind.clashNyanpasu.iconName, "cat.fill", "Clash nyanpasu icon")
+    expectEq(ClashClientKind.clashNyanpasu.iconName, "arrow.triangle.branch", "Clash nyanpasu icon")
     expectEq(ClashClientKind.genericMihomo.iconName, "network", "Generic mihomo icon")
 
     let snapshot = ClashStatusSnapshot(

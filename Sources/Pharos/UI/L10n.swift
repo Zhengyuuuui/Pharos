@@ -50,6 +50,7 @@ final class L10n: ObservableObject {
     }
 
     private var en: Bool { language == .english }
+    public var isChinese: Bool { language == .simplifiedChinese }
 
     // MARK: - Popover / shared
     // MARK: - Shared
@@ -1697,8 +1698,37 @@ final class L10n: ObservableObject {
     func batteryHoldingAboveLimit(_ current: Int, limit: Int) -> String {
         en ? "Charging On Hold (\(limit)% Limit · Current \(current)%)" : "暂停充电（设定 \(limit)% · 当前 \(current)%）"
     }
+    func batteryHoldingInHysteresis(_ current: Int, limit: Int, rechargeAt: Int) -> String {
+        en ? "Holding in Buffer (\(current)%)" : "限充保持中（\(current)%）"
+    }
     var batteryHoldingSubtitle: String {
         en ? "Power Adapter connected · Battery is not charging" : "已连接电源适配器 · 电池未在充电"
+    }
+    func batteryHoldingHysteresisNote(rechargeAt: Int, limit: Int) -> String {
+        en ? "Power Adapter connected · Battery idle at 0 mA. Minor drop from chemical relaxation or peak load assist is normal; will recharge to \(limit)% at ≤\(rechargeAt)%."
+           : "已连接电源适配器 · 电池零电流静置。由于电芯极化消除或瞬态负载存在微幅回落，跌至 ≤\(rechargeAt)% 时将自动充回 \(limit)%，无需担心。"
+    }
+    func batteryRechargeNowTo(_ limit: Int) -> String {
+        en ? "Recharge to \(limit)% Now" : "立即充回 \(limit)%"
+    }
+    var batteryHysteresisTitle: String {
+        en ? "Recharge Buffer (Hysteresis)" : "回充滞后区间（航行模式）"
+    }
+    func batteryHysteresisValue(_ margin: Int, rechargeAt: Int) -> String {
+        en ? "\(margin)% (Recharges at ≤\(rechargeAt)%)" : "滞后 \(margin)%（≤\(rechargeAt)% 自动补电）"
+    }
+    var batteryHysteresis2Percent: String {
+        en ? "2% (Recommended)" : "2%（推荐）"
+    }
+    var batteryHysteresis3Percent: String {
+        en ? "3%" : "3%"
+    }
+    var batteryHysteresis1Percent: String {
+        en ? "1% (Tight)" : "1%（紧凑）"
+    }
+    func batteryHysteresisDesc(margin: Int, limit: Int, rechargeAt: Int) -> String {
+        en ? "Pauses charging at \(limit)% with direct adapter power. When battery relaxes or transient load drops it to ≤\(rechargeAt)%, charging resumes automatically to prevent high-frequency mini-cycling."
+           : "达到 \(limit)% 上限后暂停充电并直通供电。当电量因电芯化学极化消除或瞬态负载微幅回落至 ≤\(rechargeAt)% 时，自动重新开启充电回路充回 \(limit)%，避免电芯高频微充微放循环。"
     }
     var batteryAboveLimitNote: String {
         en ? "Battery level is above target limit. Hardware charging is inhibited and Mac runs on adapter power. Battery will cap at limit once naturally drained."
@@ -2388,7 +2418,7 @@ final class L10n: ObservableObject {
     var upToDate: String { en ? "Pharos is up to date" : "当前已是最新版本" }
     var updateAvailable: String { en ? "New version available" : "发现新版本" }
     func updateBannerText(version: String) -> String {
-        en ? "New version v\(version) · Click to update" : "发现新版本 v\(version) · 点击一键更新"
+        en ? "✨ v\(version) Ready" : "✨ v\(version) 已就绪"
     }
     var updateAndRestart: String { en ? "Update & Restart" : "立即更新并重启" }
     var manualDownloadDMG: String { en ? "Download DMG" : "手动下载 DMG" }
@@ -2406,4 +2436,19 @@ final class L10n: ObservableObject {
     var updateFailed: String { en ? "Update failed" : "更新失败" }
     var updateRetry: String { en ? "Retry" : "重试" }
     var releaseNotes: String { en ? "Release Notes" : "更新日志" }
+
+    // MARK: - Demo Mode & Promo Strings
+    var demoResetButtonText: String { en ? "↩ Reset Demo: Roll back to v3.1.0" : "↩ 重置演示：回档至 v3.1.0 待更新" }
+    var readyBadge: String { en ? "Ready" : "已就绪" }
+    var upToDateBadge: String { en ? "Latest Version" : "最新版" }
+    var viewReleaseNotes: String { en ? "View Release Notes" : "查看更新日志" }
+    var demoDownloadingSpeed: String { en ? "Downloading at 32 MB/s…" : "正在高速下载 (32 MB/s)…" }
+    var demoDirectNetworkHub: String { en ? "Direct Route Dispatcher" : "直通链路调度中心" }
+    var demoEnterpriseGateway: String { en ? "Direct Mesh Core" : "Direct Mesh 核心" }
+    var demoRoutesCount: String { en ? "Direct Routes" : "条直通专线" }
+    var demoProbeLatency: String { en ? "Probe Latency" : "毫秒探活" }
+    var demoSearchPlaceholder: String { en ? "Search direct routes / gateways…" : "搜索直通专线 / 出口链路…" }
+    var demoLatencySort: String { en ? "Latency Sort" : "毫秒时延排序" }
+    var demoHideUnreachable: String { en ? "Hide Unreachable" : "隐藏不可达链路" }
+    var demoExitRoute: String { en ? "Exit Route" : "出口专线" }
 }
