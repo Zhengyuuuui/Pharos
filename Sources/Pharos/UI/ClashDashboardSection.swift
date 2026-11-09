@@ -11,12 +11,12 @@ struct ClashDashboardSection: View {
     var body: some View {
         let snap = clash.snapshot
 
-        PharosSection(title: DemoMode.isEnabled ? l10n.demoDirectNetworkHub : l10n.clashControlHub, systemImage: "network") {
+        PharosSection(title: l10n.clashControlHub, systemImage: "network") {
             HStack(spacing: 6) {
                 Button {
-                    Task { await clash.refreshNodes(triggerSpeedTest: true) }
+                    Task { await clash.refreshNodes() }
                 } label: {
-                    Label(DemoMode.isEnabled ? l10n.demoProbeLatency : l10n.clashRefreshNodes, systemImage: "arrow.clockwise")
+                    Label(l10n.clashRefreshNodes, systemImage: "arrow.clockwise")
                 }
                 .buttonStyle(.pharos)
                 .controlSize(.small)
@@ -39,14 +39,14 @@ struct ClashDashboardSection: View {
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .fill(snap.isRunning ? PharosColor.accent.opacity(0.12) : PharosColor.fill)
                             .frame(width: 36, height: 36)
-                        Image(systemName: DemoMode.isEnabled ? "network" : (snap.clientKind?.iconName ?? "network"))
+                        Image(systemName: snap.clientKind?.iconName ?? "network")
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(snap.isRunning ? PharosColor.accent : PharosColor.textSecondary)
                     }
 
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 8) {
-                            Text(DemoMode.isEnabled ? l10n.demoEnterpriseGateway : (clash.isManualMode ? clash.manualClientName : (snap.clientKind?.rawValue ?? (snap.isRunning ? "Mihomo Core" : l10n.clashControlHub))))
+                            Text(clash.isManualMode ? clash.manualClientName : (snap.clientKind?.rawValue ?? (snap.isRunning ? "Mihomo Core" : l10n.clashControlHub)))
                                 .font(PharosFont.rowLabel)
                                 .fontWeight(.semibold)
 
@@ -79,22 +79,19 @@ struct ClashDashboardSection: View {
 
                         if snap.isRunning {
                             HStack(spacing: 10) {
-                                let routesText: String = DemoMode.isEnabled
-                                    ? "\(clash.nodes.count) \(l10n.demoRoutesCount)"
-                                    : l10n.clashNodesCount(clash.nodes.count)
-                                Label(routesText, systemImage: "point.3.filled.connected.trianglepath.dotted")
+                                Label(l10n.clashNodesCount(clash.nodes.count), systemImage: "point.3.filled.connected.trianglepath.dotted")
                                     .font(PharosFont.caption)
                                     .foregroundStyle(PharosColor.textSecondary)
 
                                 Text("•").foregroundStyle(PharosColor.textTertiary)
 
-                                Label(DemoMode.isEnabled ? "\(l10n.isChinese ? "直通端口" : "Direct Port"): \(snap.mixedPort)" : "\(l10n.clashMixedPort): \(snap.mixedPort)", systemImage: "arrow.left.arrow.right")
+                                Label("\(l10n.clashMixedPort): \(snap.mixedPort)", systemImage: "arrow.left.arrow.right")
                                     .font(PharosFont.captionDigits)
                                     .foregroundStyle(PharosColor.textSecondary)
 
                                 if snap.isTunEnabled {
                                     Text("•").foregroundStyle(PharosColor.textTertiary)
-                                    Label(DemoMode.isEnabled ? (l10n.isChinese ? "内核直通 (TUN)" : "Kernel Direct (TUN)") : l10n.clashTunEnabled, systemImage: "shield.checkered")
+                                    Label(l10n.clashTunEnabled, systemImage: "shield.checkered")
                                         .font(PharosFont.caption)
                                         .foregroundStyle(PharosColor.accent)
                                 }

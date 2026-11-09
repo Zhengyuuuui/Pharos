@@ -672,32 +672,7 @@ struct MainSettingsView: View {
                     .foregroundStyle(PharosColor.textTertiary)
             }
             .padding(.top, PharosSpacing.s)
-            .padding(.bottom, DemoMode.isEnabled ? PharosSpacing.s : PharosSpacing.l)
-
-            if DemoMode.isEnabled {
-                HStack {
-                    Spacer()
-                    Button {
-                        DemoMode.resetToPreUpdate()
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "arrow.uturn.backward.circle.fill")
-                                .font(.system(size: 10, weight: .semibold))
-                            Text(l10n.demoResetButtonText)
-                                .font(.system(size: 10.5, weight: .medium))
-                        }
-                        .foregroundStyle(PharosColor.amber.opacity(0.85))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 5)
-                        .background(Capsule().fill(PharosColor.amber.opacity(0.08)))
-                        .overlay(Capsule().stroke(PharosColor.amber.opacity(0.25), lineWidth: 0.5))
-                    }
-                    .buttonStyle(.plain)
-                    .help("Cmd + Shift + R")
-                    Spacer()
-                }
-                .padding(.bottom, PharosSpacing.l)
-            }
+            .padding(.bottom, PharosSpacing.l)
         }
         .alert(l10n.resetAllSettings, isPresented: $showResetAlert) {
             Button(l10n.cancel, role: .cancel) {}
@@ -767,7 +742,7 @@ struct MainSettingsView: View {
     private var progressStatusText: String {
         switch updateStore.state {
         case .downloading:
-            return DemoMode.isEnabled ? l10n.demoDownloadingSpeed : l10n.updateDownloading
+            return l10n.updateDownloading
         case .verifying:
             return l10n.updateVerifying
         case .installing:

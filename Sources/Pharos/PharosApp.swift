@@ -49,7 +49,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             UserDefaults.standard.set(true, forKey: "pharos.onboardingCompleted")
             ScreenshotCapture.setupMockData(store: store)
-            DemoMode.resetToPreUpdate()
 
             if CommandLine.arguments.contains("--capture-screenshots") || CommandLine.arguments.contains("--capture-light") {
                 Task { @MainActor in

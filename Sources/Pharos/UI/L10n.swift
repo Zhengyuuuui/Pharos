@@ -2437,18 +2437,8 @@ final class L10n: ObservableObject {
     var updateRetry: String { en ? "Retry" : "重试" }
     var releaseNotes: String { en ? "Release Notes" : "更新日志" }
 
-    // MARK: - Demo Mode & Promo Strings
-    var demoResetButtonText: String { en ? "↩ Reset Demo: Roll back to v3.1.0" : "↩ 重置演示：回档至 v3.1.0 待更新" }
+    // MARK: - Update UI Badges
     var readyBadge: String { en ? "Ready" : "已就绪" }
     var upToDateBadge: String { en ? "Latest Version" : "最新版" }
     var viewReleaseNotes: String { en ? "View Release Notes" : "查看更新日志" }
-    var demoDownloadingSpeed: String { en ? "Downloading at 32 MB/s…" : "正在高速下载 (32 MB/s)…" }
-    var demoDirectNetworkHub: String { en ? "Direct Route Dispatcher" : "直通链路调度中心" }
-    var demoEnterpriseGateway: String { en ? "Direct Mesh Core" : "Direct Mesh 核心" }
-    var demoRoutesCount: String { en ? "Direct Routes" : "条直通专线" }
-    var demoProbeLatency: String { en ? "Probe Latency" : "毫秒探活" }
-    var demoSearchPlaceholder: String { en ? "Search direct routes / gateways…" : "搜索直通专线 / 出口链路…" }
-    var demoLatencySort: String { en ? "Latency Sort" : "毫秒时延排序" }
-    var demoHideUnreachable: String { en ? "Hide Unreachable" : "隐藏不可达链路" }
-    var demoExitRoute: String { en ? "Exit Route" : "出口专线" }
 }

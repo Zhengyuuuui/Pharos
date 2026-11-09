@@ -619,9 +619,8 @@ enum ScreenshotCapture {
                 config: ChromeConfig(
                     browser: .chrome,
                     userDataDir: "/Users/developer/Library/Application Support/Google/Chrome/Profile 1",
-                    debugPort: 9222,
-                    proxyServer: "http://127.0.0.1:19222",
-                    proxyNodeName: "HK-Direct-Alpha",
+                    debugPort: nil,
+                    proxyServer: nil,
                     startURL: nil,
                     extraFlags: []
                 ),
@@ -634,9 +633,8 @@ enum ScreenshotCapture {
                 config: ChromeConfig(
                     browser: .chrome,
                     userDataDir: "/Users/developer/Library/Application Support/Google/Chrome/Profile 2",
-                    debugPort: 9223,
-                    proxyServer: "http://127.0.0.1:19223",
-                    proxyNodeName: "JP-Tokyo-Cluster-02",
+                    debugPort: 9222,
+                    proxyServer: "http://127.0.0.1:7890",
                     startURL: nil,
                     extraFlags: []
                 ),
@@ -650,8 +648,7 @@ enum ScreenshotCapture {
                     browser: .brave,
                     userDataDir: "/Users/developer/Library/Application Support/BraveSoftware/Brave-Browser/Default",
                     debugPort: nil,
-                    proxyServer: "direct://",
-                    proxyNodeName: "Direct-Office-Intranet",
+                    proxyServer: "http://127.0.0.1:7897",
                     startURL: nil,
                     extraFlags: []
                 ),
@@ -696,10 +693,10 @@ enum ScreenshotCapture {
         batteryReading.maxCapacity = 5953
         BatteryStore.shared.applyMockReading(batteryReading, mode: .limit(maxPercent: 80), helper: .ready)
 
-        // 11. Direct Mesh Routing Snapshot
+        // 11. Clash / Mihomo Daemon Snapshot
         let clashSnap = ClashStatusSnapshot(
             isRunning: true,
-            clientKind: .genericMihomo,
+            clientKind: .mihomoParty,
             mode: .rule,
             mixedPort: 7890,
             socksPort: 7891,
@@ -712,7 +709,6 @@ enum ScreenshotCapture {
             controllerEndpoint: "127.0.0.1:9097"
         )
         ClashStore.shared.applyMockSnapshot(clashSnap)
-        ClashStore.shared.applyMockNodes(DemoMode.canonicalDemoNodes)
 
         // 12. Disk Cleaner Rows (18.6 GB cleanable)
         let targetMap = Dictionary(uniqueKeysWithValues: DiskCleaner.defaultTargets.map { ($0.id, $0) })

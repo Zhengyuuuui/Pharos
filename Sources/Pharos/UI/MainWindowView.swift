@@ -10,7 +10,6 @@ struct MainWindowView: View {
     @ObservedObject private var router = WindowRouter.shared
     @ObservedObject private var l10n = L10n.shared
     @ObservedObject private var updateStore = UpdateStore.shared
-    @ObservedObject private var demoState = DemoModeState.shared
     @AppStorage("pharos.trafficLightGlassTransparency") private var trafficLightGlassTransparency: Double = 0.75
     @AppStorage("pharos.showInspector") private var showInspector: Bool = true
     @State private var selection: SidebarItem?
@@ -102,18 +101,7 @@ struct MainWindowView: View {
             .padding(10)
             .frame(width: proxy.size.width, height: proxy.size.height)
         }
-        .opacity(demoState.windowOpacity)
         .background(PharosColor.windowGradient)
-        .background {
-            if DemoMode.isEnabled {
-                Button("") {
-                    DemoMode.resetToPreUpdate()
-                }
-                .keyboardShortcut("r", modifiers: [.command, .shift])
-                .opacity(0)
-                .allowsHitTesting(false)
-            }
-        }
         .ignoresSafeArea()
         .frame(minWidth: 940, minHeight: 620)
         .onAppear {
