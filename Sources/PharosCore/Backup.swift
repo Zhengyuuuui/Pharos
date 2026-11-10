@@ -96,6 +96,14 @@ public struct GeneralSettingsBackup: Codable, Sendable, Equatable {
     public var notifyMemory: Bool?
     public var notifyDisk: Bool?
     public var notifyFavoriteExit: Bool?
+    public var menuBarMetrics: [String]?
+    public var menuBarRingMetric: String?
+    public var menuBarShowLabels: Bool?
+    public var menuBarSeparator: String?
+    public var notifyThermal: Bool?
+    public var notifyBloat: Bool?
+    public var notifyAppUpdate: Bool?
+    public var notifyDiskThreshold: Double?
 
     public init(
         appLanguage: String? = nil,
@@ -107,7 +115,15 @@ public struct GeneralSettingsBackup: Codable, Sendable, Equatable {
         popoverHotkey: String? = nil,
         notifyMemory: Bool? = nil,
         notifyDisk: Bool? = nil,
-        notifyFavoriteExit: Bool? = nil
+        notifyFavoriteExit: Bool? = nil,
+        menuBarMetrics: [String]? = nil,
+        menuBarRingMetric: String? = nil,
+        menuBarShowLabels: Bool? = nil,
+        menuBarSeparator: String? = nil,
+        notifyThermal: Bool? = nil,
+        notifyBloat: Bool? = nil,
+        notifyAppUpdate: Bool? = nil,
+        notifyDiskThreshold: Double? = nil
     ) {
         self.appLanguage = appLanguage
         self.refreshSeconds = refreshSeconds
@@ -119,6 +135,14 @@ public struct GeneralSettingsBackup: Codable, Sendable, Equatable {
         self.notifyMemory = notifyMemory
         self.notifyDisk = notifyDisk
         self.notifyFavoriteExit = notifyFavoriteExit
+        self.menuBarMetrics = menuBarMetrics
+        self.menuBarRingMetric = menuBarRingMetric
+        self.menuBarShowLabels = menuBarShowLabels
+        self.menuBarSeparator = menuBarSeparator
+        self.notifyThermal = notifyThermal
+        self.notifyBloat = notifyBloat
+        self.notifyAppUpdate = notifyAppUpdate
+        self.notifyDiskThreshold = notifyDiskThreshold
     }
 }
 

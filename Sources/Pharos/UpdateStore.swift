@@ -130,6 +130,7 @@ final class UpdateStore: ObservableObject {
                 let skipped = manual ? nil : UserDefaults.standard.string(forKey: "pharos.skippedUpdateVersion")
                 if UpdatePolicy.isUpdateAvailable(current: self.currentVersion, remote: manifest.version, skippedVersion: skipped) {
                     self.state = .available(manifest)
+                    Notifier.shared.notifyUpdateAvailable(version: manifest.version)
                 } else {
                     self.state = .upToDate(lastChecked: Date())
                 }

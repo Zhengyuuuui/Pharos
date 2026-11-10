@@ -184,3 +184,68 @@ struct IconButton: View {
         }
     }
 }
+
+/// Compact in-app real-time active alert card with subtle glowing border and dismiss button.
+struct InAppAlertCard: View {
+    let alert: ActiveAlertBanner
+    let onClick: () -> Void
+    let onDismiss: () -> Void
+
+    @State private var hovering = false
+
+    private var themeColor: Color {
+        alert.level == .critical ? PharosColor.error : PharosColor.warning
+    }
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Button(action: onClick) {
+                HStack(spacing: 7) {
+                    Image(systemName: alert.icon)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(themeColor)
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(alert.title)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(PharosColor.textPrimary)
+                            .lineLimit(1)
+                        Text(alert.subtitle)
+                            .font(.system(size: 9))
+                            .foregroundStyle(PharosColor.textSecondary)
+                            .lineLimit(1)
+                    }
+
+                    Spacer(minLength: 0)
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(themeColor.opacity(0.8))
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(PharosColor.textTertiary)
+                    .frame(width: 16, height: 16)
+                    .background(Circle().fill(PharosColor.fill))
+            }
+            .buttonStyle(.plain)
+            .help(L10n.shared.dismissAlert)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(themeColor.opacity(hovering ? 0.16 : 0.10))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(themeColor.opacity(0.38), lineWidth: 0.75)
+        )
+        .onHover { hovering = $0 }
+    }
+}

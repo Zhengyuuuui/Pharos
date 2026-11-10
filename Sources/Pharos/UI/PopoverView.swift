@@ -5,6 +5,7 @@ struct PopoverView: View {
     @EnvironmentObject var store: ProjectStore
     @ObservedObject private var l10n = L10n.shared
     @ObservedObject private var layoutStore = PopoverLayoutStore.shared
+    @ObservedObject private var notifier = Notifier.shared
     @State private var showSettings = false
     @AppStorage("popoverTab") private var tab: PopoverTab = .projects
     @AppStorage("pharos.popoverGaussianBlur") private var popoverGaussianBlur: Bool = true
@@ -28,6 +29,20 @@ struct PopoverView: View {
                     ) : .identity)
             } else {
                 header
+                if !notifier.activeInAppAlerts.isEmpty {
+                    VStack(spacing: 4) {
+                        ForEach(notifier.activeInAppAlerts) { alert in
+                            InAppAlertCard(alert: alert) {
+                                if let tab = alert.batteryThermalTab {
+                                    WindowRouter.shared.batteryThermalTab = tab
+                                }
+                                AppDelegate.shared?.showMainWindow(selecting: alert.targetItem)
+                            } onDismiss: {
+                                notifier.dismissInAppAlert(id: alert.id)
+                            }
+                        }
+                    }
+                }
                 PopoverTabsContent(layout: layoutStore.layout, tab: $tab)
                     .blur(radius: (isBlurActive && isRefreshingBlur) ? 3.5 : 0)
                     .animation(isBlurActive ? .easeInOut(duration: 0.25) : nil, value: isRefreshingBlur)

@@ -154,8 +154,7 @@ Swift 通过 **ARC（自动引用计数）** 管理内存：编译器自动插�
     根目录本身保留；非失效库在编辑器运行时拒绝删除。需二次确认；批量清理失效项时逐条判定，
     被拒/失败只计数并在横幅显示。
   - 备份：只写到用户在保存面板中选的文件（连同 `-wal`）。
-- 本地通知（`Notifier.swift`，判定逻辑 `PharosCore/Alerts.swift` 可单测）：默认全部关闭，用户逐项开启；
-  只用 `UNUserNotificationCenter` 本地通知；每种情况触发一次，恢复后才重新触发，不刷屏。
+- 本地通知（`Notifier.swift`，判定逻辑 `PharosCore/Alerts.swift` 可单测）：v3.2.0 起引入智能守护通知（内存高压、守护进程膨胀、芯片过热、磁盘快满预警、常用项目异常退出、新版本更新）；首次升级通过迁移默认开启核心守护通知，支持用户逐项配置或一键全部开启；前台强制展示横幅与音效，点击直达故障治理页面；只用 `UNUserNotificationCenter` 本地通知；每种情况触发一次，恢复后才重新触发，不刷屏。
 - 全局快捷键（`MenuBarSettings.swift`）：默认关闭，只能从固定的几个组合中选；用 Carbon
   `RegisterEventHotKey`，不需要辅助功能权限，不监听其他按键。
 - 备份（`PharosCore/Backup.swift` + `BackupActions.swift`）：只读写用户在保存/打开面板中选的那个文件；

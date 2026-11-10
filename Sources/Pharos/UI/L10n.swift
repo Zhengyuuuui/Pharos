@@ -206,7 +206,7 @@ final class L10n: ObservableObject {
            : "\(app) 无法打开启动脚本，已改用「终端」。"
     }
 
-    // Menu bar text
+    // Menu bar text & metrics
     var menuBarText: String { en ? "Menu bar shows" : "菜单栏显示" }
     func menuBarTextOption(_ o: MenuBarText) -> String {
         switch o {
@@ -218,6 +218,50 @@ final class L10n: ObservableObject {
         case .battery: return en ? "Battery %" : "电池电量 %"
         }
     }
+    func menuBarMetricName(_ m: MenuBarMetric) -> String {
+        switch m {
+        case .ports: return en ? "Listening Ports" : "监听端口"
+        case .temperature: return en ? "Chip Temperature" : "芯片温度"
+        case .memory: return en ? "System Memory" : "系统内存"
+        case .projects: return en ? "Running Projects" : "运行项目"
+        case .disk: return en ? "Startup Disk" : "系统磁盘"
+        case .battery: return en ? "Battery Level" : "电池电量"
+        }
+    }
+    var separatorDot: String { en ? "Dot ( · )" : "中点 ( · )" }
+    var separatorPipe: String { en ? "Pipe ( | )" : "竖线 ( | )" }
+    var separatorSpace: String { en ? "Space (   )" : "空格 (   )" }
+    func separatorStyleName(_ s: MenuBarSeparator) -> String {
+        switch s {
+        case .dot: return separatorDot
+        case .pipe: return separatorPipe
+        case .space: return separatorSpace
+        }
+    }
+    var menuBarComposerTitle: String { en ? "Menu Bar Composer" : "菜单栏多指标定制" }
+    var menuBarComposerDesc: String {
+        en ? "Freely combine, order and display real-time system metrics on the macOS menu bar"
+           : "自由勾选、排序并在 macOS 顶部菜单栏实时组合展示"
+    }
+    var liveMenuBarPreview: String { en ? "1:1 Live Menu Bar Preview" : "菜单栏 1:1 实时预览" }
+    var ringMetricTitle: String { en ? "Dynamic Ring Metric" : "动态圆环绑定指标" }
+    var ringMetricHint: String {
+        en ? "Determines which metric drives the status ring's fill percentage and health color."
+           : "决定菜单栏左侧动态圆环反映哪个指标的负载比例与健康状态。"
+    }
+    var showMetricLabelsTitle: String { en ? "Show Metric Labels" : "显示微缩前缀标识" }
+    var showMetricLabelsHint: String {
+        en ? "Display short prefixes next to values (e.g. 8P · 52°C · MEM 68%)."
+           : "在数字旁显示短前缀标识（如 8P · 52°C · MEM 68%）。"
+    }
+    var separatorStyleTitle: String { en ? "Separator Style" : "分隔符样式" }
+    var presetPortsTemp: String { en ? "Ports + Temp" : "端口 + 温度" }
+    var presetTempMem: String { en ? "Temp + Memory" : "温度 + 内存" }
+    var presetPortsTempMem: String { en ? "Ports + Temp + Mem" : "端口 + 温度 + 内存" }
+    var presetIconOnly: String { en ? "Icon Only" : "仅图标" }
+    var iconOnly: String { en ? "Icon Only" : "仅图标" }
+    var openMenuBarComposer: String { en ? "Configure Menu Bar in Customize…" : "在「自定义」中配置菜单栏…" }
+
     var maxProjectsCapacity: String { en ? "Max projects capacity" : "最多项目数（容量上限）" }
     var maxPortsCapacity: String { en ? "Max ports capacity" : "最多端口数（容量上限）" }
     var capacityRingHint: String {
@@ -235,8 +279,81 @@ final class L10n: ObservableObject {
     // Notifications
     var notificationsTitle: String { en ? "Notifications" : "通知" }
     var notifyMemory: String { en ? "Memory pressure becomes high" : "内存压力升高时" }
-    var notifyDisk: String { en ? "A disk is almost full (≥ 95 %)" : "磁盘快满时（≥ 95%）" }
+    var notifyDisk: String { en ? "A disk is almost full" : "磁盘快满预警" }
     var notifyFavoriteExit: String { en ? "A favorite project stops unexpectedly" : "常用项目意外停止时" }
+    var notifyThermal: String { en ? "Chip temperature overheat (≥ 85°C)" : "芯片高温过热预警（≥ 85°C）" }
+    var notifyBloat: String { en ? "Daemon memory bloat (≥ 500 MB)" : "守护进程内存异常膨胀（≥ 500 MB）" }
+    var notifyAppUpdate: String { en ? "When an app update is available" : "发现应用新版本推送" }
+    var notifyDiskThresholdTitle: String { en ? "Disk warning threshold" : "磁盘空间预警阈值" }
+    func notifyDiskThresholdOption(_ t: Double) -> String {
+        if t <= 0.86 { return en ? "85% (Aggressive)" : "85% (更积极)" }
+        if t <= 0.91 { return en ? "90% (Recommended)" : "90% (推荐)" }
+        return en ? "95% (Critical)" : "95% (紧凑)"
+    }
+    var sendTestNotification: String { en ? "Send Test Notification" : "发送测试通知" }
+    var enableAllNotifications: String { en ? "Enable All" : "全部开启" }
+    var testNotificationSent: String { en ? "Test notification delivered" : "已发送测试通知" }
+    var testNotificationTitle: String { en ? "Pharos Alert Test" : "Pharos 守护告警测试" }
+    var testNotificationBody: String {
+        en ? "Intelligent alert system is running. Foreground banners and sounds are active."
+           : "智能告警系统运行正常，前台实时横幅与音效已就绪。"
+    }
+    var notifyThermalTitle: String { en ? "Chip Temperature Overheat" : "芯片温度过高告警" }
+    func notifyThermalBody(_ temp: String, _ culprit: String?) -> String {
+        if let culprit {
+            return en ? "Peak temperature reached \(temp). Top load process: \(culprit)."
+                      : "峰值温度达 \(temp)，当前高负载进程为 \(culprit)。"
+        }
+        return en ? "Peak temperature reached \(temp). Please inspect thermals and cooling."
+                  : "峰值温度达 \(temp)，请注意散热与负载。"
+    }
+    var notifyBloatTitle: String { en ? "Daemon Memory Bloat" : "守护进程内存膨胀" }
+    func notifyBloatBody(_ count: Int, _ reclaim: String, _ top: String) -> String {
+        en ? "Detected \(count) bloated daemons (\(top)), reclaimable \(reclaim)."
+           : "发现 \(count) 个失控后台守护进程（如 \(top)），可回收 \(reclaim) 内存。"
+    }
+    func notifyUpdateTitle(_ ver: String) -> String { en ? "Pharos v\(ver) Available" : "发现 Pharos 新版本 v\(ver)" }
+    func notifyUpdateBody(_ ver: String) -> String {
+        en ? "Click to open Settings and update in-app." : "点击立即前往设置进行应用内更新。"
+    }
+    var openSystemNotificationSettings: String {
+        en ? "Open System Notification Settings" : "打开系统通知设置"
+    }
+
+    // In-App Active Alerts
+    func inAppAlertThermalTitle(_ temp: Int) -> String {
+        en ? "🌡️ Chip Overheating (\(temp)°C)" : "🌡️ 芯片温度过高 (\(temp)°C)"
+    }
+    func inAppAlertThermalSub(_ culprit: String) -> String {
+        en ? "Top process: \(culprit) · Click to inspect thermals" : "高负载进程: \(culprit) · 点击查看温控"
+    }
+    var inAppAlertMemoryTitle: String {
+        en ? "🧠 High Memory Pressure" : "🧠 系统内存压力高"
+    }
+    func inAppAlertMemorySub(_ pct: Int) -> String {
+        en ? "Memory used \(pct)% · Click to inspect memory" : "内存已用 \(pct)% · 点击治理高内存进程"
+    }
+    var inAppAlertBloatTitle: String {
+        en ? "⚠️ Daemon Memory Bloat" : "⚠️ 守护进程内存膨胀"
+    }
+    func inAppAlertBloatSub(_ bytes: String, _ top: String) -> String {
+        en ? "Reclaimable \(bytes) (\(top)) · Click to reclaim" : "可回收 \(bytes)（\(top)）· 点击一键治理"
+    }
+    func inAppAlertDiskTitle(_ name: String) -> String {
+        en ? "💾 Low Disk Space (\(name))" : "💾 \(name) 空间不足"
+    }
+    func inAppAlertDiskSub(_ free: String) -> String {
+        en ? "Only \(free) free · Click to clean caches" : "仅剩 \(free) 可用 · 点击清理缓存"
+    }
+    func inAppAlertExitTitle(_ name: String) -> String {
+        en ? "⚠️ \(name) Stopped Unexpectedly" : "⚠️ \(name) 异常退出"
+    }
+    var inAppAlertExitSub: String {
+        en ? "Click to inspect services" : "点击查看服务端口"
+    }
+    var dismissAlert: String {
+        en ? "Dismiss alert" : "忽略告警"
+    }
     var notificationsDenied: String {
         en ? "Notifications are turned off for Pharos in System Settings → Notifications."
            : "Pharos 的通知已在「系统设置 → 通知」中关闭。"

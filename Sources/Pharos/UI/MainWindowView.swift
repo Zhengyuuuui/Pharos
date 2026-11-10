@@ -10,6 +10,7 @@ struct MainWindowView: View {
     @ObservedObject private var router = WindowRouter.shared
     @ObservedObject private var l10n = L10n.shared
     @ObservedObject private var updateStore = UpdateStore.shared
+    @ObservedObject private var notifier = Notifier.shared
     @AppStorage("pharos.trafficLightGlassTransparency") private var trafficLightGlassTransparency: Double = 0.75
     @AppStorage("pharos.showInspector") private var showInspector: Bool = true
     @State private var selection: SidebarItem?
@@ -162,6 +163,23 @@ struct MainWindowView: View {
                 TunableFrostedHeader(transparency: trafficLightGlassTransparency)
                     .frame(height: 40)
                     .allowsHitTesting(false)
+            }
+
+            if !notifier.activeInAppAlerts.isEmpty {
+                VStack(spacing: 4) {
+                    ForEach(notifier.activeInAppAlerts) { alert in
+                        InAppAlertCard(alert: alert) {
+                            if let tab = alert.batteryThermalTab {
+                                WindowRouter.shared.batteryThermalTab = tab
+                            }
+                            selection = alert.targetItem
+                        } onDismiss: {
+                            notifier.dismissInAppAlert(id: alert.id)
+                        }
+                    }
+                }
+                .padding(.horizontal, PharosSpacing.s)
+                .padding(.bottom, PharosSpacing.xs)
             }
 
             if let manifest = updateStore.availableManifest {

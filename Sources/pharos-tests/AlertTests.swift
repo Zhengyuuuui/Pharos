@@ -25,4 +25,44 @@ func testAlerts() {
     expectEq(s.update(memory: normal, volumes: [disk(3)], favorites: fav, runningFavoriteIDs: [], stoppedByUser: ["a"]),
              [.diskAlmostFull(name: "Macintosh HD", path: "/", available: 3)],
              "re-armed after clearing; favorite stopped from Pharos isn't 'unexpected'")
+
+    // Thermal overheat & hysteresis tests
+    var thermalState = AlertState()
+    expectEq(thermalState.update(memory: normal, volumes: [disk(50)], favorites: [], runningFavoriteIDs: [], stoppedByUser: [],
+                                 peakChipTemperature: 88.5, topCulpritName: "clang"),
+             [.thermalOverheat(peakCelsius: 88.5, culpritName: "clang")],
+             "temperature >= 85°C triggers overheat alert")
+    expectEq(thermalState.update(memory: normal, volumes: [disk(50)], favorites: [], runningFavoriteIDs: [], stoppedByUser: [],
+                                 peakChipTemperature: 86.0, topCulpritName: "clang"),
+             [], "temperature still >= 80°C stays armed → no repeat")
+    _ = thermalState.update(memory: normal, volumes: [disk(50)], favorites: [], runningFavoriteIDs: [], stoppedByUser: [],
+                            peakChipTemperature: 78.0)
+    expectEq(thermalState.update(memory: normal, volumes: [disk(50)], favorites: [], runningFavoriteIDs: [], stoppedByUser: [],
+                                 peakChipTemperature: 89.0, topCulpritName: "node"),
+             [.thermalOverheat(peakCelsius: 89.0, culpritName: "node")],
+             "temperature drops below 80°C clears and re-arms when spiking again")
+
+    // Daemon bloat tests
+    var bloatState = AlertState()
+    let bloat600M = (count: 2, reclaimableBytes: UInt64(600 * 1024 * 1024), topDaemon: "mediaanalysisd")
+    expectEq(bloatState.update(memory: normal, volumes: [disk(50)], favorites: [], runningFavoriteIDs: [], stoppedByUser: [],
+                               daemonBloat: bloat600M),
+             [.daemonBloat(count: 2, reclaimableBytes: UInt64(600 * 1024 * 1024), topDaemon: "mediaanalysisd")],
+             "bloat >= 500 MB triggers alert")
+    expectEq(bloatState.update(memory: normal, volumes: [disk(50)], favorites: [], runningFavoriteIDs: [], stoppedByUser: [],
+                               daemonBloat: (count: 2, reclaimableBytes: UInt64(620 * 1024 * 1024), topDaemon: "mediaanalysisd")),
+             [], "minor increase does not re-alert")
+    _ = bloatState.update(memory: normal, volumes: [disk(50)], favorites: [], runningFavoriteIDs: [], stoppedByUser: [],
+                          daemonBloat: (count: 1, reclaimableBytes: UInt64(100 * 1024 * 1024), topDaemon: "mediaanalysisd"))
+    expectEq(bloatState.update(memory: normal, volumes: [disk(50)], favorites: [], runningFavoriteIDs: [], stoppedByUser: [],
+                               daemonBloat: (count: 3, reclaimableBytes: UInt64(550 * 1024 * 1024), topDaemon: "photoanalysisd")),
+             [.daemonBloat(count: 3, reclaimableBytes: UInt64(550 * 1024 * 1024), topDaemon: "photoanalysisd")],
+             "re-arms after clearing below 250MB")
+
+    // Custom disk threshold tests
+    var customDiskState = AlertState()
+    expectEq(customDiskState.update(memory: normal, volumes: [disk(12)], favorites: [], runningFavoriteIDs: [], stoppedByUser: [],
+                                    diskThreshold: 0.85),
+             [.diskAlmostFull(name: "Macintosh HD", path: "/", available: 12)],
+             "custom 85% threshold alerts at 88% full")
 }

@@ -32,7 +32,15 @@ enum BackupActions {
                 popoverHotkey: MenuBarSettings.shared.hotkey.rawValue,
                 notifyMemory: Notifier.shared.memory,
                 notifyDisk: Notifier.shared.disk,
-                notifyFavoriteExit: Notifier.shared.favoriteExit
+                notifyFavoriteExit: Notifier.shared.favoriteExit,
+                menuBarMetrics: MenuBarSettings.shared.enabledMetrics.map(\.rawValue),
+                menuBarRingMetric: MenuBarSettings.shared.ringMetric.rawValue,
+                menuBarShowLabels: MenuBarSettings.shared.showMetricLabels,
+                menuBarSeparator: MenuBarSettings.shared.separatorStyle.rawValue,
+                notifyThermal: Notifier.shared.thermal,
+                notifyBloat: Notifier.shared.bloat,
+                notifyAppUpdate: Notifier.shared.appUpdate,
+                notifyDiskThreshold: Notifier.shared.diskThreshold
             )
             let appearance = AppearanceSettingsBackup(
                 gauge3DAcceleration: UserDefaults.standard.object(forKey: "pharos.gauge3DAcceleration") as? Bool ?? true,
@@ -107,6 +115,22 @@ enum BackupActions {
                 if let mem = g.notifyMemory { Notifier.shared.memory = mem }
                 if let d = g.notifyDisk { Notifier.shared.disk = d }
                 if let f = g.notifyFavoriteExit { Notifier.shared.favoriteExit = f }
+                if let metrics = g.menuBarMetrics {
+                    MenuBarSettings.shared.enabledMetrics = metrics.compactMap(MenuBarMetric.init)
+                }
+                if let rm = g.menuBarRingMetric, let metric = MenuBarMetric(rawValue: rm) {
+                    MenuBarSettings.shared.ringMetric = metric
+                }
+                if let labels = g.menuBarShowLabels {
+                    MenuBarSettings.shared.showMetricLabels = labels
+                }
+                if let sep = g.menuBarSeparator, let separator = MenuBarSeparator(rawValue: sep) {
+                    MenuBarSettings.shared.separatorStyle = separator
+                }
+                if let th = g.notifyThermal { Notifier.shared.thermal = th }
+                if let bl = g.notifyBloat { Notifier.shared.bloat = bl }
+                if let au = g.notifyAppUpdate { Notifier.shared.appUpdate = au }
+                if let dt = g.notifyDiskThreshold { Notifier.shared.diskThreshold = dt }
             }
             if let a = backup.appearanceSettings {
                 if let g = a.gauge3DAcceleration { UserDefaults.standard.set(g, forKey: "pharos.gauge3DAcceleration") }

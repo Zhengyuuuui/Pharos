@@ -93,45 +93,11 @@ struct ExtraSettingsForm: View {
             }
             .font(.system(size: 12))
 
-            Picker(l10n.menuBarText, selection: $menuBar.text) {
-                ForEach(MenuBarText.allCases) { Text(l10n.menuBarTextOption($0)).tag($0) }
-            }
-            .font(.system(size: 12))
-
-            if menuBar.text == .projects {
-                HStack {
-                    Text(l10n.maxProjectsCapacity)
-                    Spacer()
-                    TextField("", value: $menuBar.maxProjects, format: .number)
-                        .frame(width: 44)
-                        .multilineTextAlignment(.trailing)
-                    Stepper("", value: $menuBar.maxProjects, in: 5...200, step: 5)
-                        .labelsHidden()
+            PharosSettingRow(title: l10n.menuBarComposerTitle, systemImage: "menubar.rectangle") {
+                Button(l10n.customizeTitle) {
+                    WindowRouter.shared.request = .customize
                 }
-                .font(.system(size: 12))
-                .help(l10n.capacityRingHint)
-            } else if menuBar.text == .ports {
-                HStack {
-                    Text(l10n.maxPortsCapacity)
-                    Spacer()
-                    TextField("", value: $menuBar.maxPorts, format: .number)
-                        .frame(width: 44)
-                        .multilineTextAlignment(.trailing)
-                    Stepper("", value: $menuBar.maxPorts, in: 5...300, step: 5)
-                        .labelsHidden()
-                }
-                .font(.system(size: 12))
-                .help(l10n.capacityRingHint)
-            }
-
-            VStack(alignment: .leading, spacing: 3) {
-                Picker(l10n.hotkeyTitle, selection: $menuBar.hotkey) {
-                    ForEach(PopoverHotkey.allCases) { Text($0.label).tag($0) }
-                }
-                .font(.system(size: 12))
-                if let error = menuBar.hotkeyError {
-                    Text(error).font(.system(size: 10)).foregroundStyle(.orange)
-                }
+                .font(.system(size: 11))
             }
 
             VStack(alignment: .leading, spacing: 3) {
@@ -474,60 +440,16 @@ struct MainSettingsView: View {
                 SettingsSectionHeader(title: l10n.appearanceSettings, systemImage: "sparkles")
                 PharosCard(padding: 14) {
                     VStack(spacing: 10) {
-                        // Menu bar text
-                        PharosSettingRow(title: l10n.menuBarText, systemImage: "menubar.rectangle") {
-                            Picker("", selection: $menuBar.text) {
-                                ForEach(MenuBarText.allCases) { Text(l10n.menuBarTextOption($0)).tag($0) }
-                            }
-                            .labelsHidden()
-                            .frame(width: 150)
-                        }
-
-                        if menuBar.text == .projects {
-                            HStack {
-                                Text(l10n.maxProjectsCapacity)
-                                    .font(PharosFont.caption)
-                                    .foregroundStyle(PharosColor.textSecondary)
-                                    .padding(.leading, 26)
-                                Spacer()
-                                TextField("", value: $menuBar.maxProjects, format: .number)
-                                    .frame(width: 44)
-                                    .multilineTextAlignment(.trailing)
-                                Stepper("", value: $menuBar.maxProjects, in: 5...200, step: 5)
-                                    .labelsHidden()
-                            }
-                            .font(PharosFont.captionDigits)
-                            .help(l10n.capacityRingHint)
-                        } else if menuBar.text == .ports {
-                            HStack {
-                                Text(l10n.maxPortsCapacity)
-                                    .font(PharosFont.caption)
-                                    .foregroundStyle(PharosColor.textSecondary)
-                                    .padding(.leading, 26)
-                                Spacer()
-                                TextField("", value: $menuBar.maxPorts, format: .number)
-                                    .frame(width: 44)
-                                    .multilineTextAlignment(.trailing)
-                                Stepper("", value: $menuBar.maxPorts, in: 5...300, step: 5)
-                                    .labelsHidden()
-                            }
-                            .font(PharosFont.captionDigits)
-                            .help(l10n.capacityRingHint)
-                        }
-
-                        PharosListDivider()
-
-                        // Global hotkey
+                        // Menu bar composer shortcut
                         PharosSettingRow(
-                            title: l10n.hotkeyTitle,
-                            systemImage: "command",
-                            caption: menuBar.hotkeyError
+                            title: l10n.menuBarComposerTitle,
+                            systemImage: "menubar.rectangle",
+                            caption: l10n.menuBarComposerDesc
                         ) {
-                            Picker("", selection: $menuBar.hotkey) {
-                                ForEach(PopoverHotkey.allCases) { Text($0.label).tag($0) }
+                            Button(l10n.customizeTitle) {
+                                WindowRouter.shared.request = .customize
                             }
-                            .labelsHidden()
-                            .frame(width: 150)
+                            .buttonStyle(.borderedProminent)
                         }
 
                         PharosListDivider()
@@ -623,23 +545,87 @@ struct MainSettingsView: View {
 
             // 6. Notifications (Bell icon)
             VStack(alignment: .leading, spacing: PharosSpacing.s) {
-                SettingsSectionHeader(title: l10n.notificationsTitle, systemImage: "bell.fill")
+                HStack {
+                    SettingsSectionHeader(title: l10n.notificationsTitle, systemImage: "bell.fill")
+                    Spacer()
+                    HStack(spacing: 8) {
+                        Button {
+                            notifier.sendTestNotification()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: notifier.testNotificationDelivered ? "checkmark.circle.fill" : "paperplane.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(notifier.testNotificationDelivered ? PharosColor.success : PharosColor.accent)
+                                Text(notifier.testNotificationDelivered ? l10n.testNotificationSent : l10n.sendTestNotification)
+                                    .font(PharosFont.caption)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Capsule().fill(PharosColor.fill))
+                            .overlay(Capsule().strokeBorder(PharosColor.separator.opacity(0.3), lineWidth: 0.5))
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            notifier.enableAll()
+                        } label: {
+                            Text(l10n.enableAllNotifications)
+                                .font(PharosFont.caption)
+                                .foregroundStyle(PharosColor.accent)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Capsule().fill(PharosColor.accent.opacity(0.12)))
+                                .overlay(Capsule().strokeBorder(PharosColor.accent.opacity(0.3), lineWidth: 0.5))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
                 PharosCard(padding: 14) {
                     VStack(spacing: 10) {
                         PharosSettingRow(title: l10n.notifyMemory, systemImage: "memorychip") {
                             Toggle("", isOn: $notifier.memory).labelsHidden()
                         }
                         PharosListDivider()
+                        PharosSettingRow(title: l10n.notifyBloat, systemImage: "exclamationmark.triangle") {
+                            Toggle("", isOn: $notifier.bloat).labelsHidden()
+                        }
+                        PharosListDivider()
+                        PharosSettingRow(title: l10n.notifyThermal, systemImage: "thermometer.sun") {
+                            Toggle("", isOn: $notifier.thermal).labelsHidden()
+                        }
+                        PharosListDivider()
                         PharosSettingRow(title: l10n.notifyDisk, systemImage: "internaldrive") {
-                            Toggle("", isOn: $notifier.disk).labelsHidden()
+                            HStack(spacing: 10) {
+                                Picker("", selection: $notifier.diskThreshold) {
+                                    Text(l10n.notifyDiskThresholdOption(0.85)).tag(0.85)
+                                    Text(l10n.notifyDiskThresholdOption(0.90)).tag(0.90)
+                                    Text(l10n.notifyDiskThresholdOption(0.95)).tag(0.95)
+                                }
+                                .labelsHidden()
+                                .frame(width: 140)
+
+                                Toggle("", isOn: $notifier.disk).labelsHidden()
+                            }
                         }
                         PharosListDivider()
                         PharosSettingRow(title: l10n.notifyFavoriteExit, systemImage: "star") {
                             Toggle("", isOn: $notifier.favoriteExit).labelsHidden()
                         }
+                        PharosListDivider()
+                        PharosSettingRow(title: l10n.notifyAppUpdate, systemImage: "sparkles") {
+                            Toggle("", isOn: $notifier.appUpdate).labelsHidden()
+                        }
 
                         if notifier.denied && notifier.anyEnabled {
-                            PharosBanner(kind: .warning, text: l10n.notificationsDenied)
+                            PharosBanner(kind: .warning, text: l10n.notificationsDenied) {
+                                Button(l10n.openSystemNotificationSettings) {
+                                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") {
+                                        NSWorkspace.shared.open(url)
+                                    }
+                                }
+                                .font(PharosFont.caption)
+                            }
                         }
                     }
                     .onAppear { notifier.refreshAuthorization() }

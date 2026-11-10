@@ -399,54 +399,60 @@ enum DynamicMenuBarIcon {
     }
 }
 
-/// Icon plus the optional number chosen in Settings → "Menu bar shows".
+/// Icon plus the optional metrics configured in Customize → "Menu Bar Composer".
 struct MenuBarLabel: View {
     @ObservedObject var store: ProjectStore
     @ObservedObject private var settings = MenuBarSettings.shared
     @ObservedObject private var battery = BatteryStore.shared
 
-    private var activeMetric: (fraction: Double, pressure: MemoryPressure) {
-        switch settings.text {
+    private var activeRingStatus: (fraction: Double, pressure: MemoryPressure, highIsBad: Bool) {
+        switch settings.ringMetric {
+        case .temperature:
+            let t = store.thermals?.peakChipTemperature ?? 40.0
+            let clamped = max(35.0, min(100.0, t))
+            let frac = (clamped - 35.0) / (100.0 - 35.0)
+            let press: MemoryPressure = (t >= 95.0) ? .critical : ((t >= 85.0) ? .warning : .normal)
+            return (frac, press, true)
         case .disk:
             let disk = store.volumes.first { $0.kind == .startup }
             let frac = disk?.usedFraction ?? 0
             let press: MemoryPressure = frac >= 0.95 ? .critical : (frac >= 0.85 ? .warning : .normal)
-            return (frac, press)
+            return (frac, press, true)
         case .memory:
-            return (store.system?.usedFraction ?? 0, store.system?.pressure ?? .normal)
+            return (store.system?.usedFraction ?? 0, store.system?.pressure ?? .normal, true)
         case .projects:
             let cap = max(1, settings.maxProjects)
             let frac = Double(store.projects.count) / Double(cap)
             let press: MemoryPressure = frac >= 1.0 ? .critical : (frac >= 0.85 ? .warning : .normal)
-            return (min(1.0, frac), press)
+            return (min(1.0, frac), press, true)
         case .ports:
             let cap = max(1, settings.maxPorts)
             let frac = Double(store.totalPorts) / Double(cap)
             let press: MemoryPressure = frac >= 1.0 ? .critical : (frac >= 0.85 ? .warning : .normal)
-            return (min(1.0, frac), press)
+            return (min(1.0, frac), press, true)
         case .battery:
             let r = battery.reading
-            guard r.hasBattery else { return (store.system?.usedFraction ?? 0, store.system?.pressure ?? .normal) }
+            guard r.hasBattery else {
+                return (store.system?.usedFraction ?? 0, store.system?.pressure ?? .normal, true)
+            }
             let press: MemoryPressure = switch BatteryMenuBarMetric.level(percent: r.currentPercent, onAC: r.powerSource == .acPower) {
             case .critical: .critical
             case .warning: .warning
             case .normal: .normal
             }
-            return (BatteryMenuBarMetric.fraction(percent: r.currentPercent), press)
-        case .none:
-            return (store.system?.usedFraction ?? 0, store.system?.pressure ?? .normal)
+            return (BatteryMenuBarMetric.fraction(percent: r.currentPercent), press, false)
         }
     }
 
     var body: some View {
-        let metric = activeMetric
+        let ring = activeRingStatus
         HStack(spacing: 4) {
             Image(nsImage: DynamicMenuBarIcon.image(
-                fraction: metric.fraction,
-                pressure: metric.pressure,
-                highIsBad: !(settings.text == .battery && battery.reading.hasBattery)
+                fraction: ring.fraction,
+                pressure: ring.pressure,
+                highIsBad: ring.highIsBad
             ))
-            if let text = settings.label(for: store) {
+            if let text = settings.combinedLabel(for: store) {
                 Text(text).monospacedDigit()
             }
         }
