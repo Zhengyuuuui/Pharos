@@ -174,6 +174,16 @@ struct BatteryControlView: View {
                                 .padding(.vertical, 3)
                                 .background(Capsule().fill(Color.teal.opacity(0.15)))
                                 .foregroundStyle(Color.teal)
+                        } else if battery.isWakeSettling {
+                            HStack(spacing: 4) {
+                                ProgressView().controlSize(.mini)
+                                Text(l10n.batteryWakeSettlingBadge)
+                                    .font(PharosFont.caption)
+                                    .foregroundStyle(PharosColor.accent)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(PharosColor.accent.opacity(0.12)))
                         }
                     }
 
@@ -183,7 +193,9 @@ struct BatteryControlView: View {
                             : (r.currentPercent < limit
                                ? l10n.batteryHoldingHysteresisNote(rechargeAt: battery.rechargeThreshold, limit: limit)
                                : l10n.batteryHoldingSubtitle))
-                         : (r.adapterName ?? l10n.batteryAdapter))
+                         : (battery.isWakeSettling
+                            ? l10n.batteryWakeSettlingSubtitle(seconds: battery.wakeSettlingSecondsRemaining)
+                            : (r.adapterName ?? l10n.batteryAdapter)))
                         .font(PharosFont.body)
                         .foregroundStyle(PharosColor.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -199,6 +211,16 @@ struct BatteryControlView: View {
                             }
                             .buttonStyle(.pharos)
                             .controlSize(.mini)
+                        } else if battery.isWakeSettling {
+                            HStack(spacing: 4) {
+                                ProgressView().controlSize(.mini)
+                                Text(l10n.batteryWakeSettlingAction(seconds: battery.wakeSettlingSecondsRemaining))
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(PharosColor.accent)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(PharosColor.accent.opacity(0.12)))
                         }
                     }
 
@@ -355,15 +377,25 @@ struct BatteryControlView: View {
                 // Safe design explanation
                 PharosBanner(kind: .success, text: l10n.batterySafeLimitTip)
 
-                if battery.reading.optimizedChargingEngaged {
-                    PharosBanner(kind: .warning, text: l10n.optimizedChargingEngagedWarning) {
-                        Button {
-                            battery.openSystemBatterySettings()
-                        } label: {
-                            Label(l10n.openSystemBatterySettings, systemImage: "arrow.up.forward.app")
+                if battery.reading.hasSystemLimitConflict {
+                    PharosBanner(kind: .warning, text: l10n.systemLimitConflictNotice(limit: battery.reading.systemChargeLimit ?? 80)) {
+                        HStack(spacing: PharosSpacing.xs) {
+                            Button {
+                                battery.openSystemBatterySettings()
+                            } label: {
+                                Label(l10n.openSystemBatterySettings, systemImage: "arrow.up.forward.app")
+                            }
+                            .buttonStyle(.pharos)
+                            .controlSize(.small)
+
+                            Button {
+                                battery.forcePunchThrough()
+                            } label: {
+                                Label(l10n.batteryForcePunchThrough, systemImage: "bolt.fill")
+                            }
+                            .buttonStyle(.pharos)
+                            .controlSize(.small)
                         }
-                        .buttonStyle(.pharos)
-                        .controlSize(.small)
                     }
                 }
 

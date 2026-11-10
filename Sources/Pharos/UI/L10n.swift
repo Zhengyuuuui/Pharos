@@ -1963,6 +1963,29 @@ final class L10n: ObservableObject {
         en ? "macOS 'Optimized Battery Charging' is currently enabled in System Settings, which may conflict with Pharos charge limits. Turning it off in System Settings > Battery is recommended."
            : "提示：macOS 系统「优化电池充电」处于开启状态，可能会与 Pharos 充电限制发生冲突。建议在「系统设置 → 电池」中关闭「优化电池充电」以确保 80% 阈值绝对锁定。"
     }
+    var systemLimitConflictTitle: String {
+        en ? "macOS Native Charge Limit Detected" : "检测到 macOS 原生限充机制介入"
+    }
+    func systemLimitConflictNotice(limit: Int) -> String {
+        en ? "macOS native power management (PowerUIAgent) has an active charge cap (\(limit)%). Apple's kernel policy may hold the battery between 75%–80% and suppress recharge. Turn off 'Charging Limit' or 'Optimized Battery Charging' in macOS System Settings > Battery to let Pharos manage charging exclusively, or click 'Force Punch Through' below."
+           : "检测到 macOS 系统的原生限充机制（PowerUIAgent）当前生效中（\(limit)%）。苹果系统内核策略会在 75%~80% 之间强制截断注电回路。建议前往「系统设置 → 电池」将系统原生上限改为「充至 100%」，以完全由 Pharos 进行 2% 窄回差精准管理；或点击右侧「强制注电冲刷」直接打破硬件截断。"
+    }
+    var batteryWakeSettlingBadge: String {
+        en ? "Waking charging circuit…" : "硬件回路唤醒中…"
+    }
+    func batteryWakeSettlingSubtitle(seconds: Int) -> String {
+        en ? "Charge command dispatched. Apple PMU hardware safety settling countdown (~\(seconds)s remaining), amperage will flow shortly. No need to click repeatedly."
+           : "已向硬件发送注电指令。Apple PMU 芯片物理安全防抖倒计时中（剩余约 \(seconds) 秒），电流即将注入，无需重复点击。"
+    }
+    func batteryWakeSettlingAction(seconds: Int) -> String {
+        en ? "Waking (\(seconds)s)" : "唤醒中 (\(seconds)s)"
+    }
+    var batteryForcePunchThrough: String {
+        en ? "Force Punch Through" : "强制注电冲刷"
+    }
+    var batteryConflictTag: String {
+        en ? "System Limit Active" : "系统原生限充中"
+    }
 
     // MARK: - Settings Modern Redesign (Target App Alignment)
     var quickActions: String { en ? "Quick Action" : "快捷动作" }

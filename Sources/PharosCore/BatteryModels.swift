@@ -100,6 +100,14 @@ public struct BatteryReading: Equatable, Sendable, Codable {
     public var healthPercent: Int
     /// Whether Apple's Optimized Battery Charging is currently reported as engaged.
     public var optimizedChargingEngaged: Bool
+    /// macOS native battery charge limit percentage if enforced by system (e.g. 80 in macOS Sequoia).
+    public var systemChargeLimit: Int?
+    /// macOS native battery charge limit reason (e.g. "optimizedChargeLimit").
+    public var systemChargeLimitReason: String?
+    /// Raw NotChargingReason bitmask from AppleSmartBattery (Bit 24 / 16777216 = software limit holding).
+    public var notChargingReason: Int?
+    /// Physical settling delay in seconds reported by the PMU (typically 120s).
+    public var postChargeWaitSeconds: Int?
 
     public init(
         currentPercent: Int = 100,
@@ -119,7 +127,11 @@ public struct BatteryReading: Equatable, Sendable, Codable {
         timeRemainingMinutes: Int? = nil,
         health: BatteryHealth = .normal,
         healthPercent: Int = 100,
-        optimizedChargingEngaged: Bool = false
+        optimizedChargingEngaged: Bool = false,
+        systemChargeLimit: Int? = nil,
+        systemChargeLimitReason: String? = nil,
+        notChargingReason: Int? = nil,
+        postChargeWaitSeconds: Int? = nil
     ) {
         self.currentPercent = currentPercent
         self.remainingCapacity = remainingCapacity
@@ -139,10 +151,24 @@ public struct BatteryReading: Equatable, Sendable, Codable {
         self.health = health
         self.healthPercent = healthPercent
         self.optimizedChargingEngaged = optimizedChargingEngaged
+        self.systemChargeLimit = systemChargeLimit
+        self.systemChargeLimitReason = systemChargeLimitReason
+        self.notChargingReason = notChargingReason
+        self.postChargeWaitSeconds = postChargeWaitSeconds
     }
 
     /// Whether an internal battery is installed on this Mac (e.g. MacBook Pro / Air).
     public var hasBattery: Bool { designCapacity > 0 || maxCapacity > 0 }
+
+    /// Whether macOS native power management (PowerUIAgent / battlimit) has active limits or holds that may conflict with Pharos.
+    public var hasSystemLimitConflict: Bool {
+        optimizedChargingEngaged || systemChargeLimit != nil || (notChargingReason == 16777216 && !isCharging)
+    }
+
+    /// Whether the battery is temporarily held by a software limit (Bit 24 = 16777216).
+    public var isSoftwareInhibited: Bool {
+        notChargingReason == 16777216
+    }
 }
 
 /// User's requested charging mode.

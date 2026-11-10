@@ -19,6 +19,10 @@ public enum BatteryScanner {
         )
     }
 
+    /// Dynamic linker hook for macOS 15 Sequoia native battery level limits.
+    @_silgen_name("IOPSCopyBatteryLevelLimits")
+    private static func copyBatteryLevelLimits() -> Unmanaged<CFArray>?
+
     /// Reads live battery telemetry from IOKit and AppleSmartBattery.
     public static func read() -> BatteryReading? {
         var reading = BatteryReading()
@@ -49,6 +53,19 @@ public enum BatteryScanner {
                     if let opt = desc["Optimized Battery Charging Engaged"] as? Int {
                         reading.optimizedChargingEngaged = (opt != 0)
                     }
+                }
+            }
+        }
+
+        // 1.1 Read macOS native battery level limits (macOS 15 Sequoia native 80% limit)
+        if let limits = copyBatteryLevelLimits()?.takeRetainedValue() as? [[String: Any]] {
+            for limit in limits {
+                if let soc = limit["chargeSocLimitSoc"] as? Int, soc > 0 {
+                    reading.systemChargeLimit = soc
+                    if let reason = limit["chargeSocLimitReason"] as? String {
+                        reading.systemChargeLimitReason = reason
+                    }
+                    break
                 }
             }
         }
@@ -106,6 +123,19 @@ public enum BatteryScanner {
 
                 if let extConnected = dict["ExternalConnected"] as? Bool, extConnected {
                     reading.powerSource = .acPower
+                }
+
+                if let wait = dict["PostChargeWaitSeconds"] as? Int, wait > 0 {
+                    reading.postChargeWaitSeconds = wait
+                }
+
+                if let chargerData = dict["ChargerData"] as? [String: Any] {
+                    if let reason = chargerData["NotChargingReason"] as? Int {
+                        reading.notChargingReason = reason
+                    }
+                    if reading.postChargeWaitSeconds == nil, let wait = chargerData["PostChargeWaitSeconds"] as? Int, wait > 0 {
+                        reading.postChargeWaitSeconds = wait
+                    }
                 }
 
                 if let adapter = dict["AdapterDetails"] as? [String: Any] {

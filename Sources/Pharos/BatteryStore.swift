@@ -25,6 +25,21 @@ final class BatteryStore: ObservableObject {
     @Published private(set) var unsupported: Bool = false
     @Published private(set) var busy: Bool = false
     @Published var errorMessage: String?
+    /// Physical settling window timestamp (PMU PostChargeWaitSeconds).
+    @Published private(set) var wakeSettlingUntil: Date?
+
+    /// Whether the hardware is currently in safety delay before amperage flows into cells.
+    var isWakeSettling: Bool {
+        guard let until = wakeSettlingUntil else { return false }
+        return Date() < until && !reading.isCharging && reading.powerSource == .acPower
+    }
+
+    /// Remaining seconds of physical settling window.
+    var wakeSettlingSecondsRemaining: Int {
+        guard let until = wakeSettlingUntil else { return 0 }
+        let sec = Int(ceil(until.timeIntervalSinceNow))
+        return Swift.max(0, sec)
+    }
 
     /// User's chosen charge limit (e.g. 80%), persisted in UserDefaults.
     @Published var targetLimit: Int = UserDefaults.standard.object(forKey: "batteryTargetLimit") as? Int ?? 80 {
@@ -194,6 +209,11 @@ final class BatteryStore: ObservableObject {
             if let r, r != self.reading {
                 self.reading = r
             }
+            if self.reading.isCharging {
+                self.wakeSettlingUntil = nil
+            } else if let until = self.wakeSettlingUntil, Date() >= until {
+                self.wakeSettlingUntil = nil
+            }
         }
     }
 
@@ -249,7 +269,15 @@ final class BatteryStore: ObservableObject {
     }
 
     func chargeToFullNow() {
+        wakeSettlingUntil = Date().addingTimeInterval(TimeInterval(reading.postChargeWaitSeconds ?? 120))
         apply(.full)
+    }
+
+    /// Force punch through stubborn software inhibits by toggling hardware allow states.
+    func forcePunchThrough() {
+        guard helper == .ready, !busy else { return }
+        wakeSettlingUntil = Date().addingTimeInterval(TimeInterval(reading.postChargeWaitSeconds ?? 120))
+        chargeToFullNow()
     }
 
     func resumeLimit() {
@@ -296,6 +324,7 @@ final class BatteryStore: ObservableObject {
     func rechargeToLimitNow() {
         guard helper == .ready, !busy else { return }
         let limit = targetLimit
+        wakeSettlingUntil = Date().addingTimeInterval(TimeInterval(reading.postChargeWaitSeconds ?? 120))
         apply(.limit(maxPercent: limit))
     }
 

@@ -258,7 +258,11 @@ private struct PopoverBatteryBlock: View {
             .padding(.horizontal, 8)
 
             HStack(spacing: 8) {
-                if isHolding {
+                if battery.isWakeSettling {
+                    Image(systemName: "bolt.badge.clock.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.orange)
+                } else if isHolding {
                     Image(systemName: "powerplug.fill")
                         .font(.system(size: 14))
                         .foregroundStyle(.teal)
@@ -285,8 +289,13 @@ private struct PopoverBatteryBlock: View {
                                 .font(.system(size: 10.5))
                                 .foregroundStyle(.green)
                         }
+                        if r.hasSystemLimitConflict {
+                            Text(l10n.batteryConflictTag)
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(.orange)
+                        }
                     }
-                    Text(isHolding ? l10n.batteryHoldingSubtitle : (r.isCharging ? (managing ? l10n.batteryChargingTo(battery.targetLimit) : l10n.batteryCharging) : l10n.batteryDischarging))
+                    Text(battery.isWakeSettling ? l10n.batteryWakeSettlingAction(seconds: battery.wakeSettlingSecondsRemaining) : (isHolding ? l10n.batteryHoldingSubtitle : (r.isCharging ? (managing ? l10n.batteryChargingTo(battery.targetLimit) : l10n.batteryCharging) : l10n.batteryDischarging)))
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)

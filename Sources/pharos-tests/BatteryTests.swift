@@ -360,3 +360,30 @@ func testLogRotation() {
     let r3 = rotateLogIfNeeded(path: testPath, maxBytes: 500, keepBytes: 250)
     expectEq(r3, false, "already rotated file not rotated again")
 }
+
+func testBatterySystemConflictAndSettling() {
+    // 1. Clean reading has no conflict
+    let clean = BatteryReading(currentPercent: 80, isCharging: false)
+    expectEq(clean.hasSystemLimitConflict, false, "clean reading has no conflict")
+    expectEq(clean.isSoftwareInhibited, false, "clean reading is not software inhibited")
+
+    // 2. macOS Optimized Charging engaged triggers conflict
+    let opt = BatteryReading(currentPercent: 80, isCharging: false, optimizedChargingEngaged: true)
+    expectEq(opt.hasSystemLimitConflict, true, "optimized charging triggers conflict")
+
+    // 3. macOS native Sequoia 80% battlimit triggers conflict
+    let seq = BatteryReading(currentPercent: 76, isCharging: false, systemChargeLimit: 80, systemChargeLimitReason: "optimizedChargeLimit")
+    expectEq(seq.hasSystemLimitConflict, true, "systemChargeLimit triggers conflict")
+    expectEq(seq.systemChargeLimit, 80, "systemChargeLimit is 80")
+    expectEq(seq.systemChargeLimitReason, "optimizedChargeLimit", "reason is preserved")
+
+    // 4. Bit 24 (16777216) software inhibit detection
+    let inhibited = BatteryReading(currentPercent: 76, isCharging: false, notChargingReason: 16777216, postChargeWaitSeconds: 120)
+    expectEq(inhibited.isSoftwareInhibited, true, "bit 24 reports software inhibited")
+    expectEq(inhibited.hasSystemLimitConflict, true, "software inhibited when not charging is conflict")
+    expectEq(inhibited.postChargeWaitSeconds, 120, "postChargeWaitSeconds is preserved")
+
+    // 5. Active charging clears conflict from transient reasons
+    let activelyCharging = BatteryReading(currentPercent: 76, isCharging: true, notChargingReason: 16777216)
+    expectEq(activelyCharging.hasSystemLimitConflict, false, "actively charging does not report conflict")
+}
