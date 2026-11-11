@@ -68,7 +68,6 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
     /// "Enter Pharos" / "Skip": the onboarding card expands in place into the main window (same centre),
     /// its content fading out while the main window's content fades in. The red button closes directly.
     private func finish(select: MainWindowView.SidebarItem?) {
-        if let select, select == .batteryAndThermals { WindowRouter.shared.batteryThermalTab = .battery }
         guard let onboarding = window, let app = AppDelegate.shared else {
             AppDelegate.shared?.showMainWindow(selecting: select)
             window?.close()

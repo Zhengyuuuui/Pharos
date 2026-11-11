@@ -194,15 +194,27 @@ make test            # 全部 assertions 通过（含真实端口扫描测试）
 
 ## 7. 版本发布流水线（Release Workflow）
 
-当需要发布新版本（如 `v3.2.0`）时，流程严格按以下三步执行：
+### 7.1 版本更新档案规范（硬性规定，防遗忘）
+
+从 **v3.3.0** 起，任何针对新版本（如 `v3.3.0`、`v3.4.0`）的功能研发、架构重构或补丁修复，**所有 AI Agent / 开发者必须在 `docs/releases/` 目录下创建并维护对应的版本记录文件**：
+- **路径规范**：`docs/releases/v<版本号>.md`（例如 `docs/releases/v3.3.0.md`）。
+- **必须包含内容**：
+  1. **核心功能与架构升级**：分模块详细阐述改动背景、设计方案与 UI 视觉改进；
+  2. **问题修复清单 (Bug Fixes)**：记录修复的具体 Bug、根本原因与解决方案；
+  3. **双语 Release Notes (中英双语)**：提供地道精炼的发布文案，用于直接复制至 GitHub Release 正文与应用内更新横幅。
+- **发版同步**：正式发布打 Tag 前，须将该版本的要点同步归档至根目录的 `CHANGELOG.md`。
+
+### 7.2 发布执行三步走
+
+当需要发布新版本（如 `v3.3.0`）时，流程严格按以下三步执行：
 
 1. **本地编译与打包**：
    - 在 `Resources/Info.plist`、`Makefile`、`Casks/pharos.rb` 中更新版本号。
    - 执行 `make dmg`：生成 `dist/Pharos-<版本号>.dmg`，并自动计算输出 `dist/Pharos-<版本号>.dmg.sha256`。
 2. **发布 GitHub Release**：
-   - 在 GitHub 仓库推送对应 tag（如 `v3.2.0`）并创建 Release。
+   - 在 GitHub 仓库推送对应 tag（如 `v3.3.0`）并创建 Release。
    - 上传 `dist/Pharos-<版本号>.dmg`。
-   - 在 Release Notes 正文中必须写明 64 位 SHA-256 校验和（格式：`| Pharos-x.y.z.dmg | <sha256> |` 或独立代码行），客户端与 Worker 会用正则自动提取。
+   - 在 Release Notes 正文中必须写明 64 位 SHA-256 校验和（格式：`| Pharos-x.y.z.dmg | <sha256> |` 或独立代码行），客户端与 Worker 会用正则自动提取。正文内容直接选用 `docs/releases/v<版本号>.md` 中的双语发布日志。
 3. **更新 Homebrew Cask**：
    - 提交并推送 `Casks/pharos.rb`（包含新 version 与对应 sha256）到 `main` 分支。
 4. **Cloudflare Worker 边缘网关状态（无需重新部署，全自动感知）**：

@@ -71,7 +71,7 @@ final class OnboardingCoordinator: ObservableObject {
         }
         if step.isLast {
             applyLaunchAtLogin()
-            finish(select: enabledLimitThisSession ? .batteryAndThermals : nil)
+            finish(select: enabledLimitThisSession ? .battery : nil)
             return
         }
         advance()

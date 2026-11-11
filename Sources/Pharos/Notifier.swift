@@ -16,7 +16,6 @@ struct ActiveAlertBanner: Identifiable, Equatable {
     let subtitle: String
     let level: ActiveAlertLevel
     let targetItem: MainWindowView.SidebarItem
-    let batteryThermalTab: BatteryAndThermalTab?
 
     init(
         id: String,
@@ -24,8 +23,7 @@ struct ActiveAlertBanner: Identifiable, Equatable {
         title: String,
         subtitle: String,
         level: ActiveAlertLevel = .warning,
-        targetItem: MainWindowView.SidebarItem,
-        batteryThermalTab: BatteryAndThermalTab? = nil
+        targetItem: MainWindowView.SidebarItem
     ) {
         self.id = id
         self.icon = icon
@@ -33,7 +31,6 @@ struct ActiveAlertBanner: Identifiable, Equatable {
         self.subtitle = subtitle
         self.level = level
         self.targetItem = targetItem
-        self.batteryThermalTab = batteryThermalTab
     }
 }
 
@@ -200,8 +197,7 @@ final class Notifier: NSObject, ObservableObject, UNUserNotificationCenterDelega
         } else if identifier.hasPrefix("disk") {
             WindowRouter.shared.request = .diskCleanup
         } else if identifier.hasPrefix("thermal") {
-            WindowRouter.shared.batteryThermalTab = .thermals
-            WindowRouter.shared.request = .batteryAndThermals
+            WindowRouter.shared.request = .thermals
         } else if identifier.hasPrefix("favorite") {
             WindowRouter.shared.request = .portsOverview
         } else if identifier.hasPrefix("update") {
@@ -279,8 +275,7 @@ final class Notifier: NSObject, ObservableObject, UNUserNotificationCenterDelega
                     title: l10n.inAppAlertThermalTitle(rounded),
                     subtitle: l10n.inAppAlertThermalSub(topCulprit ?? "high CPU load"),
                     level: temp >= 95.0 ? .critical : .warning,
-                    targetItem: .batteryAndThermals,
-                    batteryThermalTab: .thermals
+                    targetItem: .thermals
                 ))
             }
         } else {

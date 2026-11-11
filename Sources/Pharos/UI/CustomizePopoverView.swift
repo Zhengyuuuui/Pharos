@@ -25,17 +25,9 @@ struct CustomizePopoverView: View {
                 .disabled(layout == .standard)
             }
         } content: {
-            HStack(alignment: .top, spacing: PharosSpacing.l) {
-                // Left: Live previews (1:1 Menu bar capsule + Popover snapshot, fixed 340 width)
-                VStack(alignment: .leading, spacing: PharosSpacing.m) {
-                    VStack(alignment: .leading, spacing: PharosSpacing.xs) {
-                        Label(l10n.liveMenuBarPreview, systemImage: "menubar.dock.rectangle")
-                            .font(PharosFont.caption)
-                            .foregroundStyle(PharosColor.textSecondary)
-                            .padding(.leading, 4)
-                        LiveMenuBarPreviewCapsule()
-                    }
-
+            VStack(alignment: .leading, spacing: PharosSpacing.xl) {
+                // Top: Popover customization + 1:1 Live Snapshot
+                HStack(alignment: .top, spacing: PharosSpacing.l) {
                     VStack(alignment: .leading, spacing: PharosSpacing.xs) {
                         Label(l10n.livePreview, systemImage: "macwindow")
                             .font(PharosFont.caption)
@@ -43,23 +35,26 @@ struct CustomizePopoverView: View {
                             .padding(.leading, 4)
                         PopoverSnapshot(layout: layout, tab: $previewTab)
                     }
-                }
-                .frame(width: 340)
+                    .frame(width: 340)
 
-                // Right: Menu Bar Composer on top, Tabs configuration below
-                editorColumns(layout: layout)
+                    popoverEditorColumns(layout: layout)
+                }
+
+                PharosListDivider()
+                    .padding(.vertical, PharosSpacing.xs)
+
+                // Bottom: Menu Bar 1:1 Live Preview + Multi-metric composer
+                HStack(alignment: .top, spacing: PharosSpacing.l) {
+                    MenuBarPreviewAndControlsColumn()
+
+                    MenuBarComposerSection()
+                }
             }
         }
     }
 
-    private func editorColumns(layout: PopoverLayout) -> some View {
+    private func popoverEditorColumns(layout: PopoverLayout) -> some View {
         VStack(alignment: .leading, spacing: PharosSpacing.m) {
-            // Upper: Menu Bar Composer Section
-            MenuBarComposerSection()
-
-            PharosListDivider()
-                .padding(.vertical, 2)
-
             // Popover widget columns header
             HStack {
                 Label(l10n.customizePopover, systemImage: "square.grid.2x2")
@@ -396,6 +391,136 @@ private struct LiveMenuBarPreviewCapsule: View {
     }
 }
 
+// MARK: - Menu Bar Preview & Controls (Left 340pt Column)
+
+private struct MenuBarPreviewAndControlsColumn: View {
+    @ObservedObject private var settings = MenuBarSettings.shared
+    @ObservedObject private var l10n = L10n.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PharosSpacing.s) {
+            // 1. Live 1:1 Preview Capsule
+            VStack(alignment: .leading, spacing: PharosSpacing.xs) {
+                Label(l10n.liveMenuBarPreview, systemImage: "menubar.dock.rectangle")
+                    .font(PharosFont.caption)
+                    .foregroundStyle(PharosColor.textSecondary)
+                    .padding(.leading, 4)
+                LiveMenuBarPreviewCapsule()
+            }
+
+            // 2. Appearance & Formatting Card
+            appearanceCard
+
+            // 3. Status Ring & Capacity Card
+            ringAndCapacityCard
+        }
+        .frame(width: 340)
+    }
+
+    private var appearanceCard: some View {
+        PharosCard(padding: 12) {
+            VStack(spacing: 8) {
+                PharosSettingRow(
+                    title: l10n.displayStyleTitle,
+                    systemImage: "character.textbox",
+                    caption: l10n.displayStyleHint
+                ) {
+                    Picker("", selection: $settings.displayStyle) {
+                        ForEach(MenuBarDisplayStyle.allCases) { style in
+                            Text(l10n.displayStyleName(style)).tag(style)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 150)
+                }
+
+                PharosListDivider()
+
+                PharosSettingRow(
+                    title: l10n.separatorStyleTitle,
+                    systemImage: "divide"
+                ) {
+                    Picker("", selection: $settings.separatorStyle) {
+                        ForEach(MenuBarSeparator.allCases) { s in
+                            Text(l10n.separatorStyleName(s)).tag(s)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 150)
+                }
+
+                PharosListDivider()
+
+                PharosSettingRow(
+                    title: l10n.hotkeyTitle,
+                    systemImage: "command",
+                    caption: settings.hotkeyError
+                ) {
+                    Picker("", selection: $settings.hotkey) {
+                        ForEach(PopoverHotkey.allCases) { Text($0.label).tag($0) }
+                    }
+                    .labelsHidden()
+                    .frame(width: 150)
+                }
+            }
+        }
+    }
+
+    private var ringAndCapacityCard: some View {
+        PharosCard(padding: 12) {
+            VStack(spacing: 8) {
+                PharosSettingRow(
+                    title: l10n.ringMetricTitle,
+                    systemImage: "circle.circle",
+                    caption: l10n.ringMetricHint
+                ) {
+                    Picker("", selection: $settings.ringMetric) {
+                        ForEach(MenuBarMetric.allCases) { m in
+                            Label(l10n.menuBarMetricName(m), systemImage: m.sfSymbol).tag(m)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 150)
+                }
+
+                if settings.enabledMetrics.contains(.ports) || settings.ringMetric == .ports {
+                    PharosListDivider()
+                    HStack {
+                        Label(l10n.maxPortsCapacity, systemImage: "network")
+                            .font(PharosFont.caption)
+                            .foregroundStyle(PharosColor.textSecondary)
+                        Spacer()
+                        TextField("", value: $settings.maxPorts, format: .number)
+                            .frame(width: 44)
+                            .multilineTextAlignment(.trailing)
+                        Stepper("", value: $settings.maxPorts, in: 5...300, step: 5)
+                            .labelsHidden()
+                    }
+                    .font(PharosFont.captionDigits)
+                    .help(l10n.capacityRingHint)
+                }
+
+                if settings.enabledMetrics.contains(.projects) || settings.ringMetric == .projects {
+                    PharosListDivider()
+                    HStack {
+                        Label(l10n.maxProjectsCapacity, systemImage: "folder")
+                            .font(PharosFont.caption)
+                            .foregroundStyle(PharosColor.textSecondary)
+                        Spacer()
+                        TextField("", value: $settings.maxProjects, format: .number)
+                            .frame(width: 44)
+                            .multilineTextAlignment(.trailing)
+                        Stepper("", value: $settings.maxProjects, in: 5...200, step: 5)
+                            .labelsHidden()
+                    }
+                    .font(PharosFont.captionDigits)
+                    .help(l10n.capacityRingHint)
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Menu Bar Composer Section
 
 private struct MenuBarComposerSection: View {
@@ -410,7 +535,6 @@ private struct MenuBarComposerSection: View {
                 activeOrderStrip
             }
             metricsSelectionGrid
-            detailsCard
         }
     }
 
@@ -427,6 +551,7 @@ private struct MenuBarComposerSection: View {
             }
 
             HStack(spacing: 6) {
+                presetButton(title: l10n.presetProjectsMem, metrics: [.projects, .memory])
                 presetButton(title: l10n.presetPortsTemp, metrics: [.ports, .temperature])
                 presetButton(title: l10n.presetTempMem, metrics: [.temperature, .memory])
                 presetButton(title: l10n.presetPortsTempMem, metrics: [.ports, .temperature, .memory])
@@ -439,7 +564,7 @@ private struct MenuBarComposerSection: View {
         let isSelected = settings.enabledMetrics == metrics
         return Button {
             withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-                settings.enabledMetrics = metrics
+                settings.applyPreset(metrics)
             }
         } label: {
             Text(title)
@@ -498,51 +623,52 @@ private struct MenuBarComposerSection: View {
     }
 
     private func activeMetricPill(metric: MenuBarMetric, index: Int, count: Int) -> some View {
-        HStack(spacing: 4) {
+        let isRingAnchor = (index == 0)
+        return HStack(spacing: 4) {
             Text("\(index + 1)")
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(Color.white)
                 .frame(width: 14, height: 14)
-                .background(Circle().fill(PharosColor.accent))
+                .background(Circle().fill(isRingAnchor ? PharosColor.accent : PharosColor.textSecondary))
 
-            Image(systemName: metric.sfSymbol)
+            Image(systemName: isRingAnchor ? "circle.circle.fill" : metric.sfSymbol)
                 .font(.system(size: 10))
-                .foregroundStyle(PharosColor.accent)
+                .foregroundStyle(isRingAnchor ? PharosColor.accent : PharosColor.textSecondary)
 
             Text(l10n.menuBarMetricName(metric))
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 11, weight: isRingAnchor ? .semibold : .medium))
                 .foregroundStyle(PharosColor.textPrimary)
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
 
             HStack(spacing: 1) {
-                Button {
-                    guard index > 0 else { return }
-                    withAnimation(.spring(response: 0.22, dampingFraction: 0.84)) {
-                        settings.enabledMetrics.swapAt(index, index - 1)
+                if index > 0 {
+                    Button {
+                        withAnimation(.spring(response: 0.22, dampingFraction: 0.84)) {
+                            settings.enabledMetrics.swapAt(index, index - 1)
+                        }
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 7, weight: .bold))
+                            .foregroundStyle(PharosColor.textSecondary)
+                            .frame(width: 12, height: 16)
                     }
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 7, weight: .bold))
-                        .foregroundStyle(index > 0 ? PharosColor.textSecondary : PharosColor.textTertiary.opacity(0.3))
-                        .frame(width: 12, height: 16)
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
-                .disabled(index == 0)
 
-                Button {
-                    guard index < count - 1 else { return }
-                    withAnimation(.spring(response: 0.22, dampingFraction: 0.84)) {
-                        settings.enabledMetrics.swapAt(index, index + 1)
+                if index < count - 1 {
+                    Button {
+                        withAnimation(.spring(response: 0.22, dampingFraction: 0.84)) {
+                            settings.enabledMetrics.swapAt(index, index + 1)
+                        }
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 7, weight: .bold))
+                            .foregroundStyle(PharosColor.textSecondary)
+                            .frame(width: 12, height: 16)
                     }
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 7, weight: .bold))
-                        .foregroundStyle(index < count - 1 ? PharosColor.textSecondary : PharosColor.textTertiary.opacity(0.3))
-                        .frame(width: 12, height: 16)
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
-                .disabled(index >= count - 1)
 
                 Button {
                     withAnimation(.spring(response: 0.22, dampingFraction: 0.84)) {
@@ -562,12 +688,13 @@ private struct MenuBarComposerSection: View {
         .padding(.vertical, 3)
         .background(
             Capsule()
-                .fill(PharosColor.surface)
+                .fill(isRingAnchor ? PharosColor.accent.opacity(0.08) : PharosColor.surface)
         )
         .overlay(
             Capsule()
-                .strokeBorder(PharosColor.separator.opacity(0.4), lineWidth: 0.5)
+                .strokeBorder(isRingAnchor ? PharosColor.accent.opacity(0.35) : PharosColor.separator.opacity(0.4), lineWidth: 0.5)
         )
+        .help(isRingAnchor ? "\(l10n.menuBarMetricName(metric)) (\(l10n.ringBoundBadge))" : l10n.menuBarMetricName(metric))
     }
 
     private var metricsSelectionGrid: some View {
@@ -586,7 +713,8 @@ private struct MenuBarComposerSection: View {
     private func metricChip(_ metric: MenuBarMetric) -> some View {
         let isEnabled = settings.enabledMetrics.contains(metric)
         let orderIndex: Int? = settings.enabledMetrics.firstIndex(of: metric).map { $0 + 1 }
-        let liveVal = metric.formattedValue(store: store, showLabel: false)
+        let liveVal = metric.value(store: store, style: settings.displayStyle)
+        let isRingAnchor = (orderIndex == 1)
 
         return Button {
             withAnimation(.spring(response: 0.24, dampingFraction: 0.82)) {
@@ -604,7 +732,7 @@ private struct MenuBarComposerSection: View {
                         .font(.system(size: 9.5, weight: .bold))
                         .foregroundStyle(Color.white)
                         .frame(width: 18, height: 18)
-                        .background(Circle().fill(PharosColor.accent))
+                        .background(Circle().fill(isRingAnchor ? PharosColor.accent : PharosColor.textSecondary))
                 } else {
                     Circle()
                         .strokeBorder(PharosColor.separator.opacity(0.6), lineWidth: 1)
@@ -612,7 +740,7 @@ private struct MenuBarComposerSection: View {
                 }
 
                 // SF Symbol
-                Image(systemName: metric.sfSymbol)
+                Image(systemName: isRingAnchor ? "circle.circle.fill" : metric.sfSymbol)
                     .font(.system(size: 12))
                     .foregroundStyle(isEnabled ? PharosColor.accent : PharosColor.textSecondary)
                     .frame(width: 14)
@@ -622,7 +750,7 @@ private struct MenuBarComposerSection: View {
                     .font(.system(size: 12, weight: isEnabled ? .semibold : .medium))
                     .foregroundStyle(isEnabled ? PharosColor.textPrimary : PharosColor.textSecondary)
                     .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
+                    .truncationMode(.tail)
 
                 Spacer(minLength: 6)
 
@@ -654,105 +782,7 @@ private struct MenuBarComposerSection: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-
-    private var detailsCard: some View {
-        PharosCard(padding: 12) {
-            VStack(spacing: 8) {
-                PharosSettingRow(
-                    title: l10n.ringMetricTitle,
-                    systemImage: "circle.circle",
-                    caption: l10n.ringMetricHint
-                ) {
-                    Picker("", selection: $settings.ringMetric) {
-                        ForEach(MenuBarMetric.allCases) { m in
-                            Label(l10n.menuBarMetricName(m), systemImage: m.sfSymbol).tag(m)
-                        }
-                    }
-                    .labelsHidden()
-                    .frame(width: 160)
-                }
-
-                PharosListDivider()
-
-                PharosSettingRow(
-                    title: l10n.displayStyleTitle,
-                    systemImage: "character.textbox",
-                    caption: l10n.displayStyleHint
-                ) {
-                    Picker("", selection: $settings.displayStyle) {
-                        ForEach(MenuBarDisplayStyle.allCases) { style in
-                            Text(l10n.displayStyleName(style)).tag(style)
-                        }
-                    }
-                    .labelsHidden()
-                    .frame(width: 160)
-                }
-
-                PharosListDivider()
-
-                PharosSettingRow(
-                    title: l10n.separatorStyleTitle,
-                    systemImage: "divide"
-                ) {
-                    Picker("", selection: $settings.separatorStyle) {
-                        ForEach(MenuBarSeparator.allCases) { s in
-                            Text(l10n.separatorStyleName(s)).tag(s)
-                        }
-                    }
-                    .labelsHidden()
-                    .frame(width: 150)
-                }
-
-                PharosListDivider()
-
-                PharosSettingRow(
-                    title: l10n.hotkeyTitle,
-                    systemImage: "command",
-                    caption: settings.hotkeyError
-                ) {
-                    Picker("", selection: $settings.hotkey) {
-                        ForEach(PopoverHotkey.allCases) { Text($0.label).tag($0) }
-                    }
-                    .labelsHidden()
-                    .frame(width: 150)
-                }
-
-                if settings.enabledMetrics.contains(.ports) || settings.ringMetric == .ports {
-                    PharosListDivider()
-                    HStack {
-                        Label(l10n.maxPortsCapacity, systemImage: "network")
-                            .font(PharosFont.caption)
-                            .foregroundStyle(PharosColor.textSecondary)
-                        Spacer()
-                        TextField("", value: $settings.maxPorts, format: .number)
-                            .frame(width: 44)
-                            .multilineTextAlignment(.trailing)
-                        Stepper("", value: $settings.maxPorts, in: 5...300, step: 5)
-                            .labelsHidden()
-                    }
-                    .font(PharosFont.captionDigits)
-                    .help(l10n.capacityRingHint)
-                }
-
-                if settings.enabledMetrics.contains(.projects) || settings.ringMetric == .projects {
-                    PharosListDivider()
-                    HStack {
-                        Label(l10n.maxProjectsCapacity, systemImage: "folder")
-                            .font(PharosFont.caption)
-                            .foregroundStyle(PharosColor.textSecondary)
-                        Spacer()
-                        TextField("", value: $settings.maxProjects, format: .number)
-                            .frame(width: 44)
-                            .multilineTextAlignment(.trailing)
-                        Stepper("", value: $settings.maxProjects, in: 5...200, step: 5)
-                            .labelsHidden()
-                    }
-                    .font(PharosFont.captionDigits)
-                    .help(l10n.capacityRingHint)
-                }
-            }
-        }
+        .help(isRingAnchor ? "\(l10n.menuBarMetricName(metric)) (\(l10n.ringBoundBadge))" : l10n.menuBarMetricName(metric))
     }
 }
 

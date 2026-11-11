@@ -82,8 +82,7 @@ enum ScreenshotCapture {
 
         // Shot 3: Battery & Thermals (80% passthrough, 0 mA, tachometer gauges, peak temp)
         print("📷 [3/9] Capturing 03-battery-thermals.png...")
-        WindowRouter.shared.batteryThermalTab = .battery
-        WindowRouter.shared.request = .batteryAndThermals
+        WindowRouter.shared.request = .battery
         await sleep(seconds: 0.8)
         captureWindow(mainWindow, name: "03-battery-thermals.png", cornerRadiusPt: 10.0, hasTrafficLights: true, topMarginPt: 20.0)
 

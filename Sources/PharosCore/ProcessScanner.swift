@@ -22,15 +22,32 @@ public enum ProcessScanner {
                 let isChrome = ChromeInstances.isChromeExecutable(path: path, argv0: nil)
                 let procName = name(of: info).lowercased()
                 let isProxy = procName.contains("mihomo") || procName.contains("clash") || procName.contains("sing-box")
+                let isCandidateScript = procName.contains("python") || procName.contains("node") ||
+                    procName.contains("ruby") || procName.contains("bun") || procName.contains("deno") ||
+                    procName.contains("ffmpeg") || procName.contains("swift") || procName.contains("clang") ||
+                    procName.contains("rust") || procName.contains("cargo") || procName.contains("java") ||
+                    procName.contains("go") || procName.contains("ollama")
+                let shouldFetchDetails = listening || isChrome || isProxy || isCandidateScript
+
+                let ru = rusage(pid)
+                let startTime: Date? = {
+                    if info.pbi_start_tvsec > 0 {
+                        return Date(timeIntervalSince1970: Double(info.pbi_start_tvsec) + Double(info.pbi_start_tvusec) / 1_000_000.0)
+                    }
+                    return nil
+                }()
+
                 result.append(ProcessSnapshot(
                     pid: pid,
                     ppid: Int32(info.pbi_ppid),
                     name: name(of: info),
                     executablePath: path,
-                    cwd: listening ? currentDirectory(pid) : nil,
-                    arguments: listening || isChrome || isProxy ? arguments(pid) : [],
-                    memoryBytes: footprint(pid),
-                    ports: ports
+                    cwd: shouldFetchDetails ? currentDirectory(pid) : nil,
+                    arguments: shouldFetchDetails ? arguments(pid) : [],
+                    memoryBytes: ru.footprint,
+                    ports: ports,
+                    cpuTimeNs: ru.cpuTimeNs,
+                    startTime: startTime
                 ))
             }
         }
@@ -65,18 +82,26 @@ public enum ProcessScanner {
         return withUnsafeBytes(of: &copy.pbi_comm) { cString($0) }
     }
 
-    /// Same "Memory" figure Activity Monitor shows.
-    static func footprint(_ pid: Int32) -> UInt64 {
+    /// Reads memory footprint and cumulative CPU time in nanoseconds via proc_pid_rusage.
+    public static func rusage(_ pid: Int32) -> (footprint: UInt64, cpuTimeNs: UInt64) {
         var usage = rusage_info_v4()
         let r = withUnsafeMutablePointer(to: &usage) { ptr in
             ptr.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) {
                 proc_pid_rusage(pid, RUSAGE_INFO_V4, $0)
             }
         }
-        return r == 0 ? usage.ri_phys_footprint : 0
+        if r == 0 {
+            return (usage.ri_phys_footprint, usage.ri_user_time + usage.ri_system_time)
+        }
+        return (0, 0)
     }
 
-    static func executablePath(_ pid: Int32) -> String? {
+    /// Same "Memory" figure Activity Monitor shows.
+    public static func footprint(_ pid: Int32) -> UInt64 {
+        rusage(pid).footprint
+    }
+
+    public static func executablePath(_ pid: Int32) -> String? {
         withUnsafeTemporaryAllocation(of: CChar.self, capacity: 4 * Int(MAXPATHLEN)) { buffer in
             guard let baseAddress = buffer.baseAddress else { return nil }
             let ret = proc_pidpath(pid, baseAddress, UInt32(buffer.count))
@@ -85,7 +110,7 @@ public enum ProcessScanner {
         }
     }
 
-    static func currentDirectory(_ pid: Int32) -> String? {
+    public static func currentDirectory(_ pid: Int32) -> String? {
         var info = proc_vnodepathinfo()
         let size = Int32(MemoryLayout<proc_vnodepathinfo>.size)
         let r = withUnsafeMutableBytes(of: &info) {
@@ -138,7 +163,7 @@ public enum ProcessScanner {
     // MARK: - sysctl
 
     /// KERN_PROCARGS2 layout: argc (Int32), exec path, NUL padding, argv[0..argc).
-    static func arguments(_ pid: Int32) -> [String] {
+    public static func arguments(_ pid: Int32) -> [String] {
         var mib: [Int32] = [CTL_KERN, KERN_PROCARGS2, pid]
         var size = 0
         guard sysctl(&mib, 3, nil, &size, nil, 0) == 0, size > 4 else { return [] }

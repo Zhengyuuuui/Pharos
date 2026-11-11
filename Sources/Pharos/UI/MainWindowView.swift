@@ -11,6 +11,7 @@ struct MainWindowView: View {
     @ObservedObject private var l10n = L10n.shared
     @ObservedObject private var updateStore = UpdateStore.shared
     @ObservedObject private var notifier = Notifier.shared
+    @ObservedObject private var battery = BatteryStore.shared
     @AppStorage("pharos.trafficLightGlassTransparency") private var trafficLightGlassTransparency: Double = 0.75
     @AppStorage("pharos.showInspector") private var showInspector: Bool = true
     @State private var selection: SidebarItem?
@@ -25,7 +26,8 @@ struct MainWindowView: View {
     enum SidebarItem: Hashable {
         case systemMemory
         case diskUsage
-        case batteryAndThermals
+        case battery
+        case thermals
         case portsOverview
         case diskCleanup
         case browsersAndNetwork
@@ -37,6 +39,7 @@ struct MainWindowView: View {
         case settings
 
         public static let chrome = SidebarItem.browsersAndNetwork
+        public static let batteryAndThermals = SidebarItem.battery
     }
 
     var body: some View {
@@ -65,19 +68,24 @@ struct MainWindowView: View {
                     )
                     .padding(.trailing, 14) // 14pt 导航与中间区隔离带
 
-                // 2. Detail Canvas (Fluid Flex)
-                ZStack(alignment: .top) {
+                // 2. Detail Canvas (Fluid Flex) with yielding space for notifications
+                VStack(spacing: 0) {
+                    if hasActiveBanner {
+                        topFloatingAlertBanner
+                            .padding(.top, 10)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 6)
+                            .padding(.trailing, (isWideScreen && !showInspector) ? 46 : 0)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+
                     detailView
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                    topFloatingAlertBanner
-                        .padding(.top, 12)
-                        .padding(.horizontal, 16)
-                        .padding(.trailing, (isWideScreen && !showInspector) ? 46 : 0)
-                        .animation(.spring(response: 0.32, dampingFraction: 0.82), value: notifier.activeInAppAlerts.first?.id)
-                        .animation(.spring(response: 0.32, dampingFraction: 0.82), value: updateStore.availableManifest?.version)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .animation(.spring(response: 0.32, dampingFraction: 0.82), value: hasActiveBanner)
+                .animation(.spring(response: 0.32, dampingFraction: 0.82), value: notifier.activeInAppAlerts.first?.id)
+                .animation(.spring(response: 0.32, dampingFraction: 0.82), value: updateStore.availableManifest?.version)
                 .overlay(alignment: .topTrailing) {
                     if isWideScreen && !showInspector {
                         Button {
@@ -131,6 +139,10 @@ struct MainWindowView: View {
         }
     }
 
+    private var hasActiveBanner: Bool {
+        !notifier.activeInAppAlerts.isEmpty || (updateStore.availableManifest != nil && updateStore.availableManifest?.version != dismissedUpdateVersion)
+    }
+
     @ViewBuilder
     private var topFloatingAlertBanner: some View {
         if let alert = notifier.activeInAppAlerts.first {
@@ -179,9 +191,6 @@ struct MainWindowView: View {
 
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
-                    if let tab = alert.batteryThermalTab {
-                        WindowRouter.shared.batteryThermalTab = tab
-                    }
                     selection = alert.targetItem
                 }
             } label: {
@@ -368,8 +377,80 @@ struct MainWindowView: View {
                 selection = .diskUsage
             }
 
-            BatteryAndThermalSidebarRow(isSelected: selection == .batteryAndThermals) {
-                selection = .batteryAndThermals
+            // Row 3: 电池与充电
+            if battery.reading.hasBattery {
+                let r = battery.reading
+                let isHolding = battery.isHolding || (!r.isCharging && r.powerSource == .acPower && r.currentPercent < 100)
+                let badgeText: String = {
+                    if isHolding && battery.targetLimit > 0 {
+                        return "\(battery.targetLimit)%"
+                    }
+                    return "\(r.currentPercent)%"
+                }()
+                let badgeIcon: String? = {
+                    if isHolding {
+                        return "powerplug.fill"
+                    } else if r.isCharging {
+                        return "bolt.fill"
+                    } else if r.currentPercent <= 20 {
+                        return "exclamationmark.triangle.fill"
+                    }
+                    return nil
+                }()
+                let badgeColor: Color? = {
+                    if isHolding {
+                        return .teal
+                    } else if r.isCharging {
+                        return .green
+                    } else if r.currentPercent <= 20 {
+                        return PharosColor.warning
+                    }
+                    return nil
+                }()
+
+                PharosSidebarRow(
+                    icon: "battery.100.bolt",
+                    title: l10n.batteryTitle,
+                    badge: badgeText,
+                    badgeIcon: badgeIcon,
+                    badgeColor: badgeColor,
+                    isSelected: selection == .battery
+                ) {
+                    selection = .battery
+                }
+            }
+
+            // Row 4: 风扇与温度
+            let thermals = store.thermals
+            let thermalAlert = notifier.activeInAppAlerts.first(where: { $0.id == "thermal" })
+            let chipTemp = thermals?.peakChipTemperature
+            let isThermalAlert = (thermalAlert != nil) || ((chipTemp ?? 0) >= AlertState.thermalTriggerCelsius)
+            let thermalBadgeColor: Color? = {
+                if let temp = chipTemp {
+                    if isThermalAlert {
+                        return (thermalAlert?.level == .critical || temp >= 95.0) ? PharosColor.error : PharosColor.warning
+                    } else if temp >= 80.0 {
+                        return ThermalStyle.color(temp)
+                    }
+                }
+                return nil
+            }()
+            let thermalBadgeIcon: String? = {
+                if let temp = chipTemp, isThermalAlert {
+                    return temp >= 95.0 ? "flame.fill" : "thermometer.sun.fill"
+                }
+                return nil
+            }()
+
+            PharosSidebarRow(
+                icon: "fanblades",
+                title: l10n.thermalTitle,
+                badge: chipTemp.map { ThermalStyle.temp($0) },
+                badgeIcon: thermalBadgeIcon,
+                badgeColor: thermalBadgeColor,
+                isSelected: selection == .thermals
+            ) {
+                selection = .thermals
             }
 
             // Group 2: 环境与运行时 (Runtime & Services)
@@ -427,6 +508,14 @@ struct MainWindowView: View {
                 selection = .diskCleanup
             }
 
+            PharosSidebarRow(
+                icon: "slider.horizontal.3",
+                title: l10n.customizeTitle,
+                isSelected: selection == .customize
+            ) {
+                selection = .customize
+            }
+
             // Group 4: 常用项目 (Favorites)
             if !workspaces.favorites.isEmpty {
                 PharosSidebarSectionHeader(title: l10n.favorites) {
@@ -477,20 +566,6 @@ struct MainWindowView: View {
                     }
                 }
             }
-
-            // Group 6: 外观与设置 (Appearance)
-            PharosSidebarSectionHeader(title: l10n.appearance)
-                .padding(.horizontal, 10)
-                .padding(.top, 6)
-                .padding(.bottom, 2)
-
-            PharosSidebarRow(
-                icon: "slider.horizontal.3",
-                title: l10n.customizeTitle,
-                isSelected: selection == .customize
-            ) {
-                selection = .customize
-            }
         }
         .padding(.horizontal, 8)
         .padding(.top, 38)
@@ -504,8 +579,10 @@ struct MainWindowView: View {
                 SystemMemoryView()
             case .diskUsage:
                 DiskUsageView()
-            case .batteryAndThermals:
-                BatteryAndThermalView()
+            case .battery:
+                BatteryControlView()
+            case .thermals:
+                ThermalView()
             case .portsOverview:
                 PortsOverviewView(onSelect: { selection = .project($0.id) },
                                   onSelectFavorite: { selection = .favorite($0.id) })
@@ -901,98 +978,6 @@ private struct PharosSidebarRow: View {
                         .background(
                             Capsule().fill(isSelected ? PharosColor.surface : PharosColor.fill.opacity(0.8))
                         )
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .contentShape(Rectangle())
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(isSelected
-                          ? PharosColor.fill
-                          : (isHovered ? PharosColor.fill.opacity(0.4) : Color.clear))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(isSelected ? PharosColor.separator.opacity(0.3) : Color.clear, lineWidth: 0.5)
-            )
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovered = $0 }
-    }
-}
-
-private struct BatteryAndThermalSidebarRow: View {
-    @ObservedObject private var battery = BatteryStore.shared
-    @ObservedObject private var notifier = Notifier.shared
-    @EnvironmentObject var store: ProjectStore
-    @ObservedObject private var l10n = L10n.shared
-    var isSelected: Bool = false
-    let action: () -> Void
-    @State private var isHovered = false
-
-    var body: some View {
-        let r = battery.reading
-        let thermals = store.thermals
-        let thermalAlert = notifier.activeInAppAlerts.first(where: { $0.id == "thermal" })
-
-        Button(action: action) {
-            HStack(spacing: PharosSpacing.s) {
-                Image(systemName: r.hasBattery ? "battery.100.bolt" : "fanblades")
-                    .font(.system(size: 14))
-                    .foregroundStyle(isSelected ? PharosColor.accent : PharosColor.textSecondary)
-                    .frame(width: 20, alignment: .center)
-                Text(r.hasBattery ? l10n.batteryAndThermalsTitle : l10n.thermalTitle)
-                    .font(PharosFont.rowLabel)
-                    .fontWeight(isSelected ? .semibold : .regular)
-                    .foregroundStyle(PharosColor.textPrimary)
-                    .lineLimit(1)
-                Spacer(minLength: 4)
-                if r.hasBattery {
-                    if battery.isHolding {
-                        Image(systemName: "powerplug.fill")
-                            .font(.system(size: 9))
-                            .foregroundStyle(.teal)
-                    } else if r.isCharging {
-                        Image(systemName: "bolt.fill")
-                            .font(.system(size: 9))
-                            .foregroundStyle(.green)
-                    }
-                    Text("\(r.currentPercent)%")
-                        .font(PharosFont.captionDigits)
-                        .foregroundStyle(PharosColor.textSecondary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(
-                            Capsule().fill(isSelected ? PharosColor.surface : PharosColor.fill.opacity(0.8))
-                        )
-                }
-                if let c = thermals?.peakChipTemperature {
-                    let isThermalAlert = (thermalAlert != nil) || (c >= AlertState.thermalTriggerCelsius)
-                    let alertColor = (thermalAlert?.level == .critical || c >= 95.0) ? PharosColor.error : PharosColor.warning
-
-                    if r.hasBattery {
-                        Text("·")
-                            .foregroundStyle(PharosColor.textTertiary)
-                    }
-                    HStack(spacing: 3) {
-                        if isThermalAlert {
-                            Image(systemName: c >= 95.0 ? "flame.fill" : "thermometer.sun.fill")
-                                .font(.system(size: 8))
-                                .foregroundStyle(alertColor)
-                        }
-                        Text(ThermalStyle.temp(c))
-                            .font(PharosFont.captionDigits)
-                            .foregroundStyle(isThermalAlert ? alertColor : (c >= 85.0 ? ThermalStyle.color(c) : PharosColor.textSecondary))
-                    }
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(
-                        Capsule().fill(isSelected ? PharosColor.surface : (isThermalAlert ? alertColor.opacity(0.14) : PharosColor.fill.opacity(0.8)))
-                    )
-                    .overlay(
-                        Capsule().strokeBorder(isThermalAlert ? alertColor.opacity(0.35) : Color.clear, lineWidth: 0.5)
-                    )
                 }
             }
             .padding(.horizontal, 10)

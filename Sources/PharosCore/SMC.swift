@@ -50,6 +50,9 @@ public final class SMCClient {
         input.keyInfo.dataSize = info.size
         input.data8 = SMCParam.Command.writeBytes
         input.setBytes(bytes)
+        if let out = call(input), out.result == 0 { return true }
+        // Transient SMC bus contention retry
+        usleep(2000)
         guard let out = call(input) else { return false }
         return out.result == 0
     }

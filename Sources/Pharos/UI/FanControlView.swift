@@ -29,6 +29,15 @@ struct FanControlCard: View {
                     }
                 }
 
+                if fan.helperNeedsUpdate {
+                    PharosBanner(kind: .warning, text: l10n.fanHelperNeedsUpdateNotice) {
+                        Button(l10n.fanUpdateHelper) { fan.install() }
+                            .buttonStyle(.pharosPrimary)
+                            .controlSize(.small)
+                            .disabled(fan.busy)
+                    }
+                }
+
                 switch fan.helper {
                 case .notInstalled:
                     Text(l10n.fanControlIntro).font(PharosFont.caption).foregroundStyle(PharosColor.textSecondary)
@@ -77,8 +86,15 @@ struct FanControlCard: View {
                     if mode == .fixed {
                         VStack(alignment: .leading, spacing: PharosSpacing.xs) {
                             HStack(spacing: PharosSpacing.s) {
-                                Slider(value: Binding(get: { Double(fan.fixedRPM) }, set: { fan.fixedRPM = Int($0 / 100) * 100 }),
-                                       in: Double(minRPM)...Double(maxRPM))
+                                Slider(
+                                    value: Binding(get: { Double(fan.fixedRPM) }, set: { fan.fixedRPM = Int($0 / 100) * 100 }),
+                                    in: Double(minRPM)...Double(maxRPM),
+                                    onEditingChanged: { isEditing in
+                                        if !isEditing {
+                                            fan.apply(.fixed(rpm: fan.fixedRPM))
+                                        }
+                                    }
+                                )
                                 Text("\(fan.fixedRPM) rpm").font(PharosFont.captionDigits)
                                     .frame(width: 80, alignment: .trailing)
                                 Button(l10n.fanApply) { fan.apply(.fixed(rpm: fan.fixedRPM)) }
@@ -104,7 +120,13 @@ struct FanControlCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .onAppear { fan.refreshState() }
+        .onAppear {
+            fan.viewAppeared()
+            fan.refreshState()
+        }
+        .onDisappear {
+            fan.viewDisappeared()
+        }
     }
 
     private var mode: Mode {

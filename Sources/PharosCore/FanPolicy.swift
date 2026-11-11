@@ -133,7 +133,7 @@ public enum FanPolicy {
 /// One request line in, one JSON response line out.
 public enum FanProtocol {
     public static let socketPath = "/var/run/pharos-fand.sock"
-    public static let version = 1
+    public static let version = 2
     /// Requests longer than this are rejected unread.
     public static let maxLineBytes = 256
 

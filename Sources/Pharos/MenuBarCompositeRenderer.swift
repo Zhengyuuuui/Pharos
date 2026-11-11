@@ -61,7 +61,7 @@ public enum MenuBarCompositeRenderer {
         let symbolWidth: CGFloat = 12.0
         let symbolGap: CGFloat = 3.5
 
-        let valueFont = NSFont.monospacedDigitSystemFont(ofSize: 11.5, weight: .medium)
+        let valueFont = NSFont.monospacedDigitSystemFont(ofSize: 13.0, weight: .medium)
         let valueAttrs: [NSAttributedString.Key: Any] = [
             .font: valueFont,
             .foregroundColor: NSColor.labelColor
@@ -73,13 +73,13 @@ public enum MenuBarCompositeRenderer {
             .foregroundColor: NSColor.secondaryLabelColor
         ]
 
-        let stackedValueFont = NSFont.monospacedDigitSystemFont(ofSize: 10.0, weight: .medium)
+        let stackedValueFont = NSFont.monospacedDigitSystemFont(ofSize: 10.5, weight: .medium)
         let stackedValueAttrs: [NSAttributedString.Key: Any] = [
             .font: stackedValueFont,
             .foregroundColor: NSColor.labelColor
         ]
 
-        let sepFont = NSFont.systemFont(ofSize: 10.0, weight: .regular)
+        let sepFont = NSFont.systemFont(ofSize: 11.0, weight: .medium)
         let sepAttrs: [NSAttributedString.Key: Any] = [
             .font: sepFont,
             .foregroundColor: NSColor.tertiaryLabelColor
@@ -136,9 +136,9 @@ public enum MenuBarCompositeRenderer {
                     case .stacked:
                         curX += 6.5
                     case .valueOnly:
-                        let sepY = (barHeight - 12.0) / 2
+                        let sepY = (barHeight - 14.0) / 2
                         NSString(string: separator.symbol).draw(
-                            in: NSRect(x: curX, y: sepY, width: sepWidth, height: 12.0),
+                            in: NSRect(x: curX, y: sepY, width: sepWidth, height: 14.0),
                             withAttributes: sepAttrs
                         )
                         curX += sepWidth
@@ -158,9 +158,9 @@ public enum MenuBarCompositeRenderer {
 
                     // Value
                     let valX = curX + symbolWidth + symbolGap
-                    let valY = (barHeight - 14.0) / 2
+                    let valY = (barHeight - 16.0) / 2
                     NSString(string: col.item.value).draw(
-                        in: NSRect(x: valX, y: valY, width: col.valueWidth, height: 14.0),
+                        in: NSRect(x: valX, y: valY, width: col.valueWidth, height: 16.0),
                         withAttributes: valueAttrs
                     )
                     curX += col.totalWidth
@@ -183,9 +183,9 @@ public enum MenuBarCompositeRenderer {
                     curX += col.totalWidth
 
                 case .valueOnly:
-                    let valY = (barHeight - 14.0) / 2
+                    let valY = (barHeight - 16.0) / 2
                     NSString(string: col.item.value).draw(
-                        in: NSRect(x: curX, y: valY, width: col.valueWidth, height: 14.0),
+                        in: NSRect(x: curX, y: valY, width: col.valueWidth, height: 16.0),
                         withAttributes: valueAttrs
                     )
                     curX += col.totalWidth

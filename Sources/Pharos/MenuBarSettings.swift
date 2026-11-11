@@ -51,7 +51,7 @@ public enum MenuBarMetric: String, CaseIterable, Identifiable, Codable, Sendable
         switch self {
         case .ports:
             let count = store.totalPorts
-            return style == .valueOnly ? ":\(count)" : "\(count)"
+            return "\(count)"
         case .temperature:
             guard let temp = store.thermals?.peakChipTemperature else { return nil }
             return "\(Int(temp.rounded()))°C"
@@ -167,12 +167,36 @@ final class MenuBarSettings: ObservableObject {
         didSet {
             UserDefaults.standard.set(enabledMetrics.map(\.rawValue), forKey: Keys.metrics)
             syncLegacyText()
+            if let first = enabledMetrics.first, ringMetric != first {
+                ringMetric = first
+            }
         }
     }
 
     @Published var ringMetric: MenuBarMetric {
         didSet {
             UserDefaults.standard.set(ringMetric.rawValue, forKey: Keys.ringMetric)
+            ensureRingMetricFirst()
+        }
+    }
+
+    /// Ensures the metric driving the dynamic ring is placed at index 0 of enabledMetrics.
+    func ensureRingMetricFirst() {
+        guard !enabledMetrics.isEmpty else { return }
+        if let idx = enabledMetrics.firstIndex(of: ringMetric) {
+            if idx != 0 {
+                let m = enabledMetrics.remove(at: idx)
+                enabledMetrics.insert(m, at: 0)
+            }
+        } else {
+            enabledMetrics.insert(ringMetric, at: 0)
+        }
+    }
+
+    func applyPreset(_ metrics: [MenuBarMetric]) {
+        enabledMetrics = metrics
+        if let first = metrics.first {
+            ringMetric = first
         }
     }
 
@@ -259,17 +283,16 @@ final class MenuBarSettings: ObservableObject {
         }
         enabledMetrics = initialMetrics
 
-        // 2. Load ringMetric (default .memory)
-        ringMetric = UserDefaults.standard.string(forKey: Keys.ringMetric).flatMap(MenuBarMetric.init) ?? .memory
+        // 2. Load ringMetric (default matches first enabled metric, or .projects)
+        let savedRing = UserDefaults.standard.string(forKey: Keys.ringMetric).flatMap(MenuBarMetric.init)
+        ringMetric = savedRing ?? initialMetrics.first ?? .projects
 
-        // 3. Load displayStyle (default .iconAndValue)
+        // 3. Load displayStyle (default .valueOnly for clean typography)
         let resolvedStyle: MenuBarDisplayStyle
         if let savedStyle = UserDefaults.standard.string(forKey: Keys.displayStyle).flatMap(MenuBarDisplayStyle.init) {
             resolvedStyle = savedStyle
-        } else if let savedLabels = UserDefaults.standard.object(forKey: Keys.showLabels) as? Bool, !savedLabels {
-            resolvedStyle = .valueOnly
         } else {
-            resolvedStyle = .iconAndValue
+            resolvedStyle = .valueOnly
         }
         displayStyle = resolvedStyle
         showMetricLabels = (resolvedStyle != .valueOnly)
@@ -298,6 +321,7 @@ final class MenuBarSettings: ObservableObject {
 
         installHandler()
         registerHotkey()
+        ensureRingMetricFirst()
     }
 
     private func syncLegacyText() {
@@ -351,12 +375,12 @@ final class MenuBarSettings: ObservableObject {
     }
 
     func reset() {
-        enabledMetrics = [.ports, .memory]
-        ringMetric = .memory
-        displayStyle = .iconAndValue
-        showMetricLabels = true
+        enabledMetrics = [.projects, .temperature, .memory]
+        ringMetric = .projects
+        displayStyle = .valueOnly
+        showMetricLabels = false
         separatorStyle = .dot
-        text = .ports
+        text = .projects
         maxProjects = Self.defaultMaxProjects
         maxPorts = Self.defaultMaxPorts
         hotkey = .none

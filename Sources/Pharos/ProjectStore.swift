@@ -19,6 +19,7 @@ final class ProjectStore: ObservableObject {
         var thermals: ThermalSnapshot?
         var thermalState: ProcessInfo.ThermalState = .nominal
         var thermalDiagnosis: ThermalDiagnosisReport?
+        var cpuDiagnosis: CPUDiagnosisReport?
         var history = MemoryHistory(window: 3600, minInterval: 10)
         var lastScan: Date?
         var memoryDiagnosis: MemoryDiagnosisReport = MemoryDiagnosisReport(items: [], reclaimableBytes: 0)
@@ -36,6 +37,7 @@ final class ProjectStore: ObservableObject {
     var thermals: ThermalSnapshot? { state.thermals }
     var thermalState: ProcessInfo.ThermalState { state.thermalState }
     var thermalDiagnosis: ThermalDiagnosisReport? { state.thermalDiagnosis }
+    var cpuDiagnosis: CPUDiagnosisReport? { state.cpuDiagnosis }
     var memoryDiagnosis: MemoryDiagnosisReport { state.memoryDiagnosis }
     private var internalHistory = MemoryHistory(window: 3600, minInterval: 10)
     var history: MemoryHistory { internalHistory }
@@ -47,6 +49,8 @@ final class ProjectStore: ObservableObject {
     @Published private(set) var stubborn: Set<String> = []
     /// Projects with a signal in flight; rows show "Stopping…" until the processes are gone.
     @Published private(set) var stopping: Set<String> = []
+    /// Culprit processes currently being terminated.
+    @Published private(set) var terminatingPIDs: Set<Int32> = []
     /// A refresh requested while a scan was running; replayed as soon as that scan ends
     /// so a stop / quit is never left waiting for the next timer tick.
     private var refreshQueued = false
@@ -205,6 +209,10 @@ final class ProjectStore: ObservableObject {
             processes: all,
             battery: BatteryStore.shared.reading
         )
+        let cpuDiag = CPUDoctor.diagnose(
+            processes: all,
+            chipTemperature: state.thermals?.peakChipTemperature
+        )
         let now = Date()
         internalHistory.append(MemorySample(
             date: now,
@@ -220,7 +228,7 @@ final class ProjectStore: ObservableObject {
         let projectsUnchanged = (projects == state.projects)
         let portsUnchanged = (ports == state.listeningPorts)
 
-        if viewers == 0 && projectsUnchanged && portsUnchanged && memoryUnchanged && state.memoryDiagnosis == diagnosis && state.thermalDiagnosis == thermalDiag {
+        if viewers == 0 && projectsUnchanged && portsUnchanged && memoryUnchanged && state.memoryDiagnosis == diagnosis && state.thermalDiagnosis == thermalDiag && state.cpuDiagnosis == cpuDiag {
             return
         }
 
@@ -234,6 +242,7 @@ final class ProjectStore: ObservableObject {
         next.lastScan = now
         next.memoryDiagnosis = diagnosis
         next.thermalDiagnosis = thermalDiag
+        next.cpuDiagnosis = cpuDiag
         state = next
         let alive = stubborn.intersection(projects.map(\.id))
         if alive != stubborn { stubborn = alive }
@@ -308,7 +317,7 @@ final class ProjectStore: ObservableObject {
         defer { readingThermals = false }
         guard let snap = (await Task.detached(priority: .utility) { Thermals.read() }.value) else { return }
         let level = ProcessInfo.processInfo.thermalState
-        if snap != state.thermals || level != state.thermalState || state.thermalDiagnosis == nil {
+        if snap != state.thermals || level != state.thermalState || state.thermalDiagnosis == nil || state.cpuDiagnosis == nil {
             var next = state
             next.thermals = snap
             next.thermalState = level
@@ -317,6 +326,10 @@ final class ProjectStore: ObservableObject {
                 thermalState: level,
                 processes: lastProcesses,
                 battery: BatteryStore.shared.reading
+            )
+            next.cpuDiagnosis = CPUDoctor.diagnose(
+                processes: lastProcesses,
+                chipTemperature: snap.peakChipTemperature
             )
             state = next
         }
@@ -380,14 +393,17 @@ final class ProjectStore: ObservableObject {
     func terminateCulprit(pid: Int32) {
         let me = getpid()
         guard pid > 1 && pid != me else { return }
+        terminatingPIDs.insert(pid)
         ProcessControl.send(.terminate, to: [pid])
         Task { [weak self] in
-            let exited = await ProcessControl.waitForExit([pid], timeout: 2.0)
+            let exited = await ProcessControl.waitForExit([pid], timeout: 3.0)
             if !exited {
                 ProcessControl.send(.kill, to: [pid])
                 _ = await ProcessControl.waitForExit([pid], timeout: 1.0)
             }
-            await self?.refresh()
+            guard let self else { return }
+            self.terminatingPIDs.remove(pid)
+            await self.refresh()
         }
     }
 

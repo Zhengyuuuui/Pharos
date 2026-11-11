@@ -22,8 +22,8 @@ public struct ListeningPort: Hashable, Sendable, Comparable {
     }
 }
 
-/// A single user-owned process. Path / cwd / arguments are only collected for
-/// processes that listen on a port (they are the expensive lookups).
+/// A single user-owned process. Path / cwd / arguments are collected for
+/// listening sockets, developer scripts/tools, or high-activity tasks.
 public struct ProcessSnapshot: Hashable, Sendable, Identifiable {
     public let pid: Int32
     public let ppid: Int32
@@ -33,12 +33,16 @@ public struct ProcessSnapshot: Hashable, Sendable, Identifiable {
     public let arguments: [String]
     public let memoryBytes: UInt64
     public let ports: [ListeningPort]
+    public let cpuTimeNs: UInt64
+    public let startTime: Date?
+    public let cpuPercent: Double?
 
     public var id: Int32 { pid }
 
     public init(pid: Int32, ppid: Int32, name: String, executablePath: String? = nil,
                 cwd: String? = nil, arguments: [String] = [], memoryBytes: UInt64,
-                ports: [ListeningPort] = []) {
+                ports: [ListeningPort] = [], cpuTimeNs: UInt64 = 0, startTime: Date? = nil,
+                cpuPercent: Double? = nil) {
         self.pid = pid
         self.ppid = ppid
         self.name = name
@@ -47,6 +51,26 @@ public struct ProcessSnapshot: Hashable, Sendable, Identifiable {
         self.arguments = arguments
         self.memoryBytes = memoryBytes
         self.ports = ports
+        self.cpuTimeNs = cpuTimeNs
+        self.startTime = startTime
+        self.cpuPercent = cpuPercent
+    }
+
+    /// Whether this process was orphaned (parent is launchd, ppid == 1).
+    public var isOrphan: Bool { ppid == 1 }
+
+    /// Wall-clock uptime elapsed since process launch.
+    public var elapsedTime: TimeInterval? {
+        guard let startTime else { return nil }
+        return max(0, Date().timeIntervalSince(startTime))
+    }
+
+    /// Full executed command string (or fallback to executable path/name).
+    public var fullCommand: String {
+        if arguments.isEmpty {
+            return executablePath ?? name
+        }
+        return arguments.joined(separator: " ")
     }
 
     /// Short human-readable command, e.g. "node vite" or "python3 manage.py runserver".

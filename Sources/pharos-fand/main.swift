@@ -54,6 +54,7 @@ final class FanDaemon: @unchecked Sendable {
     private var policy = FanPolicy.State()
     private var holding = false
     private var unsupported = false
+    private var consecutiveLockFailures = 0
     private let modeTemplate: String
     private let hasUnlock: Bool
 
@@ -92,6 +93,7 @@ final class FanDaemon: @unchecked Sendable {
                                       lastHeartbeat: lastHeartbeat, now: Date(), state: &policy)
         switch action {
         case .release:
+            consecutiveLockFailures = 0
             if holding || snap.unlockEngaged || snap.fans.contains(where: { $0.mode == .manual }) {
                 releaseLocked(fans: snap.fans.count)
             }
@@ -100,18 +102,37 @@ final class FanDaemon: @unchecked Sendable {
                 request = .system
             }
         case .hold(let targets):
-            if !holding || snap.fans.contains(where: { $0.mode != .manual }) {
-                guard takeManualLocked(fans: snap.fans.count) else {
-                    unsupported = true
-                    request = .system
-                    releaseLocked(fans: snap.fans.count)
-                    log("manual mode rejected by firmware — left fans with macOS")
-                    return
+            let needsLock = !holding || snap.fans.contains(where: { $0.mode != .manual })
+            if needsLock {
+                if takeManualLocked(fans: snap.fans.count) {
+                    holding = true
+                    consecutiveLockFailures = 0
+                } else {
+                    consecutiveLockFailures += 1
+                    // Only abandon if manual mode repeatedly fails for 5 consecutive ticks
+                    if consecutiveLockFailures >= 5 {
+                        unsupported = true
+                        request = .system
+                        releaseLocked(fans: snap.fans.count)
+                        log("manual mode repeatedly rejected by firmware (\(consecutiveLockFailures)s) — left fans with macOS")
+                        return
+                    }
                 }
-                holding = true
+            } else {
+                consecutiveLockFailures = 0
             }
-            for (i, rpm) in targets.enumerated() where snap.fans[i].targetRPM != rpm {
-                smc.write("F\(i)Tg", SMCCodec.bytes(Float(rpm)))
+
+            // In manual mode: keep Ftst=1 reinforced so thermalmonitord does not take over
+            if hasUnlock { smc.write("Ftst", [1]) }
+
+            // Write target RPMs and re-assert mode if any drifted
+            for (i, rpm) in targets.enumerated() {
+                if i < snap.fans.count && snap.fans[i].mode != .manual {
+                    smc.write(String(format: modeTemplate, i), [1])
+                }
+                if i < snap.fans.count && snap.fans[i].targetRPM != rpm {
+                    smc.write("F\(i)Tg", SMCCodec.bytes(Float(rpm)))
+                }
             }
         }
     }
@@ -119,11 +140,13 @@ final class FanDaemon: @unchecked Sendable {
     /// Ftst=1 makes thermalmonitord yield (M1–M4); then each fan's mode can go to manual.
     private func takeManualLocked(fans: Int) -> Bool {
         if hasUnlock { smc.write("Ftst", [1]) }
-        let deadline = Date().addingTimeInterval(10)
         var pending = Set(0..<fans)
-        while !pending.isEmpty, Date() < deadline {
-            for i in pending where smc.write(String(format: modeTemplate, i), [1]) { pending.remove(i) }
-            if !pending.isEmpty { usleep(100_000) }
+        for _ in 0..<3 {
+            for i in pending where smc.write(String(format: modeTemplate, i), [1]) {
+                pending.remove(i)
+            }
+            if pending.isEmpty { break }
+            usleep(10_000) // 10ms micro-retry
         }
         return pending.isEmpty
     }

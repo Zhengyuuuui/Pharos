@@ -62,7 +62,7 @@ struct PharosInspectorIsland: View {
             SystemMemoryInspectorView()
         case .diskUsage:
             DiskUsageInspectorView()
-        case .batteryAndThermals:
+        case .battery, .thermals:
             BatteryThermalInspectorView()
         case .packages:
             PackagesInspectorView()

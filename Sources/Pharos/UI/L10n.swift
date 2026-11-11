@@ -251,23 +251,24 @@ final class L10n: ObservableObject {
     }
     var displayStyleTitle: String { en ? "Metric Display Style" : "指标展示样式" }
     var displayStyleHint: String {
-        en ? "Choose between micro SF Symbols, stacked hardware gauges, or minimal pure numbers."
-           : "选择微缩 SF Symbols 图标、专业双行硬件仪表或极简纯数值。"
+        en ? "Choose between clean typography (minimal, zero visual noise), stacked gauges, or micro icons."
+           : "选择纯净排版（推荐·极简无杂音）、双行硬件仪表或微缩图标。"
     }
     func displayStyleName(_ s: MenuBarDisplayStyle) -> String {
         switch s {
-        case .iconAndValue:
-            return en ? "Micro Icon + Value" : "微缩图标 + 数值（推荐）"
-        case .stacked:
-            return en ? "Stacked Gauges" : "双行微缩仪表（硬件感）"
         case .valueOnly:
-            return en ? "Pure Value Only" : "极简纯数值"
+            return en ? "Clean Typography (Rec.)" : "纯净排版（推荐）"
+        case .stacked:
+            return en ? "Stacked Gauges" : "双行硬件仪表"
+        case .iconAndValue:
+            return en ? "Micro Icons + Values" : "微缩图标 + 数值"
         }
     }
+    var ringBoundBadge: String { en ? "Linked to Ring" : "绑定圆环" }
     var activeOrderStripTitle: String { en ? "Display Order & Layout" : "菜单栏排列顺序" }
     var activeOrderStripHint: String {
-        en ? "Click < > to reorder from left to right; click × to hide."
-           : "点击 < > 调整指标在菜单栏从左到右的排列顺序，点击 × 隐藏。"
+        en ? "The first metric is linked to the status ring; click < > to reorder or × to hide."
+           : "第 1 位指标与状态圆环直接绑定；点击 < > 调整顺序或 × 隐藏。"
     }
     var showMetricLabelsTitle: String { en ? "Show Metric Labels" : "显示微缩前缀标识" }
     var showMetricLabelsHint: String {
@@ -275,10 +276,16 @@ final class L10n: ObservableObject {
            : "在数字旁显示短前缀标识（如 8P · 52°C · MEM 68%）。"
     }
     var separatorStyleTitle: String { en ? "Separator Style" : "分隔符样式" }
+    var presetProjectsMem: String { en ? "Projects + Mem" : "项目 + 内存" }
     var presetPortsTemp: String { en ? "Ports + Temp" : "端口 + 温度" }
     var presetTempMem: String { en ? "Temp + Memory" : "温度 + 内存" }
     var presetPortsTempMem: String { en ? "Ports + Temp + Mem" : "端口 + 温度 + 内存" }
     var presetIconOnly: String { en ? "Icon Only" : "仅图标" }
+    var menuBarDisplayPreviewTipTitle: String { en ? "1:1 Status Bar Simulation" : "1:1 状态栏实时仿真" }
+    var menuBarDisplayPreviewTipDesc: String {
+        en ? "Simulates your macOS menu bar at actual pixel size. The dynamic progress ring is driven by the 1st metric."
+           : "以真实像素 1:1 模拟 macOS 菜单栏。左侧动态圆环与列表第 1 位指标保持实时联动。"
+    }
     var iconOnly: String { en ? "Icon Only" : "仅图标" }
     var openMenuBarComposer: String { en ? "Configure Menu Bar in Customize…" : "在「自定义」中配置菜单栏…" }
 
@@ -781,6 +788,27 @@ final class L10n: ObservableObject {
     var thermalReasonsTitle: String { en ? "Root Causes of Heat" : "发热诱因与机理分析" }
     var thermalSuggestionsTitle: String { en ? "Recommended Cooling Actions" : "对症散热治理建议" }
     var terminateCulpritProcess: String { en ? "Terminate" : "结束进程" }
+    var terminateProcess: String { en ? "Terminate" : "结束进程" }
+    var cpuDiagnosticsTitle: String { en ? "CPU Heat & Load Diagnostics" : "CPU 异常与发热排查" }
+    var cpuDiagnosticsDesc: String {
+        en ? "Real-time analysis of heavy CPU processes and orphaned background tasks causing thermal rise."
+           : "实时识别吃满 CPU 算力或脱离终端的孤儿脚本，闭环定位并治理芯片发热。"
+    }
+    var cpuLoadNormal: String {
+        en ? "CPU load is nominal with no abnormal background tasks."
+           : "CPU 运行平稳，无异常高耗后台任务"
+    }
+    var cpuPrimaryHeatCulprit: String {
+        en ? "Sustained high CPU usage; primary source of thermal rise."
+           : "持续高负载运行，是当前芯片升温的主要原因"
+    }
+    var orphanProcess: String { en ? "Orphan" : "孤儿脚本" }
+    var terminating: String { en ? "Terminating…" : "正在结束…" }
+    var workingDir: String { en ? "Working Dir" : "工作目录" }
+    func cpuAbnormalProcessCount(_ count: Int) -> String {
+        en ? "\(count) background tasks causing thermal rise"
+           : "检测到 \(count) 个后台任务正持续发热"
+    }
     var rampUpFansAction: String { en ? "Ramp Up Fans" : "一键提速风扇" }
     var openEnergyModeAction: String { en ? "Energy Settings…" : "能耗模式设置…" }
     var thermalTitle: String { en ? "Fans & Temperature" : "风扇与温度" }
@@ -915,6 +943,15 @@ final class L10n: ObservableObject {
     var fanSafety: String {
         en ? "Safety: fans go back to macOS when Pharos quits, crashes or stops responding for 15 s, and after sleep settings are re-applied. In smart curve mode, temperatures at 95 °C trigger max cooling. Fixed speed strictly holds your chosen RPM."
            : "安全措施：Pharos 退出、崩溃或 15 秒无响应时，风扇自动交还系统；睡眠唤醒后重新应用。在智能曲线模式下达 95°C 触发满速保护；固定转速模式严格锁定所选转速。"
+    }
+    var fanHelperNeedsUpdateNotice: String {
+        en ? "A new fan helper update is available (v2 supports dynamic curves and locked fixed RPMs)."
+           : "风扇控制核心驱动有新版本（v2 支持智能动态温控曲线与转速锁定闭环），请点击更新。"
+    }
+    var fanUpdateHelper: String { en ? "Update Helper…" : "更新核心驱动…" }
+    var fanHelperNeedsUpdateError: String {
+        en ? "The currently installed fan helper does not support dynamic curves. Please click 'Update Helper…' above."
+           : "当前安装的风扇核心驱动版本较低，不支持智能温控曲线。请点击上方「更新核心驱动…」。"
     }
 
     // MARK: - Customize popover

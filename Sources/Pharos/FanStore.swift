@@ -17,6 +17,8 @@ final class FanStore: ObservableObject {
     }
 
     @Published private(set) var helper: HelperState = .notInstalled
+    @Published private(set) var helperNeedsUpdate: Bool = false
+    @Published private(set) var helperVersion: Int? = nil
     @Published private(set) var request: FanRequest = .system
     @Published private(set) var overheating = false
     @Published private(set) var unsupported = false
@@ -29,6 +31,7 @@ final class FanStore: ObservableObject {
 
     private var heartbeat: Timer?
     private var hasViewers: Bool = false
+    private var wakeObserver: NSObjectProtocol?
 
     func updateVisibility(hasViewers: Bool) {
         guard self.hasViewers != hasViewers else { return }
@@ -47,16 +50,18 @@ final class FanStore: ObservableObject {
 
         let interval: TimeInterval
         if request != .system {
-            // Actively controlling fans: must maintain 5s heartbeat to prevent daemon 15s timeout
-            interval = 5
+            // Actively controlling fans: maintain 3s heartbeat to safely stay ahead of daemon 15s timeout
+            interval = 3.0
         } else {
             // System mode: downclock to 30s when no windows are open, 5s when visible
-            interval = hasViewers ? 5 : 30
+            interval = hasViewers ? 5.0 : 30.0
         }
 
-        heartbeat = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+        let t = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.beat() }
         }
+        heartbeat = t
+        RunLoop.main.add(t, forMode: .common)
     }
 
     private init() {
@@ -67,9 +72,28 @@ final class FanStore: ObservableObject {
             // Best effort; the heartbeat timeout covers crashes and force quits.
             _ = FanStore.send(.set(.system))
         }
+
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.refreshState()
+                if self.request != .system {
+                    self.apply(self.request)
+                }
+            }
+        }
     }
 
-    deinit { heartbeat?.invalidate() }
+    deinit {
+        heartbeat?.invalidate()
+        if let wakeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
+        }
+    }
 
     var isInstalled: Bool { FileManager.default.fileExists(atPath: FanHelperInstall.plistPath) }
 
@@ -115,10 +139,14 @@ final class FanStore: ObservableObject {
         guard let reply else {
             let nextHelper: HelperState = isInstalled ? .notResponding : .notInstalled
             if helper != nextHelper { helper = nextHelper }
+            if helperVersion != nil { helperVersion = nil }
             if let failure, errorMessage != failure { errorMessage = failure }
             return
         }
         if helper != .ready { helper = .ready }
+        if helperVersion != reply.version { helperVersion = reply.version }
+        let nextNeedsUpdate = (reply.version < FanProtocol.version)
+        if helperNeedsUpdate != nextNeedsUpdate { helperNeedsUpdate = nextNeedsUpdate }
         let oldRequest = request
         if request != reply.request { request = reply.request }
         if overheating != reply.overheating { overheating = reply.overheating }
@@ -126,7 +154,13 @@ final class FanStore: ObservableObject {
         if oldRequest != request {
             scheduleTimer()
         }
-        if !reply.ok, let failure { errorMessage = reply.error ?? failure }
+        if !reply.ok, let failure {
+            if reply.error == "bad request" && helperNeedsUpdate {
+                errorMessage = L10n.shared.fanHelperNeedsUpdateError
+            } else {
+                errorMessage = reply.error ?? failure
+            }
+        }
     }
 
     // MARK: - Install / uninstall

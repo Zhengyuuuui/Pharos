@@ -33,9 +33,6 @@ struct PopoverView: View {
                     VStack(spacing: 4) {
                         ForEach(notifier.activeInAppAlerts) { alert in
                             InAppAlertCard(alert: alert) {
-                                if let tab = alert.batteryThermalTab {
-                                    WindowRouter.shared.batteryThermalTab = tab
-                                }
                                 AppDelegate.shared?.showMainWindow(selecting: alert.targetItem)
                             } onDismiss: {
                                 notifier.dismissInAppAlert(id: alert.id)

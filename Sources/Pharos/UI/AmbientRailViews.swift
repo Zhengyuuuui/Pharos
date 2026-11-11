@@ -444,8 +444,7 @@ struct BatteryThermalInspectorView: View {
                             .foregroundStyle(PharosColor.textTertiary)
                         Spacer()
                         Button(l10n.ambientSetupAction) {
-                            WindowRouter.shared.batteryThermalTab = .thermals
-                            WindowRouter.shared.request = .batteryAndThermals
+                            WindowRouter.shared.request = .thermals
                         }
                         .font(.system(size: 10))
                         .buttonStyle(.borderless)

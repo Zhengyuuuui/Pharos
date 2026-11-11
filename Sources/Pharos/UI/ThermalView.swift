@@ -43,8 +43,7 @@ struct PopoverThermalSection: View {
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(ThermalStyle.stateColor(store.thermalState))
                     Button {
-                        WindowRouter.shared.batteryThermalTab = .thermals
-                        AppDelegate.shared?.showMainWindow(selecting: .batteryAndThermals)
+                        AppDelegate.shared?.showMainWindow(selecting: .thermals)
                     } label: {
                         Text(l10n.manage).font(.system(size: 10))
                     }
@@ -113,8 +112,6 @@ struct ThermalView: View {
 
                 FanControlCard()
 
-                ThermalDiagnosticsSection()
-
                 PharosSection(title: l10n.temperaturesTitle, systemImage: "thermometer.medium") {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: PharosSpacing.m)], spacing: PharosSpacing.m) {
                         ForEach(SensorGroup.allCases, id: \.self) { g in
@@ -124,6 +121,8 @@ struct ThermalView: View {
                         }
                     }
                 }
+
+                ThermalDiagnosticsSection()
             } else {
                 ThermalDiagnosticsSection()
 
@@ -140,7 +139,11 @@ struct ThermalView: View {
             PharosBanner(kind: .info, text: l10n.thermalReadNotice)
         }
         .onAppear {
+            FanStore.shared.viewAppeared()
             FanStore.shared.refreshState()
+        }
+        .onDisappear {
+            FanStore.shared.viewDisappeared()
         }
         .task {
             while !Task.isCancelled {
@@ -173,72 +176,33 @@ private struct TempTile: View {
     }
 }
 
-/// Comprehensive heat diagnostics section explaining why the Mac is warm/hot,
-/// highlighting root causes (fast charging, compile jobs, media AI, silent fan curve delay),
-/// and offering direct remediation actions.
+/// Dynamic real-time CPU Heat & Runaway Diagnostics.
+/// Identifies heavy CPU hogs and orphaned background processes causing chip heat,
+/// presenting full commands, working directories, and one-click graceful-to-force termination.
 private struct ThermalDiagnosticsSection: View {
     @EnvironmentObject var store: ProjectStore
     @ObservedObject private var l10n = L10n.shared
 
     var body: some View {
-        if let diag = store.thermalDiagnosis {
-            PharosSection(
-                title: l10n.thermalDiagnosticsTitle,
-                systemImage: "flame.circle.fill"
-            ) {
-                VStack(alignment: .leading, spacing: PharosSpacing.l) {
-                    // Overall Severity Header
-                    severityBanner(diag)
+        let report = store.cpuDiagnosis ?? .nominal
 
-                    // Root Causes & Inducements
-                    if !diag.reasons.isEmpty {
-                        VStack(alignment: .leading, spacing: PharosSpacing.s) {
-                            Text(l10n.thermalReasonsTitle)
-                                .font(PharosFont.caption)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(PharosColor.textSecondary)
+        PharosSection(
+            title: l10n.cpuDiagnosticsTitle,
+            systemImage: "cpu"
+        ) {
+            VStack(alignment: .leading, spacing: PharosSpacing.m) {
+                // Top Status Card
+                if report.isNominal {
+                    nominalStatusBanner
+                } else {
+                    elevatedStatusBanner(count: report.processes.count)
+                }
 
-                            VStack(spacing: PharosSpacing.s) {
-                                ForEach(diag.reasons) { reason in
-                                    reasonCard(reason)
-                                }
-                            }
-                        }
-                    }
-
-                    // Top Culprit Workloads
-                    if !diag.culprits.isEmpty {
-                        VStack(alignment: .leading, spacing: PharosSpacing.s) {
-                            HStack {
-                                Text(l10n.thermalCulpritsTitle)
-                                    .font(PharosFont.caption)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(PharosColor.textSecondary)
-                                Spacer()
-                                Text("\(diag.culprits.count)")
-                                    .font(PharosFont.captionDigits)
-                                    .foregroundStyle(PharosColor.textTertiary)
-                            }
-
-                            VStack(spacing: PharosSpacing.xs) {
-                                ForEach(diag.culprits) { culprit in
-                                    culpritRow(culprit)
-                                }
-                            }
-                        }
-                    }
-
-                    // Suggestions & Mitigation Actions
-                    if !diag.suggestions.isEmpty {
-                        VStack(alignment: .leading, spacing: PharosSpacing.s) {
-                            Text(l10n.thermalSuggestionsTitle)
-                                .font(PharosFont.caption)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(PharosColor.textSecondary)
-
-                            ForEach(diag.suggestions) { suggestion in
-                                suggestionCard(suggestion)
-                            }
+                // High-load or Orphan Process Cards
+                if !report.processes.isEmpty {
+                    VStack(spacing: PharosSpacing.s) {
+                        ForEach(report.processes) { process in
+                            culpritProcessCard(process)
                         }
                     }
                 }
@@ -246,179 +210,192 @@ private struct ThermalDiagnosticsSection: View {
         }
     }
 
-    private func severityBanner(_ diag: ThermalDiagnosisReport) -> some View {
-        HStack(alignment: .center, spacing: PharosSpacing.m) {
-            ZStack {
-                Circle()
-                    .fill(severityColor(diag.level).opacity(0.15))
-                    .frame(width: 44, height: 44)
-                Image(systemName: severityIcon(diag.level))
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(severityColor(diag.level))
-            }
+    private var nominalStatusBanner: some View {
+        HStack(spacing: PharosSpacing.m) {
+            Image(systemName: "checkmark.shield.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(PharosColor.success)
 
-            VStack(alignment: .leading, spacing: PharosSpacing.xxs) {
-                HStack(spacing: PharosSpacing.xs) {
-                    Text(severityTitle(diag.level))
-                        .font(PharosFont.rowLabel)
-                    Spacer()
-                    Text(String(format: "%.0f°C", diag.peakTemperature))
-                        .font(PharosFont.metricValue)
-                        .foregroundStyle(severityColor(diag.level))
-                }
-                Text(l10n.thermalDiagnosticsSubtitle)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(l10n.cpuLoadNormal)
+                    .font(PharosFont.rowLabel)
+                    .foregroundStyle(PharosColor.textPrimary)
+                Text(l10n.cpuDiagnosticsDesc)
                     .font(PharosFont.caption)
                     .foregroundStyle(PharosColor.textSecondary)
+            }
+            Spacer()
+        }
+        .padding(PharosSpacing.m)
+        .background(
+            RoundedRectangle(cornerRadius: PharosRadius.card, style: .continuous)
+                .fill(PharosColor.success.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: PharosRadius.card, style: .continuous)
+                .strokeBorder(PharosColor.success.opacity(0.2), lineWidth: 0.5)
+        )
+    }
+
+    private func elevatedStatusBanner(count: Int) -> some View {
+        HStack(spacing: PharosSpacing.m) {
+            Image(systemName: "flame.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(PharosColor.warning)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(l10n.cpuAbnormalProcessCount(count))
+                    .font(PharosFont.rowLabel)
+                    .foregroundStyle(PharosColor.textPrimary)
+                Text(l10n.cpuDiagnosticsDesc)
+                    .font(PharosFont.caption)
+                    .foregroundStyle(PharosColor.textSecondary)
+            }
+            Spacer()
+        }
+        .padding(PharosSpacing.m)
+        .background(
+            RoundedRectangle(cornerRadius: PharosRadius.card, style: .continuous)
+                .fill(PharosColor.warning.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: PharosRadius.card, style: .continuous)
+                .strokeBorder(PharosColor.warning.opacity(0.2), lineWidth: 0.5)
+        )
+    }
+
+    private func culpritProcessCard(_ process: CPURunawayProcess) -> some View {
+        let isTerminating = store.terminatingPIDs.contains(process.pid)
+        let isCriticalHeat = process.cpuPercent >= 70.0
+
+        return VStack(alignment: .leading, spacing: PharosSpacing.s) {
+            // Header Row: Icon, Name, PID, Badges, Spacer, Terminate Button
+            HStack(alignment: .center, spacing: PharosSpacing.s) {
+                Image(systemName: process.isOrphan ? "exclamationmark.triangle.fill" : (process.isCompilerOrBuild ? "hammer.fill" : "cpu"))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(process.isOrphan ? PharosColor.warning : (isCriticalHeat ? PharosColor.error : PharosColor.accent))
+                    .frame(width: 18)
+
+                Text(process.name)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(PharosColor.textPrimary)
+
+                Text("PID \(process.pid)")
+                    .font(PharosFont.captionDigits)
+                    .foregroundStyle(PharosColor.textTertiary)
+
+                // CPU% Badge
+                Text(String(format: "%.0f%% CPU", process.cpuPercent))
+                    .font(PharosFont.captionDigits)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(isCriticalHeat ? PharosColor.error : PharosColor.warning)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        Capsule().fill((isCriticalHeat ? PharosColor.error : PharosColor.warning).opacity(0.14))
+                    )
+
+                // Orphan Badge
+                if process.isOrphan {
+                    HStack(spacing: 3) {
+                        Image(systemName: "link.badge.plus")
+                            .font(.system(size: 8))
+                        Text(l10n.orphanProcess)
+                    }
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(PharosColor.warning)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(PharosColor.warning.opacity(0.12)))
+                }
+
+                // Memory Footprint (if > 0)
+                if process.memoryBytes > 0 {
+                    Text(ByteFormat.short(process.memoryBytes))
+                        .font(PharosFont.captionDigits)
+                        .foregroundStyle(PharosColor.textSecondary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(PharosColor.fill))
+                }
+
+                // Elapsed Uptime
+                if process.elapsedTimeSeconds > 0 {
+                    Text("⏱ \(process.formattedElapsedTime)")
+                        .font(PharosFont.captionDigits)
+                        .foregroundStyle(PharosColor.textTertiary)
+                }
+
+                Spacer(minLength: 8)
+
+                // Terminate Action Button
+                PharosActionButton(
+                    isTerminating ? l10n.terminating : l10n.terminateProcess,
+                    role: .destructive
+                ) {
+                    store.terminateCulprit(pid: process.pid)
+                }
+                .controlSize(.small)
+                .disabled(isTerminating || !process.isKillable)
+            }
+
+            // Friendly Cause Explanation
+            HStack(alignment: .top, spacing: 4) {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 10))
+                    .foregroundStyle(PharosColor.textTertiary)
+                    .padding(.top, 1)
+
+                Text(process.explanation.isEmpty ? l10n.cpuPrimaryHeatCulprit : process.explanation)
+                    .font(.system(size: 11))
+                    .foregroundStyle(PharosColor.textSecondary)
+            }
+
+            // Command & Directory Inspect Strip
+            if !process.fullCommand.isEmpty || (process.workingDirectory != nil && !process.workingDirectory!.isEmpty) {
+                VStack(alignment: .leading, spacing: 3) {
+                    if !process.fullCommand.isEmpty {
+                        HStack(alignment: .top, spacing: 6) {
+                            Text(l10n.command + ":")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(PharosColor.textTertiary)
+                            Text(process.fullCommand)
+                                .font(.system(size: 10.5).monospaced())
+                                .foregroundStyle(PharosColor.textSecondary)
+                                .lineLimit(2)
+                                .textSelection(.enabled)
+                        }
+                    }
+                    if let cwd = process.workingDirectory, !cwd.isEmpty {
+                        HStack(alignment: .top, spacing: 6) {
+                            Text(l10n.workingDir + ":")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(PharosColor.textTertiary)
+                            Text(cwd)
+                                .font(.system(size: 10.5).monospaced())
+                                .foregroundStyle(PharosColor.textTertiary)
+                                .lineLimit(1)
+                                .textSelection(.enabled)
+                        }
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.black.opacity(0.12))
+                )
             }
         }
         .padding(PharosSpacing.m)
         .background(
-            RoundedRectangle(cornerRadius: PharosRadius.control, style: .continuous)
-                .fill(PharosColor.fill.opacity(0.6))
-        )
-    }
-
-    private func reasonCard(_ reason: ThermalReason) -> some View {
-        HStack(alignment: .top, spacing: PharosSpacing.s + 2) {
-            ZStack {
-                RoundedRectangle(cornerRadius: PharosRadius.small, style: .continuous)
-                    .fill(severityColor(reason.severity).opacity(0.16))
-                    .frame(width: 28, height: 28)
-                Image(systemName: reason.icon)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(severityColor(reason.severity))
-            }
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(reason.title)
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .foregroundStyle(PharosColor.textPrimary)
-                Text(reason.detail)
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(PharosColor.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(PharosSpacing.s + 2)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: PharosRadius.control, style: .continuous)
+            RoundedRectangle(cornerRadius: PharosRadius.card, style: .continuous)
                 .fill(PharosColor.surfaceSecondary)
         )
-    }
-
-    private func culpritRow(_ culprit: ThermalCulprit) -> some View {
-        HStack(spacing: PharosSpacing.s) {
-            Image(systemName: culprit.category.icon)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(PharosColor.textSecondary)
-                .frame(width: 20)
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(culprit.name)
-                        .font(.system(size: 12, weight: .semibold))
-                    Text("PID \(culprit.pid)")
-                        .font(.system(size: 10).monospacedDigit())
-                        .foregroundStyle(PharosColor.textTertiary)
-                    if culprit.memoryBytes > 0 {
-                        Text(ByteFormat.short(culprit.memoryBytes))
-                            .font(.system(size: 10, weight: .medium).monospacedDigit())
-                            .foregroundStyle(PharosColor.textSecondary)
-                    }
-                }
-                Text(culprit.explanation)
-                    .font(.system(size: 11))
-                    .foregroundStyle(PharosColor.textTertiary)
-                    .lineLimit(1)
-            }
-
-            Spacer(minLength: 8)
-
-            if culprit.isKillable {
-                PharosActionButton(l10n.terminateCulpritProcess, role: .destructive) {
-                    store.terminateCulprit(pid: culprit.pid)
-                }
-                .controlSize(.small)
-            }
-        }
-        .padding(.horizontal, PharosSpacing.s + 2)
-        .padding(.vertical, PharosSpacing.xs + 2)
-        .background(
-            RoundedRectangle(cornerRadius: PharosRadius.small, style: .continuous)
-                .fill(PharosColor.fill.opacity(0.4))
+        .overlay(
+            RoundedRectangle(cornerRadius: PharosRadius.card, style: .continuous)
+                .strokeBorder(isCriticalHeat ? PharosColor.error.opacity(0.25) : PharosColor.separator.opacity(0.3), lineWidth: 0.5)
         )
-    }
-
-    private func suggestionCard(_ suggestion: ThermalSuggestion) -> some View {
-        HStack(spacing: PharosSpacing.m) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(suggestion.title)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(PharosColor.textPrimary)
-                Text(suggestion.detail)
-                    .font(.system(size: 11))
-                    .foregroundStyle(PharosColor.textSecondary)
-            }
-
-            Spacer(minLength: 8)
-
-            switch suggestion.actionKind {
-            case .maxFans:
-                PharosActionButton(l10n.rampUpFansAction, role: .primary) {
-                    if FanStore.shared.helper == .ready {
-                        FanStore.shared.apply(.max)
-                    } else {
-                        FanStore.shared.install()
-                    }
-                }
-                .controlSize(.small)
-            case .openEnergySettings:
-                PharosActionButton(l10n.openEnergyModeAction, role: .standard) {
-                    ThermalStyle.openEnergySettings()
-                }
-                .controlSize(.small)
-            case .killProcess(let pid, _):
-                PharosActionButton(l10n.terminateCulpritProcess, role: .destructive) {
-                    store.terminateCulprit(pid: pid)
-                }
-                .controlSize(.small)
-            case .adviceOnly:
-                EmptyView()
-            }
-        }
-        .padding(PharosSpacing.s + 2)
-        .background(
-            RoundedRectangle(cornerRadius: PharosRadius.control, style: .continuous)
-                .fill(PharosColor.surfaceSecondary)
-        )
-    }
-
-    private func severityTitle(_ level: ThermalSeverityLevel) -> String {
-        switch level {
-        case .cool: return l10n.thermalCoolTitle
-        case .warm: return l10n.thermalWarmTitle
-        case .hot: return l10n.thermalHotTitle
-        case .critical: return l10n.thermalCriticalTitle
-        }
-    }
-
-    private func severityColor(_ level: ThermalSeverityLevel) -> Color {
-        switch level {
-        case .cool: return PharosColor.success
-        case .warm: return Color.yellow
-        case .hot: return PharosColor.warning
-        case .critical: return PharosColor.error
-        }
-    }
-
-    private func severityIcon(_ level: ThermalSeverityLevel) -> String {
-        switch level {
-        case .cool: return "snowflake"
-        case .warm: return "thermometer.medium"
-        case .hot: return "flame.fill"
-        case .critical: return "exclamationmark.triangle.fill"
-        }
     }
 }
