@@ -35,6 +35,44 @@ public enum MenuBarMetric: String, CaseIterable, Identifiable, Codable, Sendable
         }
     }
 
+    public var upperLabel: String {
+        switch self {
+        case .ports: return "PORT"
+        case .temperature: return "TEMP"
+        case .memory: return "MEM"
+        case .projects: return "PROJ"
+        case .disk: return "DISK"
+        case .battery: return "BATT"
+        }
+    }
+
+    @MainActor
+    func value(store: ProjectStore, style: MenuBarDisplayStyle) -> String? {
+        switch self {
+        case .ports:
+            let count = store.totalPorts
+            return style == .valueOnly ? ":\(count)" : "\(count)"
+        case .temperature:
+            guard let temp = store.thermals?.peakChipTemperature else { return nil }
+            return "\(Int(temp.rounded()))°C"
+        case .memory:
+            guard let m = store.system else { return nil }
+            let pct = Int((m.usedFraction * 100).rounded())
+            return "\(pct)%"
+        case .projects:
+            let count = store.projects.count
+            return "\(count)"
+        case .disk:
+            guard let disk = store.volumes.first(where: { $0.kind == .startup }) else { return nil }
+            let pct = Int((disk.usedFraction * 100).rounded())
+            return "\(pct)%"
+        case .battery:
+            let r = BatteryStore.shared.reading
+            guard r.hasBattery else { return nil }
+            return "\(r.currentPercent)%"
+        }
+    }
+
     @MainActor
     func formattedValue(store: ProjectStore, showLabel: Bool) -> String? {
         switch self {
@@ -61,6 +99,15 @@ public enum MenuBarMetric: String, CaseIterable, Identifiable, Codable, Sendable
             return showLabel ? "BAT \(r.currentPercent)%" : "\(r.currentPercent)%"
         }
     }
+}
+
+/// Visual display style for metrics in the menu bar.
+public enum MenuBarDisplayStyle: String, CaseIterable, Identifiable, Codable, Sendable {
+    case iconAndValue // 微缩图标 + 数值 (默认推荐)
+    case stacked      // 上下双行微缩仪表 (专业硬件仪表)
+    case valueOnly    // 极简纯数值
+
+    public var id: String { rawValue }
 }
 
 /// Separator style between metrics in the menu bar.
@@ -129,6 +176,13 @@ final class MenuBarSettings: ObservableObject {
         }
     }
 
+    @Published var displayStyle: MenuBarDisplayStyle {
+        didSet {
+            UserDefaults.standard.set(displayStyle.rawValue, forKey: Keys.displayStyle)
+            showMetricLabels = (displayStyle != .valueOnly)
+        }
+    }
+
     @Published var showMetricLabels: Bool {
         didSet {
             UserDefaults.standard.set(showMetricLabels, forKey: Keys.showLabels)
@@ -170,6 +224,7 @@ final class MenuBarSettings: ObservableObject {
         static let metrics = "pharos.menuBarMetrics"
         static let ringMetric = "pharos.menuBarRingMetric"
         static let showLabels = "pharos.menuBarShowLabels"
+        static let displayStyle = "pharos.menuBarDisplayStyle"
         static let separator = "pharos.menuBarSeparator"
         static let hotkey = "popoverHotkey"
         static let maxProjects = "maxProjectsCapacity"
@@ -207,12 +262,17 @@ final class MenuBarSettings: ObservableObject {
         // 2. Load ringMetric (default .memory)
         ringMetric = UserDefaults.standard.string(forKey: Keys.ringMetric).flatMap(MenuBarMetric.init) ?? .memory
 
-        // 3. Load showMetricLabels (default true)
-        if UserDefaults.standard.object(forKey: Keys.showLabels) == nil {
-            showMetricLabels = true
+        // 3. Load displayStyle (default .iconAndValue)
+        let resolvedStyle: MenuBarDisplayStyle
+        if let savedStyle = UserDefaults.standard.string(forKey: Keys.displayStyle).flatMap(MenuBarDisplayStyle.init) {
+            resolvedStyle = savedStyle
+        } else if let savedLabels = UserDefaults.standard.object(forKey: Keys.showLabels) as? Bool, !savedLabels {
+            resolvedStyle = .valueOnly
         } else {
-            showMetricLabels = UserDefaults.standard.bool(forKey: Keys.showLabels)
+            resolvedStyle = .iconAndValue
         }
+        displayStyle = resolvedStyle
+        showMetricLabels = (resolvedStyle != .valueOnly)
 
         // 4. Load separatorStyle (default .dot)
         separatorStyle = UserDefaults.standard.string(forKey: Keys.separator).flatMap(MenuBarSeparator.init) ?? .dot
@@ -293,6 +353,7 @@ final class MenuBarSettings: ObservableObject {
     func reset() {
         enabledMetrics = [.ports, .memory]
         ringMetric = .memory
+        displayStyle = .iconAndValue
         showMetricLabels = true
         separatorStyle = .dot
         text = .ports

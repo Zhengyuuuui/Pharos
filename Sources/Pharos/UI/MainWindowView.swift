@@ -14,6 +14,7 @@ struct MainWindowView: View {
     @AppStorage("pharos.trafficLightGlassTransparency") private var trafficLightGlassTransparency: Double = 0.75
     @AppStorage("pharos.showInspector") private var showInspector: Bool = true
     @State private var selection: SidebarItem?
+    @State private var dismissedUpdateVersion: String? = nil
     /// Entry point from the menu-bar popover (e.g. "Disk Cleanup").
     private let initialSelection: SidebarItem?
 
@@ -65,28 +66,38 @@ struct MainWindowView: View {
                     .padding(.trailing, 14) // 14pt 导航与中间区隔离带
 
                 // 2. Detail Canvas (Fluid Flex)
-                detailView
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .overlay(alignment: .topTrailing) {
-                        if isWideScreen && !showInspector {
-                            Button {
-                                withAnimation(.easeInOut(duration: 0.22)) {
-                                    showInspector = true
-                                }
-                            } label: {
-                                Image(systemName: "sidebar.trailing")
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(PharosColor.textSecondary)
-                                    .frame(width: 28, height: 28)
-                                    .background(Circle().fill(PharosColor.surface))
-                                    .overlay(Circle().strokeBorder(PharosColor.separator.opacity(0.4), lineWidth: 0.5))
+                ZStack(alignment: .top) {
+                    detailView
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    topFloatingAlertBanner
+                        .padding(.top, 12)
+                        .padding(.horizontal, 16)
+                        .padding(.trailing, (isWideScreen && !showInspector) ? 46 : 0)
+                        .animation(.spring(response: 0.32, dampingFraction: 0.82), value: notifier.activeInAppAlerts.first?.id)
+                        .animation(.spring(response: 0.32, dampingFraction: 0.82), value: updateStore.availableManifest?.version)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .overlay(alignment: .topTrailing) {
+                    if isWideScreen && !showInspector {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.22)) {
+                                showInspector = true
                             }
-                            .buttonStyle(.plain)
-                            .help(l10n.toggleInspector)
-                            .padding(14)
-                            .transition(.opacity)
+                        } label: {
+                            Image(systemName: "sidebar.trailing")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(PharosColor.textSecondary)
+                                .frame(width: 28, height: 28)
+                                .background(Circle().fill(PharosColor.surface))
+                                .overlay(Circle().strokeBorder(PharosColor.separator.opacity(0.4), lineWidth: 0.5))
                         }
+                        .buttonStyle(.plain)
+                        .help(l10n.toggleInspector)
+                        .padding(14)
+                        .transition(.opacity)
                     }
+                }
 
                 // 3. Floating Bento Context Rail (260pt，三维安全隔离区)
                 if isInspectorVisible {
@@ -121,36 +132,170 @@ struct MainWindowView: View {
     }
 
     @ViewBuilder
-    private func updateNotificationPill(manifest: ReleaseManifest) -> some View {
-        Button {
-            selection = .settings
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(PharosColor.amber)
-                Text(l10n.updateBannerText(version: manifest.version))
-                    .font(.system(size: 11, weight: .medium))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .foregroundStyle(PharosColor.amber)
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(PharosColor.amber.opacity(0.8))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(PharosColor.amber.opacity(0.12))
-            )
-            .overlay(
-                Capsule()
-                    .strokeBorder(PharosColor.amber.opacity(0.35), lineWidth: 0.5)
-            )
+    private var topFloatingAlertBanner: some View {
+        if let alert = notifier.activeInAppAlerts.first {
+            systemAlertBanner(alert: alert)
+                .transition(.asymmetric(
+                    insertion: .move(edge: .top).combined(with: .opacity),
+                    removal: .opacity.combined(with: .scale(scale: 0.96))
+                ))
+        } else if let manifest = updateStore.availableManifest, manifest.version != dismissedUpdateVersion {
+            updateAlertBanner(manifest: manifest)
+                .transition(.asymmetric(
+                    insertion: .move(edge: .top).combined(with: .opacity),
+                    removal: .opacity.combined(with: .scale(scale: 0.96))
+                ))
         }
-        .buttonStyle(.plain)
+    }
+
+    private func systemAlertBanner(alert: ActiveAlertBanner) -> some View {
+        let isCritical = alert.level == .critical
+        let tintColor = isCritical ? PharosColor.error : PharosColor.warning
+
+        return HStack(spacing: 10) {
+            Image(systemName: alert.icon)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(tintColor)
+                .frame(width: 24, height: 24)
+                .background(Circle().fill(tintColor.opacity(0.14)))
+
+            HStack(spacing: 6) {
+                Text(alert.title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(PharosColor.textPrimary)
+                    .lineLimit(1)
+
+                Text("·")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(PharosColor.textTertiary)
+
+                Text(alert.subtitle)
+                    .font(.system(size: 11))
+                    .foregroundStyle(PharosColor.textSecondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    if let tab = alert.batteryThermalTab {
+                        WindowRouter.shared.batteryThermalTab = tab
+                    }
+                    selection = alert.targetItem
+                }
+            } label: {
+                Text(l10n.viewDetailsAction)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(tintColor)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule().fill(tintColor.opacity(0.14))
+                    )
+                    .overlay(
+                        Capsule().strokeBorder(tintColor.opacity(0.4), lineWidth: 0.5)
+                    )
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                    notifier.dismissInAppAlert(id: alert.id)
+                }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(PharosColor.textTertiary)
+                    .frame(width: 20, height: 20)
+                    .background(Circle().fill(PharosColor.fill.opacity(0.6)))
+            }
+            .buttonStyle(.plain)
+            .help(l10n.dismissBanner)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(.regularMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(tintColor.opacity(0.4), lineWidth: 0.75)
+        )
+        .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
+    }
+
+    private func updateAlertBanner(manifest: ReleaseManifest) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(PharosColor.amber)
+                .frame(width: 24, height: 24)
+                .background(Circle().fill(PharosColor.amber.opacity(0.14)))
+
+            HStack(spacing: 6) {
+                Text(l10n.updateAvailable)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(PharosColor.textPrimary)
+                    .lineLimit(1)
+
+                Text("·")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(PharosColor.textTertiary)
+
+                Text("v\(manifest.version)")
+                    .font(.system(size: 11, weight: .medium).monospacedDigit())
+                    .foregroundStyle(PharosColor.amber)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selection = .settings
+                }
+            } label: {
+                Text(l10n.updateNowAction)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(PharosColor.amber)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule().fill(PharosColor.amber.opacity(0.14))
+                    )
+                    .overlay(
+                        Capsule().strokeBorder(PharosColor.amber.opacity(0.4), lineWidth: 0.5)
+                    )
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                    dismissedUpdateVersion = manifest.version
+                }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(PharosColor.textTertiary)
+                    .frame(width: 20, height: 20)
+                    .background(Circle().fill(PharosColor.fill.opacity(0.6)))
+            }
+            .buttonStyle(.plain)
+            .help(l10n.dismissBanner)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(.regularMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(PharosColor.amber.opacity(0.4), lineWidth: 0.75)
+        )
+        .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
     }
 
     private func sidebarIsland(isWideScreen: Bool) -> some View {
@@ -163,29 +308,6 @@ struct MainWindowView: View {
                 TunableFrostedHeader(transparency: trafficLightGlassTransparency)
                     .frame(height: 40)
                     .allowsHitTesting(false)
-            }
-
-            if !notifier.activeInAppAlerts.isEmpty {
-                VStack(spacing: 4) {
-                    ForEach(notifier.activeInAppAlerts) { alert in
-                        InAppAlertCard(alert: alert) {
-                            if let tab = alert.batteryThermalTab {
-                                WindowRouter.shared.batteryThermalTab = tab
-                            }
-                            selection = alert.targetItem
-                        } onDismiss: {
-                            notifier.dismissInAppAlert(id: alert.id)
-                        }
-                    }
-                }
-                .padding(.horizontal, PharosSpacing.s)
-                .padding(.bottom, PharosSpacing.xs)
-            }
-
-            if let manifest = updateStore.availableManifest {
-                updateNotificationPill(manifest: manifest)
-                    .padding(.horizontal, PharosSpacing.s)
-                    .padding(.bottom, PharosSpacing.xs)
             }
 
             sidebarBottomIsland(isWideScreen: isWideScreen)
@@ -214,14 +336,22 @@ struct MainWindowView: View {
                 .padding(.top, 4)
                 .padding(.bottom, 2)
 
+            let memoryAlert = notifier.activeInAppAlerts.first(where: { $0.id == "memory" || $0.id == "bloat" })
+            let memoryAlertColor: Color? = memoryAlert.map { $0.level == .critical ? PharosColor.error : PharosColor.warning }
+
             PharosSidebarRow(
                 icon: "memorychip",
                 title: l10n.systemMemory,
                 badge: store.system.map { "\(Int(($0.usedFraction * 100).rounded()))%" },
+                badgeIcon: memoryAlert != nil ? (memoryAlert?.level == .critical ? "exclamationmark.octagon.fill" : "exclamationmark.triangle.fill") : nil,
+                badgeColor: memoryAlertColor,
                 isSelected: selection == .systemMemory
             ) {
                 selection = .systemMemory
             }
+
+            let diskAlert = notifier.activeInAppAlerts.first(where: { $0.id == "disk" })
+            let diskAlertColor: Color? = diskAlert.map { $0.level == .critical ? PharosColor.error : PharosColor.warning }
 
             PharosSidebarRow(
                 icon: "internaldrive",
@@ -231,6 +361,8 @@ struct MainWindowView: View {
                     let extra = store.volumes.filter { $0.kind == .external || $0.kind == .network }.count
                     return extra > 0 ? "+\(extra)" : nil
                 }(),
+                badgeIcon: diskAlert != nil ? (diskAlert?.level == .critical ? "exclamationmark.octagon.fill" : "exclamationmark.triangle.fill") : nil,
+                badgeColor: diskAlertColor,
                 isSelected: selection == .diskUsage
             ) {
                 selection = .diskUsage
@@ -288,6 +420,8 @@ struct MainWindowView: View {
                 icon: "trash",
                 title: l10n.diskCleanup,
                 badge: cleanup.totalBytes > 0 ? ByteFormat.short(cleanup.totalBytes) : nil,
+                badgeIcon: diskAlert != nil ? (diskAlert?.level == .critical ? "exclamationmark.octagon.fill" : "exclamationmark.triangle.fill") : nil,
+                badgeColor: diskAlertColor,
                 isSelected: selection == .diskCleanup
             ) {
                 selection = .diskCleanup
@@ -744,11 +878,18 @@ private struct PharosSidebarRow: View {
                 if let badge {
                     Text(badge)
                         .font(PharosFont.captionDigits)
-                        .foregroundStyle(PharosColor.textSecondary)
+                        .foregroundStyle(badgeColor ?? PharosColor.textSecondary)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(
-                            Capsule().fill(isSelected ? PharosColor.surface : PharosColor.fill.opacity(0.8))
+                            Capsule().fill(
+                                isSelected
+                                    ? PharosColor.surface
+                                    : (badgeColor != nil ? badgeColor!.opacity(0.14) : PharosColor.fill.opacity(0.8))
+                            )
+                        )
+                        .overlay(
+                            Capsule().strokeBorder(badgeColor?.opacity(0.35) ?? Color.clear, lineWidth: 0.5)
                         )
                 }
                 if let extraBadge {
@@ -783,6 +924,7 @@ private struct PharosSidebarRow: View {
 
 private struct BatteryAndThermalSidebarRow: View {
     @ObservedObject private var battery = BatteryStore.shared
+    @ObservedObject private var notifier = Notifier.shared
     @EnvironmentObject var store: ProjectStore
     @ObservedObject private var l10n = L10n.shared
     var isSelected: Bool = false
@@ -792,6 +934,8 @@ private struct BatteryAndThermalSidebarRow: View {
     var body: some View {
         let r = battery.reading
         let thermals = store.thermals
+        let thermalAlert = notifier.activeInAppAlerts.first(where: { $0.id == "thermal" })
+
         Button(action: action) {
             HStack(spacing: PharosSpacing.s) {
                 Image(systemName: r.hasBattery ? "battery.100.bolt" : "fanblades")
@@ -824,18 +968,31 @@ private struct BatteryAndThermalSidebarRow: View {
                         )
                 }
                 if let c = thermals?.peakChipTemperature {
+                    let isThermalAlert = (thermalAlert != nil) || (c >= AlertState.thermalTriggerCelsius)
+                    let alertColor = (thermalAlert?.level == .critical || c >= 95.0) ? PharosColor.error : PharosColor.warning
+
                     if r.hasBattery {
                         Text("·")
                             .foregroundStyle(PharosColor.textTertiary)
                     }
-                    Text(ThermalStyle.temp(c))
-                        .font(PharosFont.captionDigits)
-                        .foregroundStyle(c >= 85 ? ThermalStyle.color(c) : PharosColor.textSecondary)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(
-                            Capsule().fill(isSelected ? PharosColor.surface : PharosColor.fill.opacity(0.8))
-                        )
+                    HStack(spacing: 3) {
+                        if isThermalAlert {
+                            Image(systemName: c >= 95.0 ? "flame.fill" : "thermometer.sun.fill")
+                                .font(.system(size: 8))
+                                .foregroundStyle(alertColor)
+                        }
+                        Text(ThermalStyle.temp(c))
+                            .font(PharosFont.captionDigits)
+                            .foregroundStyle(isThermalAlert ? alertColor : (c >= 85.0 ? ThermalStyle.color(c) : PharosColor.textSecondary))
+                    }
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(
+                        Capsule().fill(isSelected ? PharosColor.surface : (isThermalAlert ? alertColor.opacity(0.14) : PharosColor.fill.opacity(0.8)))
+                    )
+                    .overlay(
+                        Capsule().strokeBorder(isThermalAlert ? alertColor.opacity(0.35) : Color.clear, lineWidth: 0.5)
+                    )
                 }
             }
             .padding(.horizontal, 10)

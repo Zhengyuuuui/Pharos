@@ -249,6 +249,26 @@ final class L10n: ObservableObject {
         en ? "Determines which metric drives the status ring's fill percentage and health color."
            : "决定菜单栏左侧动态圆环反映哪个指标的负载比例与健康状态。"
     }
+    var displayStyleTitle: String { en ? "Metric Display Style" : "指标展示样式" }
+    var displayStyleHint: String {
+        en ? "Choose between micro SF Symbols, stacked hardware gauges, or minimal pure numbers."
+           : "选择微缩 SF Symbols 图标、专业双行硬件仪表或极简纯数值。"
+    }
+    func displayStyleName(_ s: MenuBarDisplayStyle) -> String {
+        switch s {
+        case .iconAndValue:
+            return en ? "Micro Icon + Value" : "微缩图标 + 数值（推荐）"
+        case .stacked:
+            return en ? "Stacked Gauges" : "双行微缩仪表（硬件感）"
+        case .valueOnly:
+            return en ? "Pure Value Only" : "极简纯数值"
+        }
+    }
+    var activeOrderStripTitle: String { en ? "Display Order & Layout" : "菜单栏排列顺序" }
+    var activeOrderStripHint: String {
+        en ? "Click < > to reorder from left to right; click × to hide."
+           : "点击 < > 调整指标在菜单栏从左到右的排列顺序，点击 × 隐藏。"
+    }
     var showMetricLabelsTitle: String { en ? "Show Metric Labels" : "显示微缩前缀标识" }
     var showMetricLabelsHint: String {
         en ? "Display short prefixes next to values (e.g. 8P · 52°C · MEM 68%)."
@@ -353,6 +373,15 @@ final class L10n: ObservableObject {
     }
     var dismissAlert: String {
         en ? "Dismiss alert" : "忽略告警"
+    }
+    var viewDetailsAction: String {
+        en ? "View Details" : "立即查看"
+    }
+    var updateNowAction: String {
+        en ? "Update Now" : "立即更新"
+    }
+    var dismissBanner: String {
+        en ? "Dismiss" : "忽略"
     }
     var notificationsDenied: String {
         en ? "Notifications are turned off for Pharos in System Settings → Notifications."

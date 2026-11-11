@@ -339,47 +339,7 @@ private struct LiveMenuBarPreviewCapsule: View {
     @ObservedObject private var battery = BatteryStore.shared
     @ObservedObject private var l10n = L10n.shared
 
-    private var ringStatus: (fraction: Double, pressure: MemoryPressure, highIsBad: Bool) {
-        switch settings.ringMetric {
-        case .temperature:
-            let t = store.thermals?.peakChipTemperature ?? 40.0
-            let clamped = max(35.0, min(100.0, t))
-            let frac = (clamped - 35.0) / (100.0 - 35.0)
-            let press: MemoryPressure = (t >= 95.0) ? .critical : ((t >= 85.0) ? .warning : .normal)
-            return (frac, press, true)
-        case .disk:
-            let disk = store.volumes.first { $0.kind == .startup }
-            let frac = disk?.usedFraction ?? 0
-            let press: MemoryPressure = frac >= 0.95 ? .critical : (frac >= 0.85 ? .warning : .normal)
-            return (frac, press, true)
-        case .memory:
-            return (store.system?.usedFraction ?? 0, store.system?.pressure ?? .normal, true)
-        case .projects:
-            let cap = max(1, settings.maxProjects)
-            let frac = Double(store.projects.count) / Double(cap)
-            let press: MemoryPressure = frac >= 1.0 ? .critical : (frac >= 0.85 ? .warning : .normal)
-            return (min(1.0, frac), press, true)
-        case .ports:
-            let cap = max(1, settings.maxPorts)
-            let frac = Double(store.totalPorts) / Double(cap)
-            let press: MemoryPressure = frac >= 1.0 ? .critical : (frac >= 0.85 ? .warning : .normal)
-            return (min(1.0, frac), press, true)
-        case .battery:
-            let r = battery.reading
-            guard r.hasBattery else {
-                return (store.system?.usedFraction ?? 0, store.system?.pressure ?? .normal, true)
-            }
-            let press: MemoryPressure = switch BatteryMenuBarMetric.level(percent: r.currentPercent, onAC: r.powerSource == .acPower) {
-            case .critical: .critical
-            case .warning: .warning
-            case .normal: .normal
-            }
-            return (BatteryMenuBarMetric.fraction(percent: r.currentPercent), press, false)
-        }
-    }
-
     var body: some View {
-        let ring = ringStatus
         HStack(spacing: 8) {
             HStack(spacing: 5) {
                 Image(systemName: "apple.logo")
@@ -394,21 +354,11 @@ private struct LiveMenuBarPreviewCapsule: View {
             Spacer()
 
             HStack(spacing: 5) {
-                Image(nsImage: DynamicMenuBarIcon.image(
-                    fraction: ring.fraction,
-                    pressure: ring.pressure,
-                    highIsBad: ring.highIsBad
+                Image(nsImage: MenuBarCompositeRenderer.currentImage(
+                    store: store,
+                    settings: settings,
+                    battery: battery
                 ))
-
-                if let text = settings.combinedLabel(for: store) {
-                    Text(text)
-                        .font(.system(size: 11, weight: .medium).monospacedDigit())
-                        .foregroundStyle(PharosColor.textPrimary)
-                } else {
-                    Text(l10n.iconOnly)
-                        .font(.system(size: 10))
-                        .foregroundStyle(PharosColor.textTertiary)
-                }
 
                 if settings.hotkey != .none {
                     Text(settings.hotkey.label)
@@ -456,30 +406,32 @@ private struct MenuBarComposerSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: PharosSpacing.s) {
             headerWithPresets
+            if !settings.enabledMetrics.isEmpty {
+                activeOrderStrip
+            }
             metricsSelectionGrid
             detailsCard
         }
     }
 
     private var headerWithPresets: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .center) {
+        VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 2) {
                 Label(l10n.menuBarComposerTitle, systemImage: "menubar.rectangle")
                     .font(PharosFont.sectionTitle)
                     .foregroundStyle(PharosColor.textPrimary)
 
-                Spacer()
-
-                HStack(spacing: 6) {
-                    presetButton(title: l10n.presetPortsTemp, metrics: [.ports, .temperature])
-                    presetButton(title: l10n.presetTempMem, metrics: [.temperature, .memory])
-                    presetButton(title: l10n.presetPortsTempMem, metrics: [.ports, .temperature, .memory])
-                    presetButton(title: l10n.presetIconOnly, metrics: [])
-                }
+                Text(l10n.menuBarComposerDesc)
+                    .font(PharosFont.caption)
+                    .foregroundStyle(PharosColor.textSecondary)
             }
-            Text(l10n.menuBarComposerDesc)
-                .font(PharosFont.caption)
-                .foregroundStyle(PharosColor.textSecondary)
+
+            HStack(spacing: 6) {
+                presetButton(title: l10n.presetPortsTemp, metrics: [.ports, .temperature])
+                presetButton(title: l10n.presetTempMem, metrics: [.temperature, .memory])
+                presetButton(title: l10n.presetPortsTempMem, metrics: [.ports, .temperature, .memory])
+                presetButton(title: l10n.presetIconOnly, metrics: [])
+            }
         }
     }
 
@@ -491,10 +443,12 @@ private struct MenuBarComposerSection: View {
             }
         } label: {
             Text(title)
-                .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
+                .font(.system(size: 10.5, weight: isSelected ? .semibold : .regular))
                 .foregroundStyle(isSelected ? PharosColor.accent : PharosColor.textSecondary)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 3.5)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
                 .background(
                     Capsule()
                         .fill(isSelected ? PharosColor.accent.opacity(0.14) : PharosColor.fill)
@@ -507,9 +461,117 @@ private struct MenuBarComposerSection: View {
         .buttonStyle(.plain)
     }
 
+    private var activeOrderStrip: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                Text(l10n.activeOrderStripTitle)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(PharosColor.textSecondary)
+                Text("•")
+                    .font(.system(size: 8))
+                    .foregroundStyle(PharosColor.textTertiary)
+                Text(l10n.activeOrderStripHint)
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(PharosColor.textTertiary)
+                    .lineLimit(1)
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(Array(settings.enabledMetrics.enumerated()), id: \.element) { idx, metric in
+                        activeMetricPill(metric: metric, index: idx, count: settings.enabledMetrics.count)
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(PharosColor.fill.opacity(0.5))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(PharosColor.separator.opacity(0.3), lineWidth: 0.5)
+        )
+    }
+
+    private func activeMetricPill(metric: MenuBarMetric, index: Int, count: Int) -> some View {
+        HStack(spacing: 4) {
+            Text("\(index + 1)")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(Color.white)
+                .frame(width: 14, height: 14)
+                .background(Circle().fill(PharosColor.accent))
+
+            Image(systemName: metric.sfSymbol)
+                .font(.system(size: 10))
+                .foregroundStyle(PharosColor.accent)
+
+            Text(l10n.menuBarMetricName(metric))
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(PharosColor.textPrimary)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+
+            HStack(spacing: 1) {
+                Button {
+                    guard index > 0 else { return }
+                    withAnimation(.spring(response: 0.22, dampingFraction: 0.84)) {
+                        settings.enabledMetrics.swapAt(index, index - 1)
+                    }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(index > 0 ? PharosColor.textSecondary : PharosColor.textTertiary.opacity(0.3))
+                        .frame(width: 12, height: 16)
+                }
+                .buttonStyle(.plain)
+                .disabled(index == 0)
+
+                Button {
+                    guard index < count - 1 else { return }
+                    withAnimation(.spring(response: 0.22, dampingFraction: 0.84)) {
+                        settings.enabledMetrics.swapAt(index, index + 1)
+                    }
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(index < count - 1 ? PharosColor.textSecondary : PharosColor.textTertiary.opacity(0.3))
+                        .frame(width: 12, height: 16)
+                }
+                .buttonStyle(.plain)
+                .disabled(index >= count - 1)
+
+                Button {
+                    withAnimation(.spring(response: 0.22, dampingFraction: 0.84)) {
+                        settings.enabledMetrics.removeAll { $0 == metric }
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 7.5, weight: .bold))
+                        .foregroundStyle(PharosColor.textTertiary)
+                        .frame(width: 12, height: 16)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.leading, 5)
+        .padding(.trailing, 4)
+        .padding(.vertical, 3)
+        .background(
+            Capsule()
+                .fill(PharosColor.surface)
+        )
+        .overlay(
+            Capsule()
+                .strokeBorder(PharosColor.separator.opacity(0.4), lineWidth: 0.5)
+        )
+    }
+
     private var metricsSelectionGrid: some View {
         let columns = [
-            GridItem(.flexible(), spacing: 8),
             GridItem(.flexible(), spacing: 8),
             GridItem(.flexible(), spacing: 8)
         ]
@@ -524,100 +586,74 @@ private struct MenuBarComposerSection: View {
     private func metricChip(_ metric: MenuBarMetric) -> some View {
         let isEnabled = settings.enabledMetrics.contains(metric)
         let orderIndex: Int? = settings.enabledMetrics.firstIndex(of: metric).map { $0 + 1 }
-        let index = settings.enabledMetrics.firstIndex(of: metric)
         let liveVal = metric.formattedValue(store: store, showLabel: false)
 
-        return HStack(spacing: 6) {
-            Button {
-                withAnimation(.spring(response: 0.24, dampingFraction: 0.82)) {
-                    if isEnabled {
-                        settings.enabledMetrics.removeAll { $0 == metric }
-                    } else {
-                        settings.enabledMetrics.append(metric)
-                    }
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    if let order = orderIndex {
-                        Text("\(order)")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(Color.white)
-                            .frame(width: 16, height: 16)
-                            .background(Circle().fill(PharosColor.accent))
-                    } else {
-                        Circle()
-                            .strokeBorder(PharosColor.separator.opacity(0.6), lineWidth: 1)
-                            .frame(width: 16, height: 16)
-                    }
-
-                    Image(systemName: metric.sfSymbol)
-                        .font(.system(size: 11))
-                        .foregroundStyle(isEnabled ? PharosColor.accent : PharosColor.textSecondary)
-                        .frame(width: 14)
-
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(l10n.menuBarMetricName(metric))
-                            .font(.system(size: 11, weight: isEnabled ? .semibold : .regular))
-                            .foregroundStyle(isEnabled ? PharosColor.textPrimary : PharosColor.textSecondary)
-                            .lineLimit(1)
-
-                        if let val = liveVal {
-                            Text(val)
-                                .font(.system(size: 9, weight: .medium).monospacedDigit())
-                                .foregroundStyle(isEnabled ? PharosColor.accent : PharosColor.textTertiary)
-                        }
-                    }
-
-                    Spacer(minLength: 0)
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            if let idx = index {
-                HStack(spacing: 2) {
-                    Button {
-                        guard idx > 0 else { return }
-                        withAnimation(.spring(response: 0.22, dampingFraction: 0.84)) {
-                            settings.enabledMetrics.swapAt(idx, idx - 1)
-                        }
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(idx > 0 ? PharosColor.textSecondary : PharosColor.textTertiary.opacity(0.4))
-                            .frame(width: 14, height: 18)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(idx == 0)
-
-                    Button {
-                        guard idx < settings.enabledMetrics.count - 1 else { return }
-                        withAnimation(.spring(response: 0.22, dampingFraction: 0.84)) {
-                            settings.enabledMetrics.swapAt(idx, idx + 1)
-                        }
-                    } label: {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(idx < settings.enabledMetrics.count - 1 ? PharosColor.textSecondary : PharosColor.textTertiary.opacity(0.4))
-                            .frame(width: 14, height: 18)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(idx >= settings.enabledMetrics.count - 1)
+        return Button {
+            withAnimation(.spring(response: 0.24, dampingFraction: 0.82)) {
+                if isEnabled {
+                    settings.enabledMetrics.removeAll { $0 == metric }
+                } else {
+                    settings.enabledMetrics.append(metric)
                 }
             }
+        } label: {
+            HStack(spacing: 8) {
+                // Left: 18x18 order indicator
+                if let order = orderIndex {
+                    Text("\(order)")
+                        .font(.system(size: 9.5, weight: .bold))
+                        .foregroundStyle(Color.white)
+                        .frame(width: 18, height: 18)
+                        .background(Circle().fill(PharosColor.accent))
+                } else {
+                    Circle()
+                        .strokeBorder(PharosColor.separator.opacity(0.6), lineWidth: 1)
+                        .frame(width: 18, height: 18)
+                }
+
+                // SF Symbol
+                Image(systemName: metric.sfSymbol)
+                    .font(.system(size: 12))
+                    .foregroundStyle(isEnabled ? PharosColor.accent : PharosColor.textSecondary)
+                    .frame(width: 14)
+
+                // Metric Title
+                Text(l10n.menuBarMetricName(metric))
+                    .font(.system(size: 12, weight: isEnabled ? .semibold : .medium))
+                    .foregroundStyle(isEnabled ? PharosColor.textPrimary : PharosColor.textSecondary)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+
+                Spacer(minLength: 6)
+
+                // Right: Live Value Capsule (Never line-wraps number & unit!)
+                if let val = liveVal {
+                    Text(val)
+                        .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(isEnabled ? PharosColor.accent : PharosColor.textTertiary)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(isEnabled ? PharosColor.accent.opacity(0.12) : PharosColor.fill)
+                        )
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(isEnabled ? PharosColor.accent.opacity(0.08) : PharosColor.fill)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(isEnabled ? PharosColor.accent.opacity(0.4) : PharosColor.separator.opacity(0.3), lineWidth: 0.5)
+            )
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isEnabled ? PharosColor.accent.opacity(0.08) : PharosColor.fill)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(isEnabled ? PharosColor.accent.opacity(0.4) : PharosColor.separator.opacity(0.3), lineWidth: 0.5)
-        )
+        .buttonStyle(.plain)
     }
 
     private var detailsCard: some View {
@@ -634,18 +670,23 @@ private struct MenuBarComposerSection: View {
                         }
                     }
                     .labelsHidden()
-                    .frame(width: 150)
+                    .frame(width: 160)
                 }
 
                 PharosListDivider()
 
                 PharosSettingRow(
-                    title: l10n.showMetricLabelsTitle,
+                    title: l10n.displayStyleTitle,
                     systemImage: "character.textbox",
-                    caption: l10n.showMetricLabelsHint
+                    caption: l10n.displayStyleHint
                 ) {
-                    Toggle("", isOn: $settings.showMetricLabels)
-                        .labelsHidden()
+                    Picker("", selection: $settings.displayStyle) {
+                        ForEach(MenuBarDisplayStyle.allCases) { style in
+                            Text(l10n.displayStyleName(style)).tag(style)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 160)
                 }
 
                 PharosListDivider()
