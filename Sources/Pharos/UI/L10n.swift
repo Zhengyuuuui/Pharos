@@ -803,6 +803,29 @@ final class L10n: ObservableObject {
            : "持续高负载运行，是当前芯片升温的主要原因"
     }
     var orphanProcess: String { en ? "Orphan" : "孤儿脚本" }
+    func cpuCategoryTag(_ category: CPUCulpritCategory) -> String {
+        switch category {
+        case .runawayOrphan: return en ? "Orphan Script" : "孤儿脚本"
+        case .highWorkload: return en ? "High Load" : "高负载"
+        case .compiler: return en ? "Build Tool" : "编译构建"
+        case .thermalInducement: return en ? "Heat Driver" : "加剧积热"
+        }
+    }
+    func cpuCulpritExplanation(_ category: CPUCulpritCategory) -> String {
+        switch category {
+        case .runawayOrphan:
+            return en ? "Orphaned background script without listening ports, consuming sustained high CPU."
+                      : "脱离终端且无网络监听的孤儿脚本，持续占用高额算力"
+        case .highWorkload:
+            return cpuPrimaryHeatCulprit
+        case .compiler:
+            return en ? "Parallel compilation task running across performance CPU cores."
+                      : "多核并发编译构建进程，密集调用 CPU 性能核心释放峰值功耗"
+        case .thermalInducement:
+            return en ? "Machine is under high thermal load; this process contributes notably to heat accumulation."
+                      : "机身处于高热状态，该进程高算力消耗加剧机身积热"
+        }
+    }
     var terminating: String { en ? "Terminating…" : "正在结束…" }
     var workingDir: String { en ? "Working Dir" : "工作目录" }
     func cpuAbnormalProcessCount(_ count: Int) -> String {

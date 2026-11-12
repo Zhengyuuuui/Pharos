@@ -295,19 +295,26 @@ private struct ThermalDiagnosticsSection: View {
                         Capsule().fill((isCriticalHeat ? PharosColor.error : PharosColor.warning).opacity(0.14))
                     )
 
-                // Orphan Badge
-                if process.isOrphan {
-                    HStack(spacing: 3) {
-                        Image(systemName: "link.badge.plus")
-                            .font(.system(size: 8))
-                        Text(l10n.orphanProcess)
-                    }
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(PharosColor.warning)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Capsule().fill(PharosColor.warning.opacity(0.12)))
+                // Category Badge
+                HStack(spacing: 3) {
+                    Image(systemName: {
+                        switch process.category {
+                        case .runawayOrphan: return "link.badge.plus"
+                        case .compiler: return "hammer.fill"
+                        case .thermalInducement: return "flame.fill"
+                        case .highWorkload: return "cpu.fill"
+                        }
+                    }())
+                    .font(.system(size: 8))
+                    Text(l10n.cpuCategoryTag(process.category))
                 }
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(process.category == .runawayOrphan ? PharosColor.warning : (isCriticalHeat ? PharosColor.error : PharosColor.accent))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(
+                    Capsule().fill((process.category == .runawayOrphan ? PharosColor.warning : (isCriticalHeat ? PharosColor.error : PharosColor.accent)).opacity(0.12))
+                )
 
                 // Memory Footprint (if > 0)
                 if process.memoryBytes > 0 {
@@ -346,7 +353,7 @@ private struct ThermalDiagnosticsSection: View {
                     .foregroundStyle(PharosColor.textTertiary)
                     .padding(.top, 1)
 
-                Text(process.explanation.isEmpty ? l10n.cpuPrimaryHeatCulprit : process.explanation)
+                Text(l10n.cpuCulpritExplanation(process.category))
                     .font(.system(size: 11))
                     .foregroundStyle(PharosColor.textSecondary)
             }
