@@ -756,12 +756,16 @@ struct MainSettingsView: View {
                                     .foregroundStyle(PharosColor.textPrimary)
 
                                 if let manifest = updateStore.availableManifest {
-                                    Text("✨ v\(manifest.version) \(l10n.readyBadge)")
-                                        .font(.system(size: 9, weight: .bold))
-                                        .foregroundStyle(PharosColor.amber)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2.5)
-                                        .background(Capsule().fill(PharosColor.amber.opacity(0.15)))
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "sparkles")
+                                            .font(.system(size: 9, weight: .bold))
+                                        Text("v\(manifest.version) \(l10n.readyBadge)")
+                                            .font(.system(size: 9, weight: .bold))
+                                    }
+                                    .foregroundStyle(PharosColor.amber)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2.5)
+                                    .background(Capsule().fill(PharosColor.amber.opacity(0.15)))
                                 } else if case .upToDate = updateStore.state {
                                     HStack(spacing: 4) {
                                         Image(systemName: "checkmark.circle.fill")
@@ -1261,12 +1265,16 @@ struct ReleaseNotesSheetView: View {
                             .font(.system(size: 15, weight: .bold))
                             .foregroundStyle(PharosColor.textPrimary)
 
-                        Text("✨ \(l10n.readyBadge)")
-                            .font(.system(size: 9.5, weight: .bold))
-                            .foregroundStyle(PharosColor.amber)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Capsule().fill(PharosColor.amber.opacity(0.15)))
+                        HStack(spacing: 4) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 9, weight: .bold))
+                            Text(l10n.readyBadge)
+                                .font(.system(size: 9.5, weight: .bold))
+                        }
+                        .foregroundStyle(PharosColor.amber)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(PharosColor.amber.opacity(0.15)))
                     }
 
                     Text(l10n.isChinese ? "一次安装，自此常新 · 纤毫毕现，视界无遮" : "Install Once, Forever Fresh · Unobstructed Focus")

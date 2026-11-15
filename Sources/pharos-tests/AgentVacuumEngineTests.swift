@@ -169,8 +169,8 @@ func testAgentVacuumEngineAndExclusivity() {
         return
     }
     expect(md.contains("# Hello Pharos"), "markdown contains title")
-    expect(md.contains("👤 User"), "markdown contains user section")
+    expect(md.contains("### User"), "markdown contains user section")
     expect(md.contains("What is Pharos?"), "markdown contains prompt text")
-    expect(md.contains("🤖 Assistant"), "markdown contains assistant section")
+    expect(md.contains("### Assistant"), "markdown contains assistant section")
     expect(md.contains("Pharos is an AI session manager."), "markdown contains response text")
 }

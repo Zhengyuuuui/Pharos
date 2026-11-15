@@ -22,7 +22,7 @@ enum ScreenshotCapture {
         isLightMode = light
         outputDirectory = URL(fileURLWithPath: light ? "/Users/zhengyusheng/Documents/WidgetAIUsage/img/light" : "/Users/zhengyusheng/Documents/WidgetAIUsage/img")
 
-        print("📸 Starting Pharos Official Clean Demo Screenshot Capture (\(light ? "Light Mode" : "Dark Mode"))...")
+        print("[INFO] Starting Pharos Official Clean Demo Screenshot Capture (\(light ? "Light Mode" : "Dark Mode"))...")
 
         // 1. Force appearance and English localization
         let targetAppearance = NSAppearance(named: light ? .aqua : .darkAqua)
@@ -33,7 +33,7 @@ enum ScreenshotCapture {
         try? FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
 
         // 2. Inject clean, developer-friendly mock data across all modules
-        print("🛠️ Injecting pristine developer demo mock data...")
+        print("[INFO] Injecting pristine developer demo mock data...")
         setupMockData(store: store)
 
         await sleep(seconds: 0.6)
@@ -69,43 +69,43 @@ enum ScreenshotCapture {
         await sleep(seconds: 0.8)
 
         // Shot 1: Ports Overview (:3000 / :5173, favorites, port distribution)
-        print("📷 [1/9] Capturing 01-dashboard-ports.png...")
+        print("[CAPTURE] [1/9] Capturing 01-dashboard-ports.png...")
         WindowRouter.shared.request = .portsOverview
         await sleep(seconds: 0.8)
         captureWindow(mainWindow, name: "01-dashboard-ports.png", cornerRadiusPt: 10.0, hasTrafficLights: true, topMarginPt: 20.0)
 
         // Shot 2: System Memory (Memory composition, swap, trend, Memory Doctor)
-        print("📷 [2/9] Capturing 02-system-memory.png...")
+        print("[CAPTURE] [2/9] Capturing 02-system-memory.png...")
         WindowRouter.shared.request = .systemMemory
         await sleep(seconds: 0.8)
         captureWindow(mainWindow, name: "02-system-memory.png", cornerRadiusPt: 10.0, hasTrafficLights: true, topMarginPt: 20.0)
 
         // Shot 3: Battery & Thermals (80% passthrough, 0 mA, tachometer gauges, peak temp)
-        print("📷 [3/9] Capturing 03-battery-thermals.png...")
+        print("[CAPTURE] [3/9] Capturing 03-battery-thermals.png...")
         WindowRouter.shared.request = .battery
         await sleep(seconds: 0.8)
         captureWindow(mainWindow, name: "03-battery-thermals.png", cornerRadiusPt: 10.0, hasTrafficLights: true, topMarginPt: 20.0)
 
         // Shot 4: Browser & Network (Chromium matrix + Clash/Mihomo realtime control)
-        print("📷 [4/9] Capturing 04-clash-network.png...")
+        print("[CAPTURE] [4/9] Capturing 04-clash-network.png...")
         WindowRouter.shared.request = .browsersAndNetwork
         await sleep(seconds: 0.8)
         captureWindow(mainWindow, name: "04-clash-network.png", cornerRadiusPt: 10.0, hasTrafficLights: true, topMarginPt: 20.0)
 
         // Shot 5: Disk Cleanup (4 tabs, system & dev caches, retention options)
-        print("📷 [5/9] Capturing 05-disk-cleanup.png...")
+        print("[CAPTURE] [5/9] Capturing 05-disk-cleanup.png...")
         WindowRouter.shared.request = .diskCleanup
         await sleep(seconds: 0.8)
         captureWindow(mainWindow, name: "05-disk-cleanup.png", cornerRadiusPt: 10.0, hasTrafficLights: true, topMarginPt: 20.0)
 
         // Shot 6: AI Agent Chats (Claude Code, Cursor, Windsurf, Copilot, vacuum savings)
-        print("📷 [6/9] Capturing 06-ai-agent-chats.png...")
+        print("[CAPTURE] [6/9] Capturing 06-ai-agent-chats.png...")
         WindowRouter.shared.request = .agentChats
         await sleep(seconds: 0.8)
         captureWindow(mainWindow, name: "06-ai-agent-chats.png", cornerRadiusPt: 10.0, hasTrafficLights: true, topMarginPt: 20.0)
 
         // Shot 7: Packages & CLI (Homebrew, bun, uv, docker, cargo, bottle cache)
-        print("📷 [7/9] Capturing 07-packages-cli.png...")
+        print("[CAPTURE] [7/9] Capturing 07-packages-cli.png...")
         WindowRouter.shared.request = .packages
         await sleep(seconds: 0.8)
         captureWindow(mainWindow, name: "07-packages-cli.png", cornerRadiusPt: 10.0, hasTrafficLights: true, topMarginPt: 20.0)
@@ -113,14 +113,14 @@ enum ScreenshotCapture {
         mainWindow.orderOut(nil)
 
         // Shot 8: Popover
-        print("📷 [8/9] Capturing 08-menu-bar-popover.png...")
+        print("[CAPTURE] [8/9] Capturing 08-menu-bar-popover.png...")
         await capturePopover(name: "08-menu-bar-popover.png", store: store)
 
         // Shot 9: Onboarding Welcome
-        print("📷 [9/9] Capturing 09-onboarding-welcome.png...")
+        print("[CAPTURE] [9/9] Capturing 09-onboarding-welcome.png...")
         await captureOnboarding(name: "09-onboarding-welcome.png", store: store)
 
-        print("🎉 All 9 pristine Retina screenshots captured successfully into \(outputDirectory.path)!")
+        print("[DONE] All 9 pristine Retina screenshots captured successfully into \(outputDirectory.path)!")
     }
 
     // MARK: - Capture Helper
@@ -133,19 +133,19 @@ enum ScreenshotCapture {
         topMarginPt: CGFloat = 20.0
     ) {
         guard let themeFrame = window.contentView?.superview else {
-            print("❌ Failed to get themeFrame for \(name)")
+            print("[ERROR] Failed to get themeFrame for \(name)")
             return
         }
 
         let bounds = themeFrame.bounds
         guard let rep = themeFrame.bitmapImageRepForCachingDisplay(in: bounds) else {
-            print("❌ Failed to allocate bitmap rep for \(name)")
+            print("[ERROR] Failed to allocate bitmap rep for \(name)")
             return
         }
         themeFrame.cacheDisplay(in: bounds, to: rep)
 
         guard let rawCGImage = rep.cgImage else {
-            print("❌ Failed to create CGImage for \(name)")
+            print("[ERROR] Failed to create CGImage for \(name)")
             return
         }
 
@@ -158,7 +158,7 @@ enum ScreenshotCapture {
             trafficLightTopMarginPt: topMarginPt
         ) {
             savePNG(composited, to: destination)
-            print("✅ Saved \(name) (\(composited.width)x\(composited.height) px)")
+            print("[OK] Saved \(name) (\(composited.width)x\(composited.height) px)")
         }
     }
 
@@ -215,7 +215,7 @@ enum ScreenshotCapture {
             shadowPaddingPt: 40.0
         ) {
             savePNG(composited, to: destination)
-            print("✅ Saved \(name) (\(composited.width)x\(composited.height) px)")
+            print("[OK] Saved \(name) (\(composited.width)x\(composited.height) px)")
         }
 
         window.orderOut(nil)
@@ -272,7 +272,7 @@ enum ScreenshotCapture {
             trafficLightTopMarginPt: 16.0 // Align precisely with Onboarding topBar (height 44pt, center 22pt)
         ) {
             savePNG(composited, to: destination)
-            print("✅ Saved \(name) (\(composited.width)x\(composited.height) px)")
+            print("[OK] Saved \(name) (\(composited.width)x\(composited.height) px)")
         }
 
         window.orderOut(nil)

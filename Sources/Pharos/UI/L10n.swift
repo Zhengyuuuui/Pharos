@@ -349,31 +349,31 @@ final class L10n: ObservableObject {
 
     // In-App Active Alerts
     func inAppAlertThermalTitle(_ temp: Int) -> String {
-        en ? "🌡️ Chip Overheating (\(temp)°C)" : "🌡️ 芯片温度过高 (\(temp)°C)"
+        en ? "Chip Overheating (\(temp)°C)" : "芯片温度过高 (\(temp)°C)"
     }
     func inAppAlertThermalSub(_ culprit: String) -> String {
         en ? "Top process: \(culprit) · Click to inspect thermals" : "高负载进程: \(culprit) · 点击查看温控"
     }
     var inAppAlertMemoryTitle: String {
-        en ? "🧠 High Memory Pressure" : "🧠 系统内存压力高"
+        en ? "High Memory Pressure" : "系统内存压力高"
     }
     func inAppAlertMemorySub(_ pct: Int) -> String {
         en ? "Memory used \(pct)% · Click to inspect memory" : "内存已用 \(pct)% · 点击治理高内存进程"
     }
     var inAppAlertBloatTitle: String {
-        en ? "⚠️ Daemon Memory Bloat" : "⚠️ 守护进程内存膨胀"
+        en ? "Daemon Memory Bloat" : "守护进程内存膨胀"
     }
     func inAppAlertBloatSub(_ bytes: String, _ top: String) -> String {
         en ? "Reclaimable \(bytes) (\(top)) · Click to reclaim" : "可回收 \(bytes)（\(top)）· 点击一键治理"
     }
     func inAppAlertDiskTitle(_ name: String) -> String {
-        en ? "💾 Low Disk Space (\(name))" : "💾 \(name) 空间不足"
+        en ? "Low Disk Space (\(name))" : "\(name) 空间不足"
     }
     func inAppAlertDiskSub(_ free: String) -> String {
         en ? "Only \(free) free · Click to clean caches" : "仅剩 \(free) 可用 · 点击清理缓存"
     }
     func inAppAlertExitTitle(_ name: String) -> String {
-        en ? "⚠️ \(name) Stopped Unexpectedly" : "⚠️ \(name) 异常退出"
+        en ? "\(name) Stopped Unexpectedly" : "\(name) 异常退出"
     }
     var inAppAlertExitSub: String {
         en ? "Click to inspect services" : "点击查看服务端口"
@@ -2647,7 +2647,7 @@ final class L10n: ObservableObject {
     var upToDate: String { en ? "Pharos is up to date" : "当前已是最新版本" }
     var updateAvailable: String { en ? "New version available" : "发现新版本" }
     func updateBannerText(version: String) -> String {
-        en ? "✨ v\(version) Ready" : "✨ v\(version) 已就绪"
+        en ? "v\(version) Ready" : "v\(version) 已就绪"
     }
     var updateAndRestart: String { en ? "Update & Restart" : "立即更新并重启" }
     var manualDownloadDMG: String { en ? "Download DMG" : "手动下载 DMG" }

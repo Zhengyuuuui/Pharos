@@ -75,8 +75,8 @@ public enum AgentMarkdownExporter {
 
             if msgId != currentMsgId {
                 currentMsgId = msgId
-                let roleEmoji = role.lowercased() == "user" ? "👤 User" : (role.lowercased() == "assistant" ? "🤖 Assistant" : "⚙️ \(role.capitalized)")
-                md += "\n### \(roleEmoji)\n\n"
+                let roleHeader = role.lowercased() == "user" ? "User" : (role.lowercased() == "assistant" ? "Assistant" : role.capitalized)
+                md += "\n### \(roleHeader)\n\n"
             }
 
             if let partDataStr, let partData = partDataStr.data(using: .utf8),
@@ -85,13 +85,13 @@ public enum AgentMarkdownExporter {
                 if pType == "text", let text = json["text"] as? String {
                     md += "\(text)\n\n"
                 } else if pType == "reasoning", let reasoning = json["text"] as? String {
-                    md += "> 💭 **Thinking**:\n>\n"
+                    md += "> **Thinking**:\n>\n"
                     for line in reasoning.components(separatedBy: .newlines) {
                         md += "> \(line)\n"
                     }
                     md += "\n"
                 } else if pType == "tool", let tool = json["tool"] as? String {
-                    md += "<details><summary>🛠️ Tool Invocation: <code>\(tool)</code></summary>\n\n"
+                    md += "<details><summary>Tool Invocation: <code>\(tool)</code></summary>\n\n"
                     if let state = json["state"] as? [String: Any],
                        let output = state["output"] as? String {
                         md += "```\n\(output.prefix(2000))\n```\n"

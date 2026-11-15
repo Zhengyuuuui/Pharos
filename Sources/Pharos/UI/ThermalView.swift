@@ -328,9 +328,13 @@ private struct ThermalDiagnosticsSection: View {
 
                 // Elapsed Uptime
                 if process.elapsedTimeSeconds > 0 {
-                    Text("⏱ \(process.formattedElapsedTime)")
-                        .font(PharosFont.captionDigits)
-                        .foregroundStyle(PharosColor.textTertiary)
+                    HStack(spacing: 3) {
+                        Image(systemName: "clock")
+                            .font(.system(size: 9))
+                        Text(process.formattedElapsedTime)
+                    }
+                    .font(PharosFont.captionDigits)
+                    .foregroundStyle(PharosColor.textTertiary)
                 }
 
                 Spacer(minLength: 8)
