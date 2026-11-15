@@ -219,6 +219,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         DispatchQueue.main.async { [weak self] in
             closing.contentViewController = nil
             self?.window = nil
+            // Immediately purge freed heap pages back to the kernel so idle memory footprint stays minimal
+            malloc_zone_pressure_relief(nil, 0)
         }
     }
 }

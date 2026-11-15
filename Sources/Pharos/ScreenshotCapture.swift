@@ -666,10 +666,10 @@ enum ScreenshotCapture {
         scanState.volumes = mockVolumes
         scanState.thermals = mockThermals
         scanState.thermalState = .nominal
-        scanState.history = h
         scanState.lastScan = now
         scanState.memoryDiagnosis = mockDiagnosis
 
+        store.seedHistoryForCapture(h.samples)
         store.applyMockState(scanState)
 
         // 10. Battery Reading (80% Tahoe limit, 0 mA passthrough, AC power)

@@ -240,6 +240,7 @@ final class PackageStore: ObservableObject {
         cacheRepos = []
 
         recomputeFilteredProject()
+        malloc_zone_pressure_relief(nil, 0)
     }
 
     func scanProject(at path: String) {

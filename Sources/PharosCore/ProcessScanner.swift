@@ -22,12 +22,9 @@ public enum ProcessScanner {
                 let isChrome = ChromeInstances.isChromeExecutable(path: path, argv0: nil)
                 let procName = name(of: info).lowercased()
                 let isProxy = procName.contains("mihomo") || procName.contains("clash") || procName.contains("sing-box")
-                let isCandidateScript = procName.contains("python") || procName.contains("node") ||
-                    procName.contains("ruby") || procName.contains("bun") || procName.contains("deno") ||
-                    procName.contains("ffmpeg") || procName.contains("swift") || procName.contains("clang") ||
-                    procName.contains("rust") || procName.contains("cargo") || procName.contains("java") ||
-                    procName.contains("go") || procName.contains("ollama")
-                let shouldFetchDetails = listening || isChrome || isProxy || isCandidateScript
+                // Details (CWD & arguments) are fetched on-demand for listening projects, Chrome profiles,
+                // and proxy instances. Generic background scripts fetch them on-demand if they trigger CPUDoctor.
+                let shouldFetchDetails = listening || isChrome || isProxy
 
                 let ru = rusage(pid)
                 let startTime: Date? = {
@@ -63,7 +60,12 @@ public enum ProcessScanner {
         let n = pids.withUnsafeMutableBytes {
             proc_listallpids($0.baseAddress, Int32($0.count))
         }
-        return n > 0 ? Array(pids.prefix(Int(n))) : []
+        guard n > 0 else { return [] }
+        let validCount = min(Int(n), pids.count)
+        if validCount < pids.count {
+            pids.removeSubrange(validCount..<pids.count)
+        }
+        return pids
     }
 
     static func bsdInfo(_ pid: Int32) -> proc_bsdinfo? {
@@ -125,28 +127,31 @@ public enum ProcessScanner {
         let bytes = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, nil, 0)
         guard bytes > 0 else { return [] }
         let stride = MemoryLayout<proc_fdinfo>.stride
-        var fds = [proc_fdinfo](repeating: proc_fdinfo(), count: Int(bytes) / stride + 16)
-        let used = fds.withUnsafeMutableBytes {
-            proc_pidinfo(pid, PROC_PIDLISTFDS, 0, $0.baseAddress, Int32($0.count))
-        }
-        guard used > 0 else { return [] }
-
-        var ports: [ListeningPort] = []
-        for fd in fds.prefix(Int(used) / stride) where fd.proc_fdtype == UInt32(PROX_FDTYPE_SOCKET) {
-            var si = socket_fdinfo()
-            let size = Int32(MemoryLayout<socket_fdinfo>.size)
-            let r = withUnsafeMutableBytes(of: &si) {
-                proc_pidfdinfo(pid, fd.proc_fd, PROC_PIDFDSOCKETINFO, $0.baseAddress, size)
+        let fdCount = Int(bytes) / stride + 16
+        return withUnsafeTemporaryAllocation(of: proc_fdinfo.self, capacity: fdCount) { buffer in
+            guard let baseAddress = buffer.baseAddress else { return [] }
+            let used = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, baseAddress, Int32(buffer.count * stride))
+            guard used > 0 else { return [] }
+            let validCount = min(Int(used) / stride, buffer.count)
+            var ports: [ListeningPort] = []
+            for i in 0..<validCount {
+                let fd = buffer[i]
+                guard fd.proc_fdtype == UInt32(PROX_FDTYPE_SOCKET) else { continue }
+                var si = socket_fdinfo()
+                let size = Int32(MemoryLayout<socket_fdinfo>.size)
+                let r = withUnsafeMutableBytes(of: &si) {
+                    proc_pidfdinfo(pid, fd.proc_fd, PROC_PIDFDSOCKETINFO, $0.baseAddress, size)
+                }
+                guard r == size,
+                      si.psi.soi_kind == Int32(SOCKINFO_TCP),
+                      si.psi.soi_proto.pri_tcp.tcpsi_state == Int32(TSI_S_LISTEN) else { continue }
+                let ini = si.psi.soi_proto.pri_tcp.tcpsi_ini
+                let port = UInt16(bigEndian: UInt16(truncatingIfNeeded: ini.insi_lport))
+                guard port > 0 else { continue }
+                ports.append(ListeningPort(port: port, loopbackOnly: isLoopback(ini)))
             }
-            guard r == size,
-                  si.psi.soi_kind == Int32(SOCKINFO_TCP),
-                  si.psi.soi_proto.pri_tcp.tcpsi_state == Int32(TSI_S_LISTEN) else { continue }
-            let ini = si.psi.soi_proto.pri_tcp.tcpsi_ini
-            let port = UInt16(bigEndian: UInt16(truncatingIfNeeded: ini.insi_lport))
-            guard port > 0 else { continue }
-            ports.append(ListeningPort(port: port, loopbackOnly: isLoopback(ini)))
+            return ListeningPort.merged(ports)
         }
-        return ListeningPort.merged(ports)
     }
 
     static func isLoopback(_ ini: in_sockinfo) -> Bool {
@@ -172,13 +177,18 @@ public enum ProcessScanner {
             var actualSize = size
             let ok = sysctl(&mib, 3, baseAddress, &actualSize, nil, 0) == 0
             guard ok else { return [] }
-            return parseProcArgs(Array(buf.prefix(actualSize)))
+            let slice = UnsafeBufferPointer(start: baseAddress, count: actualSize)
+            return parseProcArgs(slice)
         }
     }
 
     public static func parseProcArgs(_ buf: [UInt8]) -> [String] {
-        guard buf.count > 4 else { return [] }
-        let argc = buf.prefix(4).withUnsafeBytes { Int($0.loadUnaligned(as: Int32.self)) }
+        buf.withUnsafeBufferPointer { parseProcArgs($0) }
+    }
+
+    public static func parseProcArgs(_ buf: UnsafeBufferPointer<UInt8>) -> [String] {
+        guard buf.count > 4, let base = buf.baseAddress else { return [] }
+        let argc = Int(base.withMemoryRebound(to: Int32.self, capacity: 1) { $0.pointee })
         var i = 4
         while i < buf.count, buf[i] != 0 { i += 1 }   // exec path
         while i < buf.count, buf[i] == 0 { i += 1 }   // padding
@@ -186,7 +196,11 @@ public enum ProcessScanner {
         while args.count < argc, i < buf.count {
             let start = i
             while i < buf.count, buf[i] != 0 { i += 1 }
-            args.append(String(decoding: buf[start..<i], as: UTF8.self))
+            let len = i - start
+            if len > 0 {
+                let slice = UnsafeBufferPointer(start: base + start, count: len)
+                args.append(String(decoding: slice, as: UTF8.self))
+            }
             i += 1
         }
         return args

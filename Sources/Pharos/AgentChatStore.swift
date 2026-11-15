@@ -352,6 +352,7 @@ final class AgentChatStore: ObservableObject {
         compactionResult = nil
         backupsForOptimizing = []
         missingProjects = []
+        malloc_zone_pressure_relief(nil, 0)
     }
 
     func revealInFinder(_ entry: AgentDatabaseEntry) {

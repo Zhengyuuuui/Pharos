@@ -20,7 +20,6 @@ final class ProjectStore: ObservableObject {
         var thermalState: ProcessInfo.ThermalState = .nominal
         var thermalDiagnosis: ThermalDiagnosisReport?
         var cpuDiagnosis: CPUDiagnosisReport?
-        var history = MemoryHistory(window: 3600, minInterval: 10)
         var lastScan: Date?
         var memoryDiagnosis: MemoryDiagnosisReport = MemoryDiagnosisReport(items: [], reclaimableBytes: 0)
     }
@@ -229,6 +228,9 @@ final class ProjectStore: ObservableObject {
         let portsUnchanged = (ports == state.listeningPorts)
 
         if viewers == 0 && projectsUnchanged && portsUnchanged && memoryUnchanged && state.memoryDiagnosis == diagnosis && state.thermalDiagnosis == thermalDiag && state.cpuDiagnosis == cpuDiag {
+            // In low-frequency background mode, periodically relieve malloc pressure so
+            // dirty reclaimable pages don't unnecessarily bloat the app's idle footprint.
+            malloc_zone_pressure_relief(nil, 0)
             return
         }
 
@@ -238,7 +240,6 @@ final class ProjectStore: ObservableObject {
         next.listeningPorts = ports
         next.apps = apps
         if let system { next.system = system }
-        next.history = internalHistory
         next.lastScan = now
         next.memoryDiagnosis = diagnosis
         next.thermalDiagnosis = thermalDiag
@@ -251,7 +252,6 @@ final class ProjectStore: ObservableObject {
 
     func applyMockState(_ mock: ScanState) {
         self.state = mock
-        self.internalHistory = mock.history
     }
 
     func seedHistoryForCapture(_ samples: [MemorySample]) {
@@ -260,7 +260,6 @@ final class ProjectStore: ObservableObject {
             h.append(s)
         }
         internalHistory = h
-        state.history = h
     }
 
     func reclaimBloatedDaemon(_ daemon: KnownBloatedDaemon) async {

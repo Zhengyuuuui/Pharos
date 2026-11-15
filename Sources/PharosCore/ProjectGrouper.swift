@@ -21,10 +21,15 @@ public enum ProjectGrouper {
         // Chromium browser instances and their helper child trees belong to
         // the Browser Instances page. Filter them out unconditionally so they
         // never get grouped as regular projects (even when started from a project cwd
-        // or when includeSystem is true).
-        let chromeInstances = ChromeInstances.find(in: all)
-        let chromePIDs = Set(chromeInstances.flatMap(\.allPIDs))
-        let procs = chromePIDs.isEmpty ? all : all.filter { !chromePIDs.contains($0.pid) }
+        // or when includeSystem is true). Fast path: skip search if already filtered out.
+        let procs: [ProcessSnapshot]
+        if all.contains(where: { ChromeInstances.isChromeExecutable(path: $0.executablePath, argv0: nil) }) {
+            let chromeInstances = ChromeInstances.find(in: all)
+            let chromePIDs = Set(chromeInstances.flatMap(\.allPIDs))
+            procs = chromePIDs.isEmpty ? all : all.filter { !chromePIDs.contains($0.pid) }
+        } else {
+            procs = all
+        }
 
         let listeners = procs.filter { !$0.ports.isEmpty && (includeSystem || !isSystemProcess($0)) }
         let listenerPIDs = Set(listeners.map(\.pid))

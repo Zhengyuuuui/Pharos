@@ -199,6 +199,23 @@ public enum MenuBarCompositeRenderer {
         return composite
     }
 
+    private struct RenderCacheKey: Hashable {
+        let percent: Int
+        let pressure: MemoryPressure
+        let highIsBad: Bool
+        let displayStyle: MenuBarDisplayStyle
+        let separator: MenuBarSeparator
+        let metricValues: [MetricCacheValue]
+    }
+
+    private struct MetricCacheValue: Hashable {
+        let metric: MenuBarMetric
+        let value: String
+    }
+
+    @MainActor private static var cachedRenderKey: RenderCacheKey?
+    @MainActor private static var cachedRenderImage: NSImage?
+
     /// Convenience helper that queries live store and settings to produce the composite NSImage.
     @MainActor
     static func currentImage(store: ProjectStore, settings: MenuBarSettings, battery: BatteryStore) -> NSImage {
@@ -207,7 +224,20 @@ public enum MenuBarCompositeRenderer {
             guard let val = m.value(store: store, style: settings.displayStyle) else { return nil }
             return MetricItem(metric: m, sfSymbol: m.sfSymbol, upperLabel: m.upperLabel, value: val)
         }
-        return render(
+        let rawPercent = min(100, max(0, Int((ring.fraction * 100).rounded())))
+        let quantPercent = (rawPercent / 2) * 2
+        let key = RenderCacheKey(
+            percent: quantPercent,
+            pressure: ring.pressure,
+            highIsBad: ring.highIsBad,
+            displayStyle: settings.displayStyle,
+            separator: settings.separatorStyle,
+            metricValues: metrics.map { MetricCacheValue(metric: $0.metric, value: $0.value) }
+        )
+        if let cached = cachedRenderImage, cachedRenderKey == key {
+            return cached
+        }
+        let rendered = render(
             ringFraction: ring.fraction,
             ringPressure: ring.pressure,
             ringHighIsBad: ring.highIsBad,
@@ -215,6 +245,9 @@ public enum MenuBarCompositeRenderer {
             displayStyle: settings.displayStyle,
             separator: settings.separatorStyle
         )
+        cachedRenderKey = key
+        cachedRenderImage = rendered
+        return rendered
     }
 
     /// Calculates the ring fraction and memory pressure status for the currently selected ring metric.

@@ -156,6 +156,7 @@ final class CleanupStore: ObservableObject {
         aiModels = []
         toolchainItems = []
         report = nil
+        malloc_zone_pressure_relief(nil, 0)
     }
 
     // MARK: - Standard Targets Clean
