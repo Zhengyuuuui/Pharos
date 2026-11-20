@@ -58,6 +58,12 @@ final class FanDaemon: @unchecked Sendable {
     private let modeTemplate: String
     private let hasUnlock: Bool
 
+    // Clamshell Guard state
+    private var clamshellConfig = ClamshellConfig(enabled: false)
+    private var clamshellState = ClamshellPolicy.State()
+    private var sleepDisabledApplied = false
+    private var clamshellAbort: ClamshellAbortReason?
+
     init(smc: SMCClient) {
         self.smc = smc
         modeTemplate = smc.exists("F0md") ? "F%dmd" : "F%dMd"
@@ -69,17 +75,43 @@ final class FanDaemon: @unchecked Sendable {
     func handle(_ command: FanProtocol.Command) -> FanProtocol.Reply {
         lock.lock()
         defer { lock.unlock() }
+        var shouldTick = false
         switch command {
-        case .status: break
-        case .heartbeat: lastHeartbeat = Date()
+        case .status:
+            break
+        case .heartbeat:
+            lastHeartbeat = Date()
         case .set(let r):
             request = r
             lastHeartbeat = Date()
             unsupported = false
+            consecutiveLockFailures = 0
+            shouldTick = true
             log("request \(FanProtocol.encode(.set(r)))")
+        case .setClamshell(let cfg):
+            clamshellConfig = cfg
+            clamshellState = ClamshellPolicy.State()
+            lastHeartbeat = Date()
+            if cfg.enabled {
+                clamshellAbort = nil
+            }
+            shouldTick = true
+            log("clamshell \(FanProtocol.encode(.setClamshell(cfg)))")
+        case .clearClamshellAbort:
+            clamshellAbort = nil
         }
-        let reply = FanProtocol.Reply(ok: true, request: request, overheating: policy.overheating, unsupported: unsupported)
-        if case .set = command { DispatchQueue.global().async { self.tick() } }
+        let reply = FanProtocol.Reply(
+            ok: true,
+            request: request,
+            overheating: policy.overheating,
+            unsupported: unsupported,
+            clamshellEnabled: clamshellConfig.enabled,
+            sleepDisabledApplied: sleepDisabledApplied,
+            clamshellAbort: clamshellAbort
+        )
+        if shouldTick {
+            DispatchQueue.global().async { self.tick() }
+        }
         return reply
     }
 
@@ -88,16 +120,72 @@ final class FanDaemon: @unchecked Sendable {
     func tick() {
         lock.lock()
         defer { lock.unlock() }
-        guard let snap = Thermals.read(using: smc), !snap.fans.isEmpty else { return }
-        let action = FanPolicy.decide(request: request, fans: snap.fans, chipCelsius: snap.peakChipTemperature,
-                                      lastHeartbeat: lastHeartbeat, now: Date(), state: &policy)
+        let snap = Thermals.read(using: smc)
+        let now = Date()
+
+        // 1. Evaluate Clamshell Guard (works even on fanless Macs)
+        var battPercent: Int? = nil
+        var onAC = true
+        if clamshellConfig.enabled, let batt = BatteryScanner.read() {
+            battPercent = batt.currentPercent
+            onAC = (batt.powerSource == .acPower)
+        }
+        let clamshellAction = ClamshellPolicy.decide(
+            config: clamshellConfig,
+            chipCelsius: snap?.peakChipTemperature,
+            batteryPercent: battPercent,
+            isOnACPower: onAC,
+            lastHeartbeat: lastHeartbeat,
+            now: now,
+            state: &clamshellState
+        )
+        switch clamshellAction {
+        case .inactive:
+            if sleepDisabledApplied {
+                applySleepDisabledLocked(false)
+            }
+        case .active:
+            if !sleepDisabledApplied {
+                applySleepDisabledLocked(true)
+            }
+        case .heartbeatRestore:
+            clamshellConfig.enabled = false
+            clamshellAbort = .heartbeatTimeout
+            applySleepDisabledLocked(false)
+            log("no heartbeat from Pharos — clamshell sleep restored")
+        case .abort(let reason):
+            clamshellConfig.enabled = false
+            clamshellAbort = reason
+            log("EMERGENCY CLAMSHELL ABORT: \(reason) — restoring sleep & forcing sleepnow")
+            let fanCount = snap?.fans.count ?? Int(smc.readUInt8("FNum") ?? 0)
+            if fanCount > 0 {
+                releaseLocked(fans: fanCount)
+            }
+            request = .system
+            applySleepDisabledLocked(false, force: true)
+            triggerSleepNow()
+            return
+        }
+
+        // 2. Evaluate Fan Policy
+        guard let snap, !snap.fans.isEmpty else { return }
+        let proactive = clamshellConfig.enabled && clamshellConfig.proactiveFanControl
+        let action = FanPolicy.decide(
+            request: request,
+            fans: snap.fans,
+            chipCelsius: snap.peakChipTemperature,
+            lastHeartbeat: lastHeartbeat,
+            now: now,
+            state: &policy,
+            clamshellProactive: proactive
+        )
         switch action {
         case .release:
             consecutiveLockFailures = 0
             if holding || snap.unlockEngaged || snap.fans.contains(where: { $0.mode == .manual }) {
                 releaseLocked(fans: snap.fans.count)
             }
-            if request != .system, lastHeartbeat.map({ Date().timeIntervalSince($0) > FanPolicy.heartbeatTimeout }) ?? true {
+            if request != .system, lastHeartbeat.map({ now.timeIntervalSince($0) > FanPolicy.heartbeatTimeout }) ?? true {
                 if holding { log("no heartbeat from Pharos — fans back to macOS") }
                 request = .system
             }
@@ -137,18 +225,60 @@ final class FanDaemon: @unchecked Sendable {
         }
     }
 
+    // MARK: pmset sleep control (root only)
+
+    private func applySleepDisabledLocked(_ disable: Bool, force: Bool = false) {
+        guard force || sleepDisabledApplied != disable else { return }
+        let ok = runPmset(["-a", "disablesleep", disable ? "1" : "0"])
+        if ok {
+            sleepDisabledApplied = disable
+            log("pmset disablesleep=\(disable ? 1 : 0)")
+        } else {
+            log("pmset disablesleep=\(disable ? 1 : 0) failed")
+        }
+    }
+
+    private func triggerSleepNow() {
+        _ = runPmset(["sleepnow"])
+    }
+
+    @discardableResult
+    private func runPmset(_ arguments: [String]) -> Bool {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/pmset")
+        p.arguments = arguments
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = FileHandle.nullDevice
+        do {
+            try p.run()
+            p.waitUntilExit()
+            return p.terminationStatus == 0
+        } catch {
+            log("pmset \(arguments.joined(separator: " ")) error: \(error)")
+            return false
+        }
+    }
+
     /// Ftst=1 makes thermalmonitord yield (M1–M4); then each fan's mode can go to manual.
+    /// thermalmonitord typically needs 100ms–500ms to yield the SMC lock after Ftst=1.
     private func takeManualLocked(fans: Int) -> Bool {
         if hasUnlock { smc.write("Ftst", [1]) }
+        let deadline = Date().addingTimeInterval(5.0)
         var pending = Set(0..<fans)
-        for _ in 0..<3 {
+        while !pending.isEmpty, Date() < deadline {
             for i in pending where smc.write(String(format: modeTemplate, i), [1]) {
                 pending.remove(i)
             }
-            if pending.isEmpty { break }
-            usleep(10_000) // 10ms micro-retry
+            if !pending.isEmpty {
+                usleep(100_000) // 100ms: wait for macOS thermalmonitord to yield SMC control
+            }
         }
-        return pending.isEmpty
+        if pending.isEmpty {
+            log("manual mode locked for \(fans) fan(s)")
+            return true
+        }
+        log("takeManualLocked timed out; pending fans: \(pending)")
+        return false
     }
 
     private func releaseLocked(fans: Int) {
@@ -163,6 +293,9 @@ final class FanDaemon: @unchecked Sendable {
         let count = Int(smc.readUInt8("FNum") ?? 0)
         releaseLocked(fans: count)
         request = .system
+        clamshellConfig.enabled = false
+        clamshellState = ClamshellPolicy.State()
+        applySleepDisabledLocked(false, force: true)
     }
 }
 

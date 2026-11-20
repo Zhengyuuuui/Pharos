@@ -29,6 +29,49 @@ final class FanStore: ObservableObject {
         didSet { UserDefaults.standard.set(fixedRPM, forKey: "fanFixedRPM") }
     }
 
+    // MARK: - Clamshell Guard state & preferences
+    @Published private(set) var clamshellEnabled: Bool = false
+    @Published private(set) var sleepDisabledApplied: Bool = false
+    @Published private(set) var lastClamshellAbort: ClamshellAbortReason? = nil
+
+    @Published var clamshellThermalAbort: Double = ClamshellConfig.clampThermalAbort(
+        UserDefaults.standard.object(forKey: "clamshellThermalAbort") as? Double ?? ClamshellPolicy.defaultThermalAbortCelsius
+    ) {
+        didSet {
+            let clamped = ClamshellConfig.clampThermalAbort(clamshellThermalAbort)
+            if clamshellThermalAbort != clamped { clamshellThermalAbort = clamped; return }
+            UserDefaults.standard.set(clamped, forKey: "clamshellThermalAbort")
+            if clamshellEnabled { syncClamshellConfig() }
+        }
+    }
+
+    @Published var clamshellBatteryFloor: Int = ClamshellConfig.clampBatteryFloor(
+        UserDefaults.standard.object(forKey: "clamshellBatteryFloor") as? Int ?? ClamshellPolicy.defaultBatteryFloorPercent
+    ) {
+        didSet {
+            let clamped = ClamshellConfig.clampBatteryFloor(clamshellBatteryFloor)
+            if clamshellBatteryFloor != clamped { clamshellBatteryFloor = clamped; return }
+            UserDefaults.standard.set(clamped, forKey: "clamshellBatteryFloor")
+            if clamshellEnabled { syncClamshellConfig() }
+        }
+    }
+
+    @Published var clamshellProactiveFan: Bool = UserDefaults.standard.object(forKey: "clamshellProactiveFan") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(clamshellProactiveFan, forKey: "clamshellProactiveFan")
+            if clamshellEnabled { syncClamshellConfig() }
+        }
+    }
+
+    private var currentClamshellConfig: ClamshellConfig {
+        ClamshellConfig(
+            enabled: clamshellEnabled,
+            thermalAbortCelsius: clamshellThermalAbort,
+            batteryFloorPercent: clamshellBatteryFloor,
+            proactiveFanControl: clamshellProactiveFan
+        )
+    }
+
     private var heartbeat: Timer?
     private var hasViewers: Bool = false
     private var wakeObserver: NSObjectProtocol?
@@ -49,8 +92,8 @@ final class FanStore: ObservableObject {
         heartbeat?.invalidate()
 
         let interval: TimeInterval
-        if request != .system {
-            // Actively controlling fans: maintain 3s heartbeat to safely stay ahead of daemon 15s timeout
+        if request != .system || clamshellEnabled {
+            // Actively controlling fans or clamshell sleep: maintain 3s heartbeat to stay ahead of 15s timeout
             interval = 3.0
         } else {
             // System mode: downclock to 30s when no windows are open, 5s when visible
@@ -70,6 +113,7 @@ final class FanStore: ObservableObject {
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil,
                                                queue: .main) { _ in
             // Best effort; the heartbeat timeout covers crashes and force quits.
+            _ = FanStore.send(.setClamshell(ClamshellConfig(enabled: false)))
             _ = FanStore.send(.set(.system))
         }
 
@@ -104,8 +148,44 @@ final class FanStore: ObservableObject {
     }
 
     func resetSettings() {
+        setClamshell(enabled: false)
         setSystemMode()
         fixedRPM = 3500
+    }
+
+    func setClamshell(enabled: Bool) {
+        guard helper == .ready, !helperNeedsUpdate else { return }
+        busy = true
+        let cfg = ClamshellConfig(
+            enabled: enabled,
+            thermalAbortCelsius: clamshellThermalAbort,
+            batteryFloorPercent: clamshellBatteryFloor,
+            proactiveFanControl: clamshellProactiveFan
+        )
+        if enabled { lastClamshellAbort = nil }
+        Task {
+            let reply = await Task.detached { FanStore.send(.setClamshell(cfg)) }.value
+            busy = false
+            handle(reply, failure: L10n.shared.fanCommandFailed)
+            scheduleTimer()
+        }
+    }
+
+    private func syncClamshellConfig() {
+        guard helper == .ready, !helperNeedsUpdate else { return }
+        let cfg = currentClamshellConfig
+        Task {
+            let reply = await Task.detached { FanStore.send(.setClamshell(cfg)) }.value
+            handle(reply, failure: nil)
+        }
+    }
+
+    func dismissClamshellAbort() {
+        lastClamshellAbort = nil
+        guard helper == .ready, !helperNeedsUpdate else { return }
+        Task {
+            _ = await Task.detached { FanStore.send(.clearClamshellAbort) }.value
+        }
     }
 
     func apply(_ r: FanRequest) {
@@ -122,7 +202,7 @@ final class FanStore: ObservableObject {
 
     private func beat() {
         // Only ping while something is held; idle Pharos shouldn't touch the helper.
-        let cmd: FanProtocol.Command = request == .system ? .status : .heartbeat
+        let cmd: FanProtocol.Command = (request != .system || clamshellEnabled) ? .heartbeat : .status
         guard isInstalled else { if helper != .notInstalled { helper = .notInstalled }; return }
         Task {
             let reply = await Task.detached { FanStore.send(cmd) }.value
@@ -147,11 +227,21 @@ final class FanStore: ObservableObject {
         if helperVersion != reply.version { helperVersion = reply.version }
         let nextNeedsUpdate = (reply.version < FanProtocol.version)
         if helperNeedsUpdate != nextNeedsUpdate { helperNeedsUpdate = nextNeedsUpdate }
+
         let oldRequest = request
+        let oldClamshell = clamshellEnabled
         if request != reply.request { request = reply.request }
         if overheating != reply.overheating { overheating = reply.overheating }
         if unsupported != reply.unsupported { unsupported = reply.unsupported }
-        if oldRequest != request {
+        if clamshellEnabled != reply.clamshellEnabled { clamshellEnabled = reply.clamshellEnabled }
+        if sleepDisabledApplied != reply.sleepDisabledApplied { sleepDisabledApplied = reply.sleepDisabledApplied }
+
+        if let abort = reply.clamshellAbort, abort != lastClamshellAbort {
+            lastClamshellAbort = abort
+            Notifier.shared.notifyClamshellAbort(abort)
+        }
+
+        if oldRequest != request || oldClamshell != clamshellEnabled {
             scheduleTimer()
         }
         if !reply.ok, let failure {
@@ -191,6 +281,10 @@ final class FanStore: ObservableObject {
         runAsAdmin(FanHelperInstall.uninstallScript, prompt: l10n.fanUninstallPrompt) { [weak self] error in
             if let error { self?.errorMessage = l10n.fanInstallFailed(error) }
             self?.request = .system
+            self?.clamshellEnabled = false
+            self?.sleepDisabledApplied = false
+            self?.lastClamshellAbort = nil
+            self?.scheduleTimer()
             self?.refreshState()
         }
     }

@@ -968,13 +968,74 @@ final class L10n: ObservableObject {
            : "安全措施：Pharos 退出、崩溃或 15 秒无响应时，风扇自动交还系统；睡眠唤醒后重新应用。在智能曲线模式下达 95°C 触发满速保护；固定转速模式严格锁定所选转速。"
     }
     var fanHelperNeedsUpdateNotice: String {
-        en ? "A new fan helper update is available (v2 supports dynamic curves and locked fixed RPMs)."
-           : "风扇控制核心驱动有新版本（v2 支持智能动态温控曲线与转速锁定闭环），请点击更新。"
+        en ? "A new helper update is available (adds Clamshell Agent Guard with thermal runaway protection & proactive fan control)."
+           : "核心硬件控制驱动有新版本（新增「AI Agent 盒盖清醒守护」与密闭书包高热紧急熔断保护），请点击更新。"
     }
     var fanUpdateHelper: String { en ? "Update Helper…" : "更新核心驱动…" }
     var fanHelperNeedsUpdateError: String {
-        en ? "The currently installed fan helper does not support dynamic curves. Please click 'Update Helper…' above."
-           : "当前安装的风扇核心驱动版本较低，不支持智能温控曲线。请点击上方「更新核心驱动…」。"
+        en ? "The currently installed fan helper version is outdated. Please click 'Update Helper…' above."
+           : "当前安装的核心驱动版本较低，不支持此指令。请点击上方「更新核心驱动…」。"
+    }
+
+    // MARK: - Clamshell Agent Guard
+    var clamshellTitle: String { en ? "Clamshell Agent Guard" : "盒盖运行守护" }
+    var clamshellPopoverToggle: String { en ? "Keep Awake on Lid Close" : "盒盖继续运行" }
+    var clamshellActiveBadge: String { en ? "Awake Guard Active" : "清醒守护生效中" }
+    var clamshellInactiveBadge: String { en ? "Normal Sleep" : "系统正常休眠" }
+    var clamshellIntro: String {
+        en ? "Allow background AI agents and scripts to continue running when your MacBook lid is closed without an external display."
+           : "允许在未连接外接显示器时合上 MacBook 盒盖，让内部 AI Agent 与后台脚本继续执行工作。"
+    }
+    var clamshellBagWarningTitle: String {
+        en ? "Backpack & Sealed Environment Protection"
+           : "书包与密闭空间安全警示"
+    }
+    var clamshellBagWarningBody: String {
+        en ? "Inside a closed bag without fresh airflow, fans alone cannot dissipate trapped heat. If chip temperature reaches the redline despite cooling, Pharos automatically restores sleep and puts your Mac to sleep immediately to prevent hardware damage."
+           : "在书包等无风道密闭环境中，仅靠风扇无法将积热排出，极易发生焖烧过热。开启激进风扇联动与熔断红线后，一旦结温持续触及红线，Pharos 将瞬间解除防休眠并强制系统休眠，绝不硬扛。"
+    }
+    var clamshellProactiveFanTitle: String { en ? "Proactive Fan Cooling" : "盒盖激进风扇联动" }
+    var clamshellProactiveFanDesc: String {
+        en ? "Engages cooling early at 42 °C and hits 100% speed by 80 °C while lid-closed mode is active."
+           : "盒盖运行期间提前在 42°C 介入散热，80°C 即达 100% 满速，尽量避免热堆积。"
+    }
+    var clamshellThermalAbortLabel: String { en ? "Thermal Abort Redline" : "密闭高热熔断红线" }
+    func clamshellThermalAbortDesc(_ celsius: Int) -> String {
+        en ? "Force emergency sleep if sustained ≥ \(celsius) °C (or immediately at ≥ \(celsius + 4) °C)"
+           : "结温持续 ≥ \(celsius)°C（或瞬间达 \(celsius + 4)°C）时立刻切断并强制休眠"
+    }
+    var clamshellBatteryFloorLabel: String { en ? "Unplugged Battery Floor" : "离电最低保留电量" }
+    func clamshellBatteryFloorDesc(_ pct: Int) -> String {
+        en ? "Force safe sleep if battery drops to \(pct)% while unplugged"
+           : "未插电运行时，电量降至 \(pct)% 即自动解除并休眠保护电池"
+    }
+    func clamshellPopoverMeta(abortC: Int, battPct: Int, proactive: Bool) -> String {
+        if en {
+            return proactive
+                ? "Proactive fan · Abort ≥\(abortC)°C · Floor \(battPct)%"
+                : "Thermal abort ≥\(abortC)°C · Floor \(battPct)%"
+        }
+        return proactive
+            ? "激进散热 · ≥\(abortC)°C 熔断 · \(battPct)% 电量休眠"
+            : "≥\(abortC)°C 熔断 · \(battPct)% 电量休眠"
+    }
+    var clamshellNeedsHelperHint: String {
+        en ? "Requires hardware helper" : "需安装或更新硬件助手"
+    }
+    var clamshellAbortBannerTitle: String {
+        en ? "Clamshell Guard Emergency Sleep" : "盒盖守护已触发紧急熔断休眠"
+    }
+    func clamshellAbortThermalMsg(_ celsius: Int) -> String {
+        en ? "Chip temperature hit \(celsius)°C (possible sealed/backpack environment). Sleep was restored and forced immediately to protect hardware."
+           : "检测到芯片结温达到 \(celsius)°C（疑处于书包等密闭环境），已立刻恢复睡眠策略并强制休眠，成功保护硬件安全。"
+    }
+    func clamshellAbortBatteryMsg(_ pct: Int) -> String {
+        en ? "Unplugged battery dropped to \(pct)%. Clamshell keep-awake aborted and Mac went to sleep safely."
+           : "离电模式下电池电量降至 \(pct)%，已自动解除盒盖常亮并进入安全休眠。"
+    }
+    var clamshellAbortHeartbeatMsg: String {
+        en ? "Pharos exited or paused; hardware helper restored normal macOS lid-close sleep."
+           : "Pharos 主程序退出或无响应，硬件助手已自动恢复系统正常盒盖休眠。"
     }
 
     // MARK: - Customize popover

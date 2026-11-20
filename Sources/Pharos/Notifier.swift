@@ -335,12 +335,41 @@ final class Notifier: NSObject, ObservableObject, UNUserNotificationCenterDelega
             dismissedInAppAlertIDs.remove("disk")
         }
 
+        // 5. Clamshell Guard Emergency Abort
+        if let abort = FanStore.shared.lastClamshellAbort {
+            let id = "clamshell-abort"
+            if !dismissedInAppAlertIDs.contains(id) {
+                let sub: String
+                switch abort {
+                case .thermalRunaway(let c):
+                    sub = l10n.clamshellAbortThermalMsg(Int(c.rounded()))
+                case .lowBattery(let p):
+                    sub = l10n.clamshellAbortBatteryMsg(p)
+                case .heartbeatTimeout:
+                    sub = l10n.clamshellAbortHeartbeatMsg
+                }
+                current.append(ActiveAlertBanner(
+                    id: id,
+                    icon: "flame.fill",
+                    title: l10n.clamshellAbortBannerTitle,
+                    subtitle: sub,
+                    level: .critical,
+                    targetItem: .thermals
+                ))
+            }
+        } else {
+            dismissedInAppAlertIDs.remove("clamshell-abort")
+        }
+
         self.activeInAppAlerts = current
     }
 
     func dismissInAppAlert(id: String) {
         dismissedInAppAlertIDs.insert(id)
         activeInAppAlerts.removeAll { $0.id == id }
+        if id == "clamshell-abort" {
+            FanStore.shared.dismissClamshellAbort()
+        }
     }
 
     // MARK: - Delivery
@@ -403,6 +432,30 @@ final class Notifier: NSObject, ObservableObject, UNUserNotificationCenterDelega
         }
 
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "update:\(version)", content: content, trigger: nil))
+    }
+
+    public func notifyClamshellAbort(_ reason: ClamshellAbortReason) {
+        evaluate()
+        guard !denied else { return }
+        guard Bundle.main.bundleIdentifier != nil, Bundle.main.bundleURL.pathExtension == "app" else { return }
+
+        let l10n = L10n.shared
+        let content = UNMutableNotificationContent()
+        content.title = l10n.clamshellAbortBannerTitle
+        switch reason {
+        case .thermalRunaway(let c):
+            content.body = l10n.clamshellAbortThermalMsg(Int(c.rounded()))
+        case .lowBattery(let p):
+            content.body = l10n.clamshellAbortBatteryMsg(p)
+        case .heartbeatTimeout:
+            content.body = l10n.clamshellAbortHeartbeatMsg
+        }
+        content.sound = .default
+        if #available(macOS 12.0, *) {
+            content.interruptionLevel = .timeSensitive
+        }
+
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "thermal:clamshell-abort", content: content, trigger: nil))
     }
 
     public func sendTestNotification() {
