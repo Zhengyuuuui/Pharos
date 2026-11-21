@@ -194,3 +194,268 @@ struct FanControlStatusLine: View {
         }
     }
 }
+
+/// Compact one-click toggle row in the menu-bar popover for Clamshell Agent Guard.
+struct PopoverClamshellControlRow: View {
+    @ObservedObject private var fan = FanStore.shared
+    @ObservedObject private var l10n = L10n.shared
+
+    private var helperReady: Bool {
+        fan.helper == .ready && !fan.helperNeedsUpdate
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: fan.clamshellEnabled ? "shield.lefthalf.filled" : "laptopcomputer")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(fan.clamshellEnabled ? PharosColor.accent : .secondary)
+
+                Text(l10n.clamshellPopoverToggle)
+                    .font(.system(size: 11, weight: .medium))
+
+                Spacer()
+
+                if helperReady {
+                    Toggle("", isOn: Binding(
+                        get: { fan.clamshellEnabled },
+                        set: { fan.setClamshell(enabled: $0) }
+                    ))
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .labelsHidden()
+                    .disabled(fan.busy)
+                } else {
+                    Button {
+                        AppDelegate.shared?.showMainWindow(selecting: .thermals)
+                    } label: {
+                        Text(l10n.clamshellNeedsHelperHint)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(PharosColor.warning)
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+
+            if fan.clamshellEnabled {
+                Text(l10n.clamshellPopoverMeta(
+                    abortC: Int(fan.clamshellThermalAbort.rounded()),
+                    battPct: fan.clamshellBatteryFloor,
+                    proactive: fan.clamshellProactiveFan
+                ))
+                .font(.system(size: 10).monospacedDigit())
+                .foregroundStyle(PharosColor.success)
+                .padding(.leading, 17)
+            }
+
+            if let abort = fan.lastClamshellAbort {
+                Button {
+                    AppDelegate.shared?.showMainWindow(selecting: .thermals)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 10))
+                        Text(abortSummary(abort))
+                            .font(.system(size: 10, weight: .medium))
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                    }
+                    .foregroundStyle(PharosColor.error)
+                }
+                .buttonStyle(.borderless)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(fan.clamshellEnabled ? PharosColor.accent.opacity(0.08) : PharosColor.fill.opacity(0.35))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .stroke(fan.clamshellEnabled ? PharosColor.accent.opacity(0.28) : Color.clear, lineWidth: 1)
+        )
+    }
+
+    private func abortSummary(_ abort: ClamshellAbortReason) -> String {
+        switch abort {
+        case .thermalRunaway(let c):
+            return l10n.clamshellAbortThermalMsg(Int(c.rounded()))
+        case .lowBattery(let p):
+            return l10n.clamshellAbortBatteryMsg(p)
+        case .heartbeatTimeout:
+            return l10n.clamshellAbortHeartbeatMsg
+        }
+    }
+}
+
+/// Main Thermals page card: toggle Clamshell Agent Guard & configure sealed-bag thermal redline + battery floor.
+struct ClamshellGuardCard: View {
+    @ObservedObject private var fan = FanStore.shared
+    @ObservedObject private var l10n = L10n.shared
+
+    private let thermalChoices: [Int] = [80, 82, 84, 86, 88, 90]
+    private let batteryChoices: [Int] = [10, 15, 20, 30]
+
+    private var helperReady: Bool {
+        fan.helper == .ready && !fan.helperNeedsUpdate
+    }
+
+    var body: some View {
+        PharosCard {
+            VStack(alignment: .leading, spacing: PharosSpacing.m) {
+                HStack(spacing: PharosSpacing.s) {
+                    Label(l10n.clamshellTitle, systemImage: fan.clamshellEnabled ? "shield.lefthalf.filled" : "laptopcomputer")
+                        .font(PharosFont.rowLabel)
+
+                    if fan.clamshellEnabled {
+                        PharosStatusIndicator(
+                            level: .normal,
+                            text: l10n.clamshellActiveBadge
+                        )
+                    } else {
+                        HStack(spacing: PharosSpacing.xs + 1) {
+                            Image(systemName: "moon.zzz")
+                                .foregroundStyle(PharosColor.textTertiary)
+                            Text(l10n.clamshellInactiveBadge)
+                                .foregroundStyle(PharosColor.textSecondary)
+                        }
+                        .font(PharosFont.caption)
+                        .padding(.horizontal, PharosSpacing.s + 2)
+                        .padding(.vertical, PharosSpacing.xs)
+                        .background(Capsule().fill(PharosColor.fill))
+                    }
+
+                    Spacer()
+
+                    if helperReady {
+                        Toggle("", isOn: Binding(
+                            get: { fan.clamshellEnabled },
+                            set: { fan.setClamshell(enabled: $0) }
+                        ))
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                        .disabled(fan.busy)
+                    } else if fan.helper == .notInstalled {
+                        Button(l10n.fanInstall) { fan.install() }
+                            .buttonStyle(.pharosPrimary)
+                            .controlSize(.small)
+                            .disabled(fan.busy)
+                    } else if fan.helperNeedsUpdate {
+                        Button(l10n.fanUpdateHelper) { fan.install() }
+                            .buttonStyle(.pharosPrimary)
+                            .controlSize(.small)
+                            .disabled(fan.busy)
+                    }
+                }
+
+                Text(l10n.clamshellIntro)
+                    .font(PharosFont.caption)
+                    .foregroundStyle(PharosColor.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let abort = fan.lastClamshellAbort {
+                    PharosBanner(kind: .error, text: abortMessage(abort)) {
+                        IconButton(systemImage: "xmark", help: l10n.dismiss) {
+                            fan.dismissClamshellAbort()
+                        }
+                    }
+                }
+
+                // Backpack / sealed container thermal suffocation safeguard explanation
+                HStack(alignment: .top, spacing: PharosSpacing.s) {
+                    Image(systemName: "flame.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(PharosColor.warning)
+                        .frame(width: 18)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(l10n.clamshellBagWarningTitle)
+                            .font(.system(size: 12, weight: .semibold))
+                        Text(l10n.clamshellBagWarningBody)
+                            .font(PharosFont.caption)
+                            .foregroundStyle(PharosColor.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(PharosSpacing.s)
+                .background(
+                    RoundedRectangle(cornerRadius: PharosRadius.small, style: .continuous)
+                        .fill(PharosColor.warning.opacity(0.08))
+                )
+
+                Divider()
+
+                // Safety controls
+                VStack(alignment: .leading, spacing: PharosSpacing.s) {
+                    Toggle(isOn: $fan.clamshellProactiveFan) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(l10n.clamshellProactiveFanTitle)
+                                .font(.system(size: 12.5, weight: .medium))
+                            Text(l10n.clamshellProactiveFanDesc)
+                                .font(PharosFont.caption)
+                                .foregroundStyle(PharosColor.textSecondary)
+                        }
+                    }
+                    .toggleStyle(.switch)
+
+                    HStack(alignment: .center) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(l10n.clamshellThermalAbortLabel)
+                                .font(.system(size: 12.5, weight: .medium))
+                            Text(l10n.clamshellThermalAbortDesc(Int(fan.clamshellThermalAbort.rounded())))
+                                .font(PharosFont.caption)
+                                .foregroundStyle(PharosColor.textSecondary)
+                        }
+                        Spacer()
+                        Picker("", selection: Binding(
+                            get: { Int(fan.clamshellThermalAbort.rounded()) },
+                            set: { fan.clamshellThermalAbort = Double($0) }
+                        )) {
+                            ForEach(thermalChoices, id: \.self) { deg in
+                                Text("\(deg)°C").tag(deg)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 90)
+                    }
+
+                    HStack(alignment: .center) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(l10n.clamshellBatteryFloorLabel)
+                                .font(.system(size: 12.5, weight: .medium))
+                            Text(l10n.clamshellBatteryFloorDesc(fan.clamshellBatteryFloor))
+                                .font(PharosFont.caption)
+                                .foregroundStyle(PharosColor.textSecondary)
+                        }
+                        Spacer()
+                        Picker("", selection: $fan.clamshellBatteryFloor) {
+                            ForEach(batteryChoices, id: \.self) { pct in
+                                Text("\(pct)%").tag(pct)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 90)
+                    }
+                }
+            }
+        }
+        .onAppear {
+            fan.viewAppeared()
+            fan.refreshState()
+        }
+        .onDisappear {
+            fan.viewDisappeared()
+        }
+    }
+
+    private func abortMessage(_ abort: ClamshellAbortReason) -> String {
+        switch abort {
+        case .thermalRunaway(let c):
+            return l10n.clamshellAbortThermalMsg(Int(c.rounded()))
+        case .lowBattery(let p):
+            return l10n.clamshellAbortBatteryMsg(p)
+        case .heartbeatTimeout:
+            return l10n.clamshellAbortHeartbeatMsg
+        }
+    }
+}

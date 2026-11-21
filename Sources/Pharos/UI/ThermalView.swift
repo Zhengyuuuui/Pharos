@@ -71,6 +71,10 @@ struct PopoverThermalSection: View {
                     }
                 }
                 FanControlStatusLine()
+                if FanStore.shared.clamshellEnabled || FanStore.shared.lastClamshellAbort != nil {
+                    PopoverClamshellControlRow()
+                }
+                PopoverClamshellControlRow()
             }
         }
     }
@@ -112,6 +116,8 @@ struct ThermalView: View {
 
                 FanControlCard()
 
+                ClamshellGuardCard()
+
                 PharosSection(title: l10n.temperaturesTitle, systemImage: "thermometer.medium") {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: PharosSpacing.m)], spacing: PharosSpacing.m) {
                         ForEach(SensorGroup.allCases, id: \.self) { g in
@@ -124,6 +130,8 @@ struct ThermalView: View {
 
                 ThermalDiagnosticsSection()
             } else {
+                ClamshellGuardCard()
+
                 ThermalDiagnosticsSection()
 
                 PharosCard {
